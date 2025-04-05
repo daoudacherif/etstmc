@@ -264,7 +264,7 @@
 
 <!-- Header -->
 <header>
-  <div class="navbar-brand">Gesetstmc </div>
+  <div class="navbar-brand">GESCOMETSTMC </div>
   <nav>
     <ul>
       <li><a href="#features">Caractéristiques</a></li>
