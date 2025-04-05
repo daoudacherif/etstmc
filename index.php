@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-    <title>Italal - Aluminium & Matériaux de Construction</title>
+    <title>Gesetstmc - Aluminium & Matériaux de Construction</title>
     <meta name="description"
           content="Italal est une entreprise spécialisée dans l'importation et la vente de matériaux de construction en aluminium en République de Guinée." />
 
@@ -264,7 +264,7 @@
 
 <!-- Header -->
 <header>
-  <div class="navbar-brand">Italalu</div>
+  <div class="navbar-brand">Gesetstmc </div>
   <nav>
     <ul>
       <li><a href="#features">Caractéristiques</a></li>
