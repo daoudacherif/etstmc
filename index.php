@@ -81,39 +81,36 @@
 
         .btn-hero:hover, .btn-pricing:hover { background-color: #ca6702; }
 
-        .section-title {
-            font-size: 2rem;
-            color: #005f73;
-            margin-bottom: 2rem;
-            text-align: center;
-            position: relative;
-        }
+   /* From Uiverse.io by barisdogansutcu */ 
+button {
+  padding: 17px 40px;
+  border-radius: 50px;
+  cursor: pointer;
+  border: 0;
+  background-color: white;
+  box-shadow: rgb(0 0 0 / 5%) 0 0 8px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-size: 15px;
+  transition: all 0.5s ease;
+}
 
-        .section-title::after {
-            content: "";
-            width: 60px;
-            height: 3px;
-            background: #0a9396;
-            display: block;
-            margin: 8px auto;
-        }
+button:hover {
+  letter-spacing: 3px;
+  background-color: hsl(261deg 80% 48%);
+  color: hsl(0, 0%, 100%);
+  box-shadow: rgb(93 24 220) 0px 7px 29px 0px;
+}
 
-        .feature-card, .pricing-card {
-            background-color: #fff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            padding: 1.5rem;
-            transition: transform 0.3s ease;
-        }
+button:active {
+  letter-spacing: 3px;
+  background-color: hsl(261deg 80% 48%);
+  color: hsl(0, 0%, 100%);
+  box-shadow: rgb(93 24 220) 0px 0px 0px 0px;
+  transform: translateY(10px);
+  transition: 100ms;
+}
 
-        .feature-card:hover, .pricing-card:hover { transform: translateY(-10px); }
-
-        footer {
-            background: #005f73;
-            color: #fff;
-            text-align: center;
-            padding: 1.5rem 0;
-        }
     </style>
 </head>
 
@@ -129,11 +126,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="#features">Caractéristiques</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#pricing">Tarifs</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#blog">Blog</a></li>
-                    <li class="nav-item"><a class="nav-link" href="admin/login.php">Connexion</a></li>
+                    <li class="nav-item"><a class="nav-link button" href="admin/login.php">Connexion</a></li>
                 </ul>
             </div>
         </div>
