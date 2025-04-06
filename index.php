@@ -97,7 +97,7 @@
 
 .button:hover {
   letter-spacing: 3px;
-  background-color: hsl(261deg 80% 48%);
+  background-color:  #0a9396;
   color: hsl(0, 0%, 100%);
   box-shadow: rgb(93 24 220) 0px 7px 29px 0px;
 }
@@ -126,7 +126,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="button" href="admin/login.php">Connexion</a></li>
+                    <li class="nav-item "><a class="nav-link button" href="admin/login.php">Connexion</a></li>
                 </ul>
             </div>
         </div>
