@@ -82,7 +82,7 @@
         .btn-hero:hover, .btn-pricing:hover { background-color: #ca6702; }
 
    /* From Uiverse.io by barisdogansutcu */ 
-button {
+.button {
   padding: 17px 40px;
   border-radius: 50px;
   cursor: pointer;
@@ -95,14 +95,14 @@ button {
   transition: all 0.5s ease;
 }
 
-button:hover {
+.button:hover {
   letter-spacing: 3px;
   background-color: hsl(261deg 80% 48%);
   color: hsl(0, 0%, 100%);
   box-shadow: rgb(93 24 220) 0px 7px 29px 0px;
 }
 
-button:active {
+.button:active {
   letter-spacing: 3px;
   background-color: hsl(261deg 80% 48%);
   color: hsl(0, 0%, 100%);
