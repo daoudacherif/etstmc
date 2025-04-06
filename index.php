@@ -45,7 +45,7 @@
 
         .navbar-brand:hover { transform: scale(1.1); }
 
-        .nav-link { color: #fff !important; }
+        .nav-link { color:  #0a9396 !important; }
 
         .hero {
             min-height: 90vh;
@@ -99,7 +99,7 @@
   letter-spacing: 3px;
   background-color:  #0a9396;
   color: hsl(0, 0%, 100%);
-  box-shadow: rgb(93 24 220) 0px 7px 29px 0px;
+  box-shadow:rgb(69, 225, 228) 0px 7px 29px 0px;
 }
 
 .button:active {
