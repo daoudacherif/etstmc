@@ -3,28 +3,65 @@ session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
+// =======================================================
+// 0) SMS Function: Send SMS via Nimba SMS API
+// =======================================================
+function sendSmsNotification($to, $message) {
+    $url = "https://api.nimbasms.com/v1/messages";
+    $apiKey = "YOUR_NIMBA_SMS_API_KEY"; // Replace with your actual Nimba SMS API key
+
+    $postData = json_encode([
+        "to"      => $to,
+        "message" => $message
+    ]);
+
+    $headers = [
+        "Authorization: Bearer $apiKey",
+        "Content-Type: application/json"
+    ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode == 201) {
+        return true; // SMS sent successfully
+    } else {
+        error_log("Failed to send SMS. Response: $response");
+        return false;
+    }
+}
+
+// =======================================================
 // Vérifier si l'admin est connecté
+// =======================================================
 if (strlen($_SESSION['imsaid'] == 0)) {
   header('location:logout.php');
   exit;
 }
 
-// ==========================
-// 0) Préparer la liste de tous les produits pour le <datalist>
-// ==========================
+// =======================================================
+// 1) Préparer la liste de tous les produits pour le <datalist>
+// =======================================================
 $allProdQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName ASC");
 $productNames = [];
 while ($rowProd = mysqli_fetch_assoc($allProdQuery)) {
   $productNames[] = $rowProd['ProductName'];
 }
 
-// ==========================
-// 1) Ajouter un produit au panier
-// ==========================
+// =======================================================
+// 2) Ajouter un produit au panier
+// =======================================================
 if (isset($_POST['addtocart'])) {
   $productId = intval($_POST['productid']);
   $quantity  = intval($_POST['quantity']);
-  $price     = floatval($_POST['price']);  // <-- prix saisi manuellement
+  $price     = floatval($_POST['price']);  // prix saisi manuellement
 
   if ($quantity <= 0)  $quantity = 1;
   if ($price    < 0)  $price    = 0;
@@ -60,9 +97,9 @@ if (isset($_POST['addtocart'])) {
   exit;
 }
 
-// ==========================
-// 2) Retirer un produit du panier
-// ==========================
+// =======================================================
+// 3) Retirer un produit du panier
+// =======================================================
 if (isset($_GET['delid'])) {
   $rid = intval($_GET['delid']);
   mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
@@ -71,9 +108,9 @@ if (isset($_GET['delid'])) {
   exit;
 }
 
-// ==========================
-// 3) Gérer la remise (discount) en session
-// ==========================
+// =======================================================
+// 4) Gérer la remise (discount) en session
+// =======================================================
 if (isset($_POST['applyDiscount'])) {
   $_SESSION['discount'] = floatval($_POST['discount']);
   echo "<script>window.location.href='cart.php'</script>";
@@ -81,9 +118,9 @@ if (isset($_POST['applyDiscount'])) {
 }
 $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 
-// ==========================
-// 4) Validation du panier (checkout) & création de facture
-// ==========================
+// =======================================================
+// 5) Validation du panier (checkout) & création de facture
+// =======================================================
 if (isset($_POST['submit'])) {
   $custname      = $_POST['customername'];
   $custmobilenum = $_POST['mobilenumber'];
@@ -130,7 +167,18 @@ if (isset($_POST['submit'])) {
     $_SESSION['invoiceid'] = $billingnum;
     unset($_SESSION['discount']); // on réinitialise la remise
 
-    echo "<script>alert('Facture créée avec succès. Numéro : $billingnum');</script>";
+    // Préparer les détails du SMS
+    // Assurez-vous que le numéro de téléphone est au format international (ex: "+221776543210")
+    $customerPhone = $custmobilenum;
+    $smsMessage = "Dear $custname, your order (Invoice No: $billingnum) has been successfully placed. Thank you for shopping with us.";
+
+    // Envoyer la notification SMS
+    if (sendSmsNotification($customerPhone, $smsMessage)) {
+      echo "<script>alert('Facture créée avec succès. Numéro : $billingnum. SMS envoyé.');</script>";
+    } else {
+      echo "<script>alert('Facture créée avec succès. Numéro : $billingnum. Échec de l\'envoi du SMS.');</script>";
+    }
+
     echo "<script>window.location.href='invoice.php'</script>";
     exit;
   } else {
@@ -178,7 +226,6 @@ if (isset($_POST['submit'])) {
             <?php
             // Générer <option> pour chaque nom de produit
             foreach ($productNames as $pname) {
-              // Sécuriser l'affichage avec htmlspecialchars
               echo '<option value="' . htmlspecialchars($pname) . '"></option>';
             }
             ?>
