@@ -8,7 +8,7 @@ include('includes/dbconnection.php');
 // =======================================================
 function sendSmsNotification($to, $message) {
     $url = "https://api.nimbasms.com/v1/messages";
-    $apiKey = "YOUR_NIMBA_SMS_API_KEY"; // Replace with your actual Nimba SMS API key
+    $apiKey = "1608e90e20415c7edf0226bf86e7effd"; // Replace with your actual Nimba SMS API key
 
     $postData = json_encode([
         "to"      => $to,
