@@ -4,46 +4,45 @@ error_reporting(0);
 include('includes/dbconnection.php');
 
 // =======================================================
-// 0) SMS Function: Send SMS via Nimba SMS API
+// 0) SMS Function: Send SMS via Nimba SMS API using HTTP Basic Auth
 // =======================================================
 function sendSmsNotification($to, $message) {
     $url = "https://api.nimbasms.com/v1/messages";
     
-    // Define your credentials as provided in the API docs
-    $service_id    = "1608e90e20415c7edf0226bf86e7effd"; // Your service_id
-    $secret_token  = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg";  // Replace with your actual secret_token
-
-    // Create the base64-encoded authentication string
-    $authString = base64_encode($service_id . ":" . $secret_token);
+    // Replace with your actual credentials
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";  // Your service_id
+    $secret_token  = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg";                   // Your secret_token
     
-    // Prepare data in JSON format
+    // Create the Basic authentication string: base64(service_id:secret_token)
+    $authCredentials = base64_encode($service_id . ":" . $secret_token);
+    
+    // Prepare the JSON data to send (you might need to adjust the keys according to the API documentation)
     $postData = json_encode([
         "to"      => $to,
         "message" => $message
     ]);
-
-    // Set the Authorization header according to API docs ("Basic" authentication)
+    
     $headers = [
-        "Authorization: Basic $authString",
+        "Authorization: Basic $authCredentials",
         "Content-Type: application/json"
     ];
-
-    // Initialize cURL session
+    
+    // Initialize cURL session and set options
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
+    
     // Execute the request
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    // Capture any cURL errors
+    
+    // Check for cURL errors
     $curlError = curl_errno($ch) ? curl_error($ch) : "None";
     curl_close($ch);
-
-    // Check if SMS was sent successfully (HTTP 201 code indicates success)
+    
+    // The API documentation indicates that a success should return HTTP 201
     if ($httpCode == 201) {
         return true;
     } else {
@@ -137,10 +136,10 @@ $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 // =======================================================
 if (isset($_POST['submit'])) {
   $custname      = $_POST['customername'];
-  $custmobilenum = $_POST['mobilenumber']; // Saisie du client pour le numéro de mobile
+  $custmobilenum = $_POST['mobilenumber']; // Numéro de mobile saisi par le client
   $modepayment   = $_POST['modepayment'];
 
-  // Recalculer le total du panier
+  // Calculer le total du panier
   $cartQuery = mysqli_query($con, "
     SELECT ProductQty, Price 
     FROM tblcart
@@ -181,8 +180,9 @@ if (isset($_POST['submit'])) {
     $_SESSION['invoiceid'] = $billingnum;
     unset($_SESSION['discount']); // Réinitialisation de la remise
 
-    // Préparer les détails du SMS
-    $customerPhone = $custmobilenum; // Assurez-vous que le numéro est au format international (ex: "+221...")
+    // Préparer le SMS
+    // Assurez-vous que $custmobilenum est au format international (ex: "+221787368793")
+    $customerPhone = $custmobilenum;
     $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
 
     // Envoyer le SMS
@@ -229,19 +229,14 @@ if (isset($_POST['submit'])) {
       <div class="span12">
         <form method="get" action="cart.php" class="form-inline">
           <label>Rechercher des produits :</label>
-          <!-- Champ de saisie relié à une datalist -->
           <input type="text" name="searchTerm" class="span3" placeholder="Nom du produit..." list="productsList" />
-
-          <!-- La datalist contenant tous les noms de produits -->
           <datalist id="productsList">
             <?php
-            // Générer une option pour chaque produit
             foreach ($productNames as $pname) {
               echo '<option value="' . htmlspecialchars($pname) . '"></option>';
             }
             ?>
           </datalist>
-
           <button type="submit" class="btn btn-primary">Rechercher</button>
         </form>
       </div>
@@ -263,7 +258,7 @@ if (isset($_POST['submit'])) {
       ";
       $res = mysqli_query($con, $sql);
       $count = mysqli_num_rows($res);
-      ?>
+    ?>
       <div class="row-fluid">
         <div class="span12">
           <h4>Résultats de recherche pour "<em><?php echo htmlentities($searchTerm); ?></em>"</h4>
@@ -285,9 +280,9 @@ if (isset($_POST['submit'])) {
               </thead>
               <tbody>
                 <?php
-                $i=1;
+                $i = 1;
                 while ($row = mysqli_fetch_assoc($res)) {
-                  ?>
+                ?>
                   <tr>
                     <td><?php echo $i++; ?></td>
                     <td><?php echo $row['ProductName']; ?></td>
@@ -297,7 +292,6 @@ if (isset($_POST['submit'])) {
                     <td><?php echo $row['ModelNumber']; ?></td>
                     <td><?php echo $row['Price']; ?></td>
                     <td>
-                      <!-- Formulaire pour ajouter un produit au panier -->
                       <form method="post" action="cart.php" style="margin:0;">
                         <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
                         <input type="number" name="price" step="any" value="<?php echo $row['Price']; ?>" style="width:80px;" />
@@ -312,7 +306,7 @@ if (isset($_POST['submit'])) {
                       </form>
                     </td>
                   </tr>
-                  <?php
+                <?php
                 }
                 ?>
               </tbody>
@@ -323,12 +317,11 @@ if (isset($_POST['submit'])) {
         </div>
       </div>
       <hr>
-    <?php } // end if searchTerm ?>
+    <?php } ?>
 
     <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
     <div class="row-fluid">
       <div class="span12">
-        <!-- Formulaire pour la remise -->
         <form method="post" class="form-inline" style="text-align:right;">
           <label>Remise :</label>
           <input type="number" name="discount" step="any" value="<?php echo $discount; ?>" style="width:80px;" />
@@ -390,7 +383,7 @@ if (isset($_POST['submit'])) {
               </thead>
               <tbody>
                 <?php
-                // Récupération des articles du panier (IsCheckOut=0)
+                // Récupérer les articles du panier (IsCheckOut=0)
                 $ret = mysqli_query($con, "
                   SELECT 
                     tblcart.ID as cid,
@@ -402,16 +395,16 @@ if (isset($_POST['submit'])) {
                   WHERE tblcart.IsCheckOut = 0
                   ORDER BY tblcart.ID ASC
                 ");
-                $cnt=1; 
-                $grandTotal=0; 
-                $num=mysqli_num_rows($ret);
-                if($num>0){
-                  while ($row=mysqli_fetch_array($ret)) {
-                    $pq    = $row['ProductQty'];
-                    $ppu   = $row['cartPrice'];
+                $cnt = 1;
+                $grandTotal = 0;
+                $num = mysqli_num_rows($ret);
+                if($num > 0){
+                  while ($row = mysqli_fetch_array($ret)) {
+                    $pq = $row['ProductQty'];
+                    $ppu = $row['cartPrice'];
                     $lineTotal = $pq * $ppu;
                     $grandTotal += $lineTotal;
-                    ?>
+                ?>
                     <tr class="gradeX">
                       <td><?php echo $cnt; ?></td>
                       <td><?php echo $row['ProductName']; ?></td>
@@ -419,19 +412,18 @@ if (isset($_POST['submit'])) {
                       <td><?php echo number_format($ppu,2); ?></td>
                       <td><?php echo number_format($lineTotal,2); ?></td>
                       <td>
-                        <a href="cart.php?delid=<?php echo $row['cid'];?>"
+                        <a href="cart.php?delid=<?php echo $row['cid']; ?>"
                            onclick="return confirm('Voulez-vous vraiment retirer cet article?');">
                            <i class="icon-trash"></i>
                         </a>
                       </td>
                     </tr>
-                    <?php
+                <?php
                     $cnt++;
                   }
-                  // Calcul et affichage du total, remise et total net
                   $netTotal = $grandTotal - $discount;
                   if ($netTotal < 0) $netTotal = 0;
-                  ?>
+                ?>
                   <tr>
                     <th colspan="4" style="text-align: right; font-weight: bold;">Total général</th>
                     <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal,2); ?></th>
@@ -444,13 +436,13 @@ if (isset($_POST['submit'])) {
                     <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total net</th>
                     <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal,2); ?></th>
                   </tr>
-                  <?php
+                <?php
                 } else {
-                  ?>
+                ?>
                   <tr>
                     <td colspan="6" style="color:red; text-align:center">Aucun article trouvé dans le panier</td>
                   </tr>
-                  <?php
+                <?php
                 }
                 ?>
               </tbody>
