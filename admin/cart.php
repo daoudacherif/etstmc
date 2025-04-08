@@ -7,44 +7,50 @@ include('includes/dbconnection.php');
 // 0) SMS Function: Send SMS via Nimba SMS API
 // =======================================================
 function sendSmsNotification($to, $message) {
-  $url = "https://api.nimbasms.com/v1/messages";
-  $apiKey = "1608e90e20415c7edf0226bf86e7effd"; // your API key
+    $url = "https://api.nimbasms.com/v1/messages";
+    
+    // Define your credentials as provided in the API docs
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd"; // Your service_id
+    $secret_token  = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg";  // Replace with your actual secret_token
 
-  $postData = json_encode([
-      "to"      => $to,
-      "message" => $message
-  ]);
+    // Create the base64-encoded authentication string
+    $authString = base64_encode($service_id . ":" . $secret_token);
+    
+    // Prepare data in JSON format
+    $postData = json_encode([
+        "to"      => $to,
+        "message" => $message
+    ]);
 
-  $headers = [
-      "Authorization: Bearer $apiKey",
-      "Content-Type: application/json"
-  ];
+    // Set the Authorization header according to API docs ("Basic" authentication)
+    $headers = [
+        "Authorization: Basic $authString",
+        "Content-Type: application/json"
+    ];
 
-  $ch = curl_init($url);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    // Initialize cURL session
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-  $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    // Execute the request
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-  // Capture any cURL errors
-  if (curl_errno($ch)) {
-      $curlError = curl_error($ch);
-  } else {
-      $curlError = "None";
-  }
-  curl_close($ch);
+    // Capture any cURL errors
+    $curlError = curl_errno($ch) ? curl_error($ch) : "None";
+    curl_close($ch);
 
-  // Log detailed error information if SMS not sent successfully
-  if ($httpCode != 201) {
-      error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
-      return false;
-  }
-  return true;
+    // Check if SMS was sent successfully (HTTP 201 code indicates success)
+    if ($httpCode == 201) {
+        return true;
+    } else {
+        error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
+        return false;
+    }
 }
-
 
 // =======================================================
 // Vérifier si l'admin est connecté
@@ -175,8 +181,8 @@ if (isset($_POST['submit'])) {
     $_SESSION['invoiceid'] = $billingnum;
     unset($_SESSION['discount']); // Réinitialisation de la remise
 
-    // Préparer les détails du SMS : assurez-vous que le numéro est au format international (ex: "+221...")
-    $customerPhone = $custmobilenum;
+    // Préparer les détails du SMS
+    $customerPhone = $custmobilenum; // Assurez-vous que le numéro est au format international (ex: "+221...")
     $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
 
     // Envoyer le SMS
@@ -339,18 +345,16 @@ if (isset($_POST['submit'])) {
             </div>
           </div>
           <div class="control-group">
-  <label class="control-label">Numéro de mobile du client :</label>
-  <div class="controls">
-    <input type="tel" 
-           class="span11" 
-           id="mobilenumber" 
-           name="mobilenumber" 
-           required 
-           pattern="^\+?[0-9]{11,16}$" 
-           placeholder="+221787368793" />
-  </div>
-</div>
-
+            <label class="control-label">Numéro de mobile du client :</label>
+            <div class="controls">
+              <input type="tel" 
+                     class="span11" 
+                     id="mobilenumber" 
+                     name="mobilenumber" 
+                     required 
+                     pattern="^\+?[0-9]{11,16}$" 
+                     placeholder="+221787368793" />
+            </div>
           </div>
           <div class="control-group">
             <label class="control-label">Mode de paiement :</label>
