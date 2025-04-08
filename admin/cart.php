@@ -7,41 +7,44 @@ include('includes/dbconnection.php');
 // 0) SMS Function: Send SMS via Nimba SMS API
 // =======================================================
 function sendSmsNotification($to, $message) {
-    $url = "https://api.nimbasms.com/v1/messages";
-    // Replace with your actual Nimba SMS API key. In this example we use the service ID (SID).
-    $apiKey = "1608e90e20415c7edf0226bf86e7effd"; 
+  $url = "https://api.nimbasms.com/v1/messages";
+  $apiKey = "1608e90e20415c7edf0226bf86e7effd"; // your API key
 
-    // Prepare data in JSON format
-    $postData = json_encode([
-        "to"      => $to,
-        "message" => $message
-    ]);
+  $postData = json_encode([
+      "to"      => $to,
+      "message" => $message
+  ]);
 
-    $headers = [
-        "Authorization: Bearer $apiKey",
-        "Content-Type: application/json"
-    ];
+  $headers = [
+      "Authorization: Bearer $apiKey",
+      "Content-Type: application/json"
+  ];
 
-    // Initialize cURL session
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-    // Execute the request
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+  $response = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    // Check if SMS was sent successfully (HTTP 201 code is a success for create)
-    if ($httpCode == 201) {
-        return true;
-    } else {
-        error_log("Failed to send SMS. Response: $response");
-        return false;
-    }
+  // Capture any cURL errors
+  if (curl_errno($ch)) {
+      $curlError = curl_error($ch);
+  } else {
+      $curlError = "None";
+  }
+  curl_close($ch);
+
+  // Log detailed error information if SMS not sent successfully
+  if ($httpCode != 201) {
+      error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
+      return false;
+  }
+  return true;
 }
+
 
 // =======================================================
 // Vérifier si l'admin est connecté
