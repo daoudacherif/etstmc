@@ -336,10 +336,18 @@ if (isset($_POST['submit'])) {
             </div>
           </div>
           <div class="control-group">
-            <label class="control-label">Numéro de mobile du client :</label>
-            <div class="controls">
-              <input type="text" class="span11" id="mobilenumber" name="mobilenumber" required maxlength="16" pattern="[0-9]+" />
-            </div>
+  <label class="control-label">Numéro de mobile du client :</label>
+  <div class="controls">
+    <input type="tel" 
+           class="span11" 
+           id="mobilenumber" 
+           name="mobilenumber" 
+           required 
+           pattern="^\+?[0-9]{11,16}$" 
+           placeholder="+221787368793" />
+  </div>
+</div>
+
           </div>
           <div class="control-group">
             <label class="control-label">Mode de paiement :</label>
