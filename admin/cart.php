@@ -338,7 +338,7 @@ if (isset($_POST['submit'])) {
           <div class="control-group">
             <label class="control-label">Numéro de mobile du client :</label>
             <div class="controls">
-              <input type="text" class="span11" id="mobilenumber" name="mobilenumber" required maxlength="10" pattern="[0-9]+" />
+              <input type="text" class="span11" id="mobilenumber" name="mobilenumber" required maxlength="16" pattern="[0-9]+" />
             </div>
           </div>
           <div class="control-group">
