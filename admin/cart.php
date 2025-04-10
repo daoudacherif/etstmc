@@ -36,7 +36,7 @@ function sendSmsNotification($to, $message) {
             "method"        => "POST",
             "header"        => implode("\r\n", $headers),
             "content"       => $postData,
-            "ignore_errors" => true
+            "ignore_errors" => false
         )
     );
     
