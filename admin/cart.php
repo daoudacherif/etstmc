@@ -7,55 +7,42 @@ include('includes/dbconnection.php');
 // 0) SMS Function: Send SMS via Nimba SMS API using HTTP Basic Auth
 // =======================================================
 function sendSmsNotification($to, $message) {
-    $url = "https://api.nimbasms.com/v1/messages";
-    
-    // Replace with your actual credentials
-    $service_id   = "1608e90e20415c7edf0226bf86e7effd";  // Your service_id
-    $secret_token = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg"; // Your secret_token
-    
-    // Create the Basic authentication string: base64(service_id:secret_token)
-    $authCredentials = base64_encode($service_id . ":" . $secret_token);
-    
-    // Prepare the JSON body data with the correct keys
-    $body = array(
-        "sender_name" => "sms 9080",   // The sender name (change if needed)
-        "to"          => array($to), // Recipient phone numbers as an array
-        "message"     => $message    // The SMS text
-    );
-    $postData = json_encode($body);
-    
-    // Prepare the headers (calculate the auth header dynamically)
-    $headers = array(
-        "Authorization: Basic $authCredentials",
-        "Content-Type: application/json"
-    );
-    
-    // Build the stream context options for a POST request
-    $options = array(
-        "http" => array(
-            "method"        => "POST",
-            "header"        => implode("\r\n", $headers),
-            "content"       => $postData,
-            "ignore_errors" => false
-        )
-    );
-    
-    $context = stream_context_create($options);
-    $response = file_get_contents($url, false, $context);
-    
-    // Parse HTTP response status code from $http_response_header
-    $http_response_header = isset($http_response_header) ? $http_response_header : array();
-    $status_line = $http_response_header[0];
-    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
-    $status_code = isset($match[1]) ? $match[1] : 0;
-    
-    if ($status_code != 201) {
-        error_log("Failed to send SMS. HTTP Code: $status_code. Response: $response");
-        echo "<script>console.log(" . json_encode(array("response" => $response, "status" => $status_code)) . ");</script>";
-        return false;
-    }
-    
-    return true;
+ $url = "https://api.nimbasms.com/v1/messages";
+
+$headers = array(
+    "Authorization: Basic Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
+    "Content-Type: application/json"
+);
+
+$body = array(
+    "to" => array($to, ),
+    "sender_name" => "SMS 9080",
+    "message" => "$message"
+);
+
+$options = array(
+    "http" => array(
+        "method" => "POST",
+        "header" => implode("\r\n",$headers),
+        "content" => json_encode($body)
+        "ignore_errors" => true
+    )
+);
+
+$context = stream_context_create($options);
+$response = file_get_contents($url, false, $context);
+
+$http_response_header = isset($http_response_header) ? $http_response_header : [];
+$status_line = $http_response_header[0];
+
+preg_match('{HTTP\/\S*\s(\d{3})', $status_line, $match);
+$status_code = $match[1];
+
+if ($status_code != 201) {
+    return "Réponse:" . $response;
+}
+
+print_r($response);
 }
 
 // =======================================================
