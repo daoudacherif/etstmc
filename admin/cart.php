@@ -10,20 +10,21 @@ function sendSmsNotification($to, $message) {
     $url = "https://api.nimbasms.com/v1/messages";
     
     // Replace with your actual credentials
-    $service_id    = "1608e90e20415c7edf0226bf86e7effd";  // Your service_id
-    $secret_token  = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg";                   // Your secret_token
+    $service_id   = "1608e90e20415c7edf0226bf86e7effd";  // Your service_id
+    $secret_token = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg"; // Your secret_token
     
     // Create the Basic authentication string: base64(service_id:secret_token)
     $authCredentials = base64_encode($service_id . ":" . $secret_token);
     
-    // Prepare the JSON data to send (you might need to adjust the keys according to the API documentation)
+    // Prepare the JSON data to send
     $postData = json_encode([
         "to"      => $to,
         "message" => $message
     ]);
     
+    // Use the computed authCredentials in the header
     $headers = [
-        "Authorization: Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
+        "Authorization: Basic $authCredentials",
         "Content-Type: application/json"
     ];
     
@@ -33,22 +34,28 @@ function sendSmsNotification($to, $message) {
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    // Enable verbose output (this writes to stderr or the error log)
+    curl_setopt($ch, CURLOPT_VERBOSE, true);
     
     // Execute the request
     $response = curl_exec($ch);
+    if ($response === false) {
+        $curlError = curl_error($ch);
+        error_log("cURL error: $curlError");
+    }
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-    
-    // Check for cURL errors
-    $curlError = curl_errno($ch) ? curl_error($ch) : "None";
     curl_close($ch);
     
-    // The API documentation indicates that a success should return HTTP 201
+    // Expecting a 201 response on success
     if ($httpCode == 201) {
         return true;
     } else {
-        error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
-        echo "<script>console.log({response: $response, status: $httpCode, error: $curlError})</script>";
+        $errorData = [
+            "response" => $response,
+            "status"   => $httpCode
+        ];
+        error_log("Failed to send SMS. " . print_r($errorData, true));
+        echo "<script>console.log(" . json_encode($errorData) . ");</script>";
         return false;
     }
 }
