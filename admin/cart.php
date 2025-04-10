@@ -7,43 +7,45 @@ include('includes/dbconnection.php');
 // 0) SMS Function: Send SMS via Nimba SMS API using HTTP Basic Auth
 // =======================================================
 function sendSmsNotification($to, $message) {
- $url = "https://api.nimbasms.com/v1/messages";
-
-$headers = array(
-    "Authorization: Basic Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
-    "Content-Type: application/json"
-);
-
-$body = array(
-    "to" => array($to, ),
-    "sender_name" => "SMS 9080",
-    "message" => "$message"
-);
-
-$options = array(
-    "http" => array(
-        "method" => "POST",
-        "header" => implode("\r\n",$headers),
-        "content" => json_encode($body)
-        "ignore_errors" => true
-    )
-);
-
-$context = stream_context_create($options);
-$response = file_get_contents($url, false, $context);
-
-$http_response_header = isset($http_response_header) ? $http_response_header : [];
-$status_line = $http_response_header[0];
-
-preg_match('{HTTP\/\S*\s(\d{3})', $status_line, $match);
-$status_code = $match[1];
-
-if ($status_code != 201) {
-    return "Réponse:" . $response;
+    $url = "https://api.nimbasms.com/v1/messages";
+    
+    $headers = array(
+        "Authorization: Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
+        "Content-Type: application/json"
+    );
+    
+    $body = array(
+        "to"          => array($to),
+        "sender_name" => "SMS 9080",
+        "message"     => $message
+    );
+    
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => json_encode($body),
+            "ignore_errors" => true
+        )
+    );
+    
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+    
+    // Get HTTP status from response headers
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    if ($status_code != 201) {
+        return "Réponse:" . $response;
+    }
+    
+    print_r($response);
 }
 
-print_r($response);
-}
 
 // =======================================================
 // Vérifier si l'admin est connecté
