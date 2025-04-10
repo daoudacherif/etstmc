@@ -18,7 +18,7 @@ function sendSmsNotification($to, $message) {
     
     // Prepare the JSON body data with the correct keys
     $body = array(
-        "sender_name" => "Etstmc",   // The sender name (change if needed)
+        "sender_name" => "sms 9080",   // The sender name (change if needed)
         "to"          => array($to), // Recipient phone numbers as an array
         "message"     => $message    // The SMS text
     );
