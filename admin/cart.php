@@ -16,48 +16,46 @@ function sendSmsNotification($to, $message) {
     // Create the Basic authentication string: base64(service_id:secret_token)
     $authCredentials = base64_encode($service_id . ":" . $secret_token);
     
-    // Prepare the JSON data to send
-    $postData = json_encode([
-        "to"      => $to,
-        "message" => $message
-    ]);
+    // Prepare the JSON body data with the correct keys
+    $body = array(
+        "sender_name" => "Etstmc",   // The sender name (change if needed)
+        "to"          => array($to), // Recipient phone numbers as an array
+        "message"     => $message    // The SMS text
+    );
+    $postData = json_encode($body);
     
-    // Use the computed authCredentials in the header
-    $headers = [
+    // Prepare the headers (calculate the auth header dynamically)
+    $headers = array(
         "Authorization: Basic $authCredentials",
         "Content-Type: application/json"
-    ];
+    );
     
-    // Initialize cURL session and set options
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    // Enable verbose output (this writes to stderr or the error log)
-    curl_setopt($ch, CURLOPT_VERBOSE, true);
+    // Build the stream context options for a POST request
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => $postData,
+            "ignore_errors" => true
+        )
+    );
     
-    // Execute the request
-    $response = curl_exec($ch);
-    if ($response === false) {
-        $curlError = curl_error($ch);
-        error_log("cURL error: $curlError");
-    }
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
     
-    // Expecting a 201 response on success
-    if ($httpCode == 201) {
-        return true;
-    } else {
-        $errorData = [
-            "response" => $response,
-            "status"   => $httpCode
-        ];
-        error_log("Failed to send SMS. " . print_r($errorData, true));
-        echo "<script>console.log(" . json_encode($errorData) . ");</script>";
+    // Parse HTTP response status code from $http_response_header
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    if ($status_code != 201) {
+        error_log("Failed to send SMS. HTTP Code: $status_code. Response: $response");
+        echo "<script>console.log(" . json_encode(array("response" => $response, "status" => $status_code)) . ");</script>";
         return false;
     }
+    
+    return true;
 }
 
 // =======================================================
@@ -95,6 +93,7 @@ if (isset($_POST['addtocart'])) {
     WHERE ProductId='$productId' AND IsCheckOut=0 
     LIMIT 1
   ");
+  
   if (mysqli_num_rows($checkCart) > 0) {
     // Mise à jour de la quantité
     $row    = mysqli_fetch_assoc($checkCart);
@@ -126,7 +125,7 @@ if (isset($_GET['delid'])) {
   $rid = intval($_GET['delid']);
   mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
   echo "<script>alert('Produit retiré du panier');</script>";
-  echo "<script>window.location.href = 'cart.php'</script>";
+  echo "<script>window.location.href='cart.php'</script>";
   exit;
 }
 
