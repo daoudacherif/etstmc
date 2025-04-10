@@ -32,19 +32,22 @@ function sendSmsNotification($to, $message) {
     $context = stream_context_create($options);
     $response = file_get_contents($url, false, $context);
     
-    // Get HTTP status from response headers
     $http_response_header = isset($http_response_header) ? $http_response_header : array();
     $status_line = $http_response_header[0];
-    
     preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
     $status_code = isset($match[1]) ? $match[1] : 0;
     
+    // Log the full response so you can check for message IDs or errors.
+    error_log("SMS API Response: " . print_r($response, true));
+    
     if ($status_code != 201) {
-        return "Réponse:" . $response;
+        error_log("Failed to send SMS. HTTP Code: $status_code. Response: $response");
+        return $response;
     }
     
-    print_r($response);
+    return $response;
 }
+
 
 
 // =======================================================
