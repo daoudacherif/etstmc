@@ -23,7 +23,7 @@ function sendSmsNotification($to, $message) {
     ]);
     
     $headers = [
-        "Authorization: Basic $authCredentials",
+        "Authorization: Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
         "Content-Type: application/json"
     ];
     
@@ -37,6 +37,8 @@ function sendSmsNotification($to, $message) {
     // Execute the request
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    echo "<script>console.log({response: $response, status: $httpCode})</script>";
     
     // Check for cURL errors
     $curlError = curl_errno($ch) ? curl_error($ch) : "None";
