@@ -41,7 +41,6 @@ function sendSmsNotification($to, $message) {
     
     // Check for cURL errors
     $curlError = curl_errno($ch) ? curl_error($ch) : "None";
-    echo "<script>console.log({response: $response, status: $httpCode, error: $curlError})</script>";
     curl_close($ch);
     
     // The API documentation indicates that a success should return HTTP 201
@@ -49,6 +48,7 @@ function sendSmsNotification($to, $message) {
         return true;
     } else {
         error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
+        echo "<script>console.log({response: $response, status: $httpCode, error: $curlError})</script>";
         return false;
     }
 }
