@@ -51,7 +51,7 @@ function getAccessToken() {
  */
 function sendSmsNotification($to, $message) {
     // Remplacez senderAddress par votre identifiant expéditeur enregistré auprès d'Orange (format "tel:+221XXXXXXXX")
-    $senderAddress = "tel:+22112345678"; // Exemple de senderAddress, modifiez-le selon vos données.
+    $senderAddress = "tel:+221787368793"; // Exemple de senderAddress, modifiez-le selon vos données.
     
     // L'URL d'envoi inclut le senderAddress
     $url = "https://api.orange.com/smsmessaging/v1/outbound/" . urlencode($senderAddress) . "/requests";
