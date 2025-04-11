@@ -9,47 +9,46 @@ include('includes/dbconnection.php');
 function sendSmsNotification($to, $message) {
     $url = "https://api.nimbasms.com/v1/messages";
     
-    // Replace with your actual credentials
-    $service_id    = "1608e90e20415c7edf0226bf86e7effd";  // Your service_id
-    $secret_token  = "4Up9v9s_Wzo6kjkhyE4qT4q3sRJoRIJs5YB0DmhUVXZP8eKemnSuVOgBzrRLMfOwp5tlt5aw2mh7DtuMJ2Y9uNGHmaDCrRKDnXjLap4bCcg";                   // Your secret_token
-    
-    // Create the Basic authentication string: base64(service_id:secret_token)
-    $authCredentials = base64_encode($service_id . ":" . $secret_token);
-    
-    // Prepare the JSON data to send (you might need to adjust the keys according to the API documentation)
-    $postData = json_encode([
-        "to"      => $to,
-        "message" => $message
-    ]);
-    
-    $headers = [
-        "Authorization: Basic $authCredentials",
+    $headers = array(
+        "Authorization: Basic MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c=",
         "Content-Type: application/json"
-    ];
+    );
     
-    // Initialize cURL session and set options
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    $body = array(
+        "to"          => array($to),
+        "sender_name" => "SMS 9080",
+        "message"     => $message
+    );
     
-    // Execute the request
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => json_encode($body),
+            "ignore_errors" => true
+        )
+    );
     
-    // Check for cURL errors
-    $curlError = curl_errno($ch) ? curl_error($ch) : "None";
-    curl_close($ch);
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
     
-    // The API documentation indicates that a success should return HTTP 201
-    if ($httpCode == 201) {
-        return true;
-    } else {
-        error_log("Failed to send SMS. HTTP Code: $httpCode. cURL Error: $curlError. Response: $response");
-        return false;
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    // Log the full response so you can check for message IDs or errors.
+    error_log("SMS API Response: " . print_r($response, true));
+    
+    if ($status_code != 201) {
+        error_log("Failed to send SMS. HTTP Code: $status_code. Response: $response");
+        return $response;
     }
+    
+    return $response;
 }
+
+
 
 // =======================================================
 // Vérifier si l'admin est connecté
@@ -86,6 +85,7 @@ if (isset($_POST['addtocart'])) {
     WHERE ProductId='$productId' AND IsCheckOut=0 
     LIMIT 1
   ");
+  
   if (mysqli_num_rows($checkCart) > 0) {
     // Mise à jour de la quantité
     $row    = mysqli_fetch_assoc($checkCart);
@@ -117,7 +117,7 @@ if (isset($_GET['delid'])) {
   $rid = intval($_GET['delid']);
   mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
   echo "<script>alert('Produit retiré du panier');</script>";
-  echo "<script>window.location.href = 'cart.php'</script>";
+  echo "<script>window.location.href='cart.php'</script>";
   exit;
 }
 
