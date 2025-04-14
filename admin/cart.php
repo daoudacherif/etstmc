@@ -378,9 +378,9 @@ if (isset($_POST['submit'])) {
                                    id="mobilenumber"
                                    name="mobilenumber"
                                    required
-                                   pattern="^\+221[0-9]{9}$"
+                                   pattern="^\+224[0-9]{9}$"
                                    placeholder="+221787368793"
-                                   title="Format: +221 suivi de 9 chiffres">
+                                   title="Format: +224 suivi de 9 chiffres">
                         </div>
                     </div>
                     <div class="control-group">
