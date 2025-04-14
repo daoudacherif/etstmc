@@ -4,16 +4,16 @@ error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
 /**
- * 1. Fonction pour obtenir le token d'accès OAuth2 d'Orange via cURL.
+ * 1. Fonction pour obtenir le token d'accès OAuth2 de Nimba via cURL.
  */
 function getAccessToken() {
-    $url = "https://api.orange.com/oauth/v3/token";
+    $url = "https://api.nimbasms.com/v1/oauth/token"; // Vérifiez l'URL selon votre documentation Nimba.
     
-    // Identifiants Orange (vérifiez qu'ils sont exacts et actifs)
-    $client_id = "kwKdtG7tzc26fW37QTg3qxivib3mDv71";
-    $client_secret = "8UEqTlKIXRLnJru6NMHa8uBmouQU9x9x1A4KzCounl2W";
-    
-    // Calculer les identifiants en Base64
+    // Vérifiez que ces informations sont exactes et actives
+    $client_id = "1608e90e20415c7edf0226bf86e7effd";      // Exemple: "1608e90e20415c7edf0226bf86e7effd"
+    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";  // Exemple: "4Up9v9s_Wzo6kj..."
+
+    // Calcul de l'authentification de base en encodant "client_id:client_secret"
     $credentials = base64_encode($client_id . ":" . $client_secret);
     
     $headers = array(
@@ -25,69 +25,67 @@ function getAccessToken() {
         "grant_type" => "client_credentials"
     ));
     
-    // Utilisation de cURL pour plus de fiabilité
+    // Utilisation de cURL pour effectuer la requête POST
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // À n'utiliser qu'en développement !
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // À utiliser en dev seulement
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    
     if ($response === FALSE) {
         $error = curl_error($ch);
-        error_log("Erreur cURL: " . $error);
+        error_log("Erreur cURL lors de l'obtention du token: " . $error);
         curl_close($ch);
         return false;
     }
-    curl_close($ch);
     
-    if ($httpCode != 200) { // Le token est généralement renvoyé avec un code 200
+    curl_close($ch);
+
+    if ($httpCode != 200) {
         error_log("Erreur lors de la récupération du token d'accès. Code HTTP: $httpCode. Réponse: $response");
         return false;
     }
     
     $decoded = json_decode($response, true);
     if (!isset($decoded['access_token'])) {
-        error_log("Erreur Orange API (token): " . print_r($decoded, true));
+        error_log("Erreur API (token): " . print_r($decoded, true));
         return false;
     }
     return $decoded['access_token'];
 }
 
 /**
- * 2. Fonction pour envoyer un SMS via l'API SMS d'Orange.
+ * 2. Fonction pour envoyer un SMS via l'API Nimba.
  */
 function sendSmsNotification($to, $message) {
-    // Vérifiez que senderAddress est correctement enregistré chez Orange
-    $senderAddress = "tel:+221787368793"; // Exemple : remplacez par votre numéro expéditeur autorisé
+    // URL de l'API d'envoi de SMS (vérifiez l'URL selon votre documentation Nimba)
+    $url = "https://api.nimbasms.com/v1/messages";
     
-    // URL d'envoi incluant le senderAddress
-    $url = "https://api.orange.com/smsmessaging/v1/outbound/" . urlencode($senderAddress) . "/requests";
+    // Vérifiez que ces informations sont exactes et actives
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";     // Exemple: "1608e90e20415c7edf0226bf86e7effd"
+    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";   // Exemple: "4Up9v9s_Wzo6kj..."
     
-    $accessToken = getAccessToken();
-    if (!$accessToken) {
-        return false;
-    }
+    // Calcul de l'authentification de base
+    $authString = base64_encode($service_id . ":" . $secret_token);
     
-    // Préparation du corps de la requête conformément à la doc d'Orange
-    $body = array(
-        "outboundSMSMessageRequest" => array(
-            "address" => "tel:" . $to,
-            "senderAddress" => $senderAddress,
-            "outboundSMSTextMessage" => array(
-                "message" => $message
-            )
-        )
-    );
-    $postData = json_encode($body);
+    // Préparez le corps de la requête avec le format requis par l'API Nimba
+    // Ici, on peut inclure aussi "sender_name" si nécessaire
+    $postData = json_encode(array(
+        "to"          => array($to),
+        "message"     => $message,
+        "sender_name" => "SMS 9080"  // Remplacez par le sender_name autorisé auprès de Nimba
+    ));
     
     $headers = array(
-        "Authorization: Bearer " . $accessToken,
+        "Authorization: Basic " . $authString,
         "Content-Type: application/json"
     );
     
+    // Nous utilisons file_get_contents avec un contexte HTTP, vous pouvez également passer en cURL
     $options = array(
         "http" => array(
             "method"        => "POST",
@@ -100,10 +98,10 @@ function sendSmsNotification($to, $message) {
     $context = stream_context_create($options);
     $response = file_get_contents($url, false, $context);
     
-    // Journaliser la réponse complète pour debug
+    // Journaliser la réponse complète pour debugging
     error_log("Réponse API SMS: " . $response);
     
-    // Récupérer le code HTTP dans les en-têtes de réponse
+    // Récupération du code HTTP depuis les en-têtes de réponse
     $http_response_header = isset($http_response_header) ? $http_response_header : array();
     $status_line = $http_response_header[0];
     preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
@@ -121,8 +119,8 @@ function sendSmsNotification($to, $message) {
  * Reste du code de gestion du panier et du checkout
  */
 
-// Vérifiez que l'admin est connecté
-if (strlen($_SESSION['imsaid'] == 0)) {
+// Vérifier si l'admin est connecté
+if (strlen($_SESSION['imsaid']) == 0) {
     header('location:logout.php');
     exit;
 }
@@ -147,8 +145,9 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
-    // Vérifier si le produit est déjà dans le panier
+    // Vérifier si ce produit est déjà dans le panier
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
+    
     if (mysqli_num_rows($checkCart) > 0) {
         // Mise à jour de la quantité
         $row = mysqli_fetch_assoc($checkCart);
@@ -185,7 +184,7 @@ $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 // 5) Validation du panier (checkout) & création de facture
 if (isset($_POST['submit'])) {
     $custname = $_POST['customername'];
-    $custmobilenum = $_POST['mobilenumber']; // Le numéro de mobile saisi (doit respecter le format)
+    $custmobilenum = $_POST['mobilenumber']; // Le numéro de mobile saisi par le client (doit être au format +221xxxxxxxxx)
     $modepayment = $_POST['modepayment'];
     
     // Calculer le total du panier
@@ -217,7 +216,7 @@ if (isset($_POST['submit'])) {
         $customerPhone = $custmobilenum; // Assurez-vous qu'il est au format international, ex: "+221787368793"
         $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
         
-        // Envoyer le SMS via l'API d'Orange
+        // Envoyer le SMS via l'API Nimba
         $smsResult = sendSmsNotification($customerPhone, $smsMessage);
         if ($smsResult === true) {
             $smsMsg = "SMS envoyé avec succès";
@@ -227,7 +226,7 @@ if (isset($_POST['submit'])) {
         
         echo "<script>
             alert('Facture créée. Numéro : $billingnum\\n$smsMsg');
-            window.location.href='invoice.php'
+            window.location.href='invoice.php';
         </script>";
         exit;
     } else {
