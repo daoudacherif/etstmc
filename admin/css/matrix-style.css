@@ -1271,319 +1271,421 @@ form {
 	list-style:none;
 	position:relative;
 }
-/* Responsive design */
-@media (max-width: 480px) {
-#header h1 {
-	top: 10px; left:5px;
-	margin: 3px auto;
-}
-#user-nav {
-	position: relative;
-	left: auto;
-	right: auto;
-	width: 100%;
-	margin-top: -31px;
-	border-top:1px solid #363E48;
-	margin-bottom: 0px;
-	background:#2E363F;
-	float:right;
-}
-.navbar > .nav {
-	float: none;
-}
-#my_menu {
-	display:none;
-}
-#my_menu_input {
-	display:block;
-}
-#user-nav > ul {
-	right: 0px;
-	margin-left:20%!important;
-	margin-top:0px;
-	width:100%;
-	background:#000;
-	position: relative;
-}
-#user-nav > ul > li {
-	padding:0px 0px;
-}
-#user-nav > ul > li > a {
-	padding:5px 10px;
-}
-#sidebar .content{ display:none;}
-#content {
-	margin-left: 0 !important;
-	border-top-left-radius: 0;
-	margin-top:0px;
-}
-#content-header {
-	margin-top: 0;
-	text-align: center;
-}
-#content-header h1, #content-header .btn-group {
-	float: none;
-}
-#content-header h1 {
-	display: block;
-	text-align: center;
-	margin-left: auto;
-	margin-top: 0;
-	padding-top: 15px;
-	width: 100%;
-}
-#content-header .btn-group {
-	margin-top: 70px;
-	margin-bottom: 0;
-	margin-right: 0;
-	left: 30%;
-}
-#sidebar {
-	float: none;
-	width: 100% !important;
-	display:block;
-	position:relative;
-	top:0px;
-}
-#sidebar > ul {
-	margin:0px;
-	padding:0px;
-	width:100%;
-	display:block;
-	z-index:999;
-	position:relative
-}
-#sidebar > ul > li {
-	list-style-type:none;
-	display:block;
-	border-top:1px solid #41BEDD;
-	float:none !important;
-	margin:0px;
-	position:relative;
-	padding:2px 10px;
-	cursor:pointer
-}
-#sidebar > ul > li:hover ul {
-	display:none;
-}
-#sidebar > ul > li:hover {
-	background-color:#27a9e3;
-}
-#sidebar > ul > li:hover a {
-	background:none;
-}
-#sidebar > ul li ul {
-	margin:0px;
-	padding:0px;
-	top:35px; left:0px;
-	z-index:999;
-	display:none;
-	position:absolute;
-	width:100%;
-	min-width:100%;
-	border-radius:none;
-}
-#sidebar > ul li ul li {
-	list-style-type:none;
-	margin:0px;
-	font-size:12px;
-	line-height:30px;
-}
-#sidebar > ul li ul li a {
-	display:block;
-	padding:5px 10px;
-	color:#fff;
-	text-decoration:none;
-	font-weight:bold;
-}
-#sidebar > ul li ul li:hover a {
-	border-radius:0px;
-}
-#sidebar > ul li span {
-	cursor:pointer;
-	margin:0px 2px 0 5px;
-	font-weight:bold;
-	color:#fff;
-	font-size:12px;
-}
-#sidebar > ul li a i {
-	background-image: url("../img/glyphicons-halflings-white.png");
-	margin-top:4px;
-	vertical-align: top;
-}
-#sidebar > a {
-	padding: 9px 20px 9px 15px;
-	display: block !important;
-	color: #eeeeee;
-	float:none !important;
-	font-size:12px;
-	font-weight:bold
-}
-#sidebar > ul > li > a {
-	padding:5px;
-	display:block;
-	color: #AAAAAA;
-}
-.widget-title .buttons > .btn {
-	width: 11px;
-	white-space: nowrap;
-	overflow: hidden;
-}
-.form-horizontal .control-label {
-	padding-left: 30px;
-}
-.form-horizontal .controls {
-	margin-left: 0;
-	padding: 10px 30px;
-}
-.form-actions {
-	text-align: center;
-}
-.panel-right2 {
-	width: 100%;
-	background-color: #fff;
-	border-right: 1px solid #dddddd;
-	position: relative;
-	left: 0;
-	overflow:auto;
-	top:0px;
-	height:87%;
-	width:100%;
-}
-.panel-left2 {
-	margin-left:0px;
-}
-.dataTables_paginate .ui-button, .pagination.alternate li a {
-	padding:4px 4px!important;
-}
-.table th {
-	padding: 5px 4px 2px;
-}
-}
- @media (min-width: 481px) and (max-width: 970px) {
-body {
-	background:#49CCED
-}
-#header h1 {
-	top:10px; left:35px;
-}
-#search {
-	top:5px
-}
-#my_menu {
-	display:none;
-}
-#my_menu_input {
-	display:block;
-}
-#content {
-	margin-top:0px;
-}
-#sidebar > ul > li {
-	float:none;
-}
-#sidebar > ul > li:hover ul {
-	display:block;
-}
-#sidebar, #sidebar > ul {
-	width: 43px;
-	display: block;
-	position: absolute;
-	height:100%;
-	z-index:1;
-}
-#sidebar > ul ul {
-	display: none;
-	position: absolute;
-	left:43px;
-	top: 0;
-	min-width: 150px;
-	list-style: none;
-}
-#sidebar > ul ul li a {
-	white-space: nowrap;
-	padding: 10px 25px;
-}
-#sidebar > ul ul:before {
-	border-top: 7px solid transparent;
-	border-bottom: 7px solid transparent;
-	content: "";
-	display: inline-block;
-	left: -6px;
-	position: absolute;
-	top: 11px;
-}
-#sidebar > ul ul:after {
-	content: "";
-	display: inline-block;
-	left: -5px;
-	position: absolute;
-	top: 12px;
-}
-#sidebar > a {
-	display: none !important;
-}
-#sidebar > ul > li.open.submenu > a {
-	border-bottom: none !important;
-}
-#sidebar > ul > li > a > span {
-	display: none;
-}
-#content {
-	margin-left: 43px;
-}
-#sidebar .content{ display:none;}
-}
-@media (max-width: 600px) {
-.widget-title .buttons {
-	float: left;
-}
-.panel-left {
-	margin-right: 0;
-}
-.panel-right {
-	border-top: 1px solid #DDDDDD;
-	border-left: none;
-	position: relative;
-	top: auto;
-	right: auto;
-	height: auto;
-	width: auto;
-}
-#sidebar .content{ display:none;}
-}
-@media (max-width: 767px) {
-body {
-	padding: 0 !important;
-}
-.container-fluid {
-	padding-left: 20px;
-	padding-right: 20px;
-}
-#search {
-	display: none;
-}
-#user-nav > ul > li > a > span.text {
-	display: none;
-}
-#sidebar .content{ display:none;}
-}
-@media (min-width: 768px) and (max-width: 979px) {
- [class*="span"], .row-fluid [class*="span"] {
- display: block;
- float: none;
- margin-left: 0;
- width: auto;
-}
-}
-@media (max-width: 979px) {
-div.dataTables_wrapper .ui-widget-header {
-	height: 68px;
-}
-.dataTables_filter{ position:relative; top:0px;}
-.dataTables_length{ width:100%; text-align:center;}
-.dataTables_filter, .dataTables_paginate {
-	text-align: center;
-}
-#sidebar .content{ display:none;}
-}
+/***************************************************************
+ * Default/Global Styles (applies to all screen sizes)
+ * Place any global resets or default styles here if needed
+ **************************************************************/
+
+/* Example global resets or simplifications:
+body, html {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+*/
+
+/***************************************************************
+ * Mobile-first approach typically starts with the smallest screen
+ * Here we specifically focus on phone sizes up to 480px
+ ***************************************************************/
+ @media (max-width: 480px) {
+
+	/* Header & Top Navigation */
+	#header {
+	  width: 100%;
+	  position: relative;
+	}
+  
+	#header h1 {
+	  position: relative;
+	  top: 10px;
+	  left: 5px;
+	  margin: 3px auto;
+	  font-size: 18px; /* Adjust as needed */
+	}
+  
+	#user-nav {
+	  position: relative;
+	  width: 100%;
+	  margin-top: 0;
+	  margin-bottom: 0;
+	  border-top: 1px solid #363E48;
+	  background: #2E363F;
+	  text-align: center; /* Helps center nav items for phone */
+	}
+  
+	/* The default .navbar > .nav float can break on narrow screens */
+	.navbar > .nav {
+	  float: none;
+	}
+  
+	/* Optionally hide a large menu, show a button to toggle it */
+	#my_menu {
+	  display: none; /* Hide the large menu on phone */
+	}
+  
+	#my_menu_input {
+	  display: block; /* Show a condensed/hamburger menu icon/input */
+	}
+  
+	/* Make sure user-nav items stack or center properly */
+	#user-nav > ul {
+	  position: relative;
+	  margin: 0;
+	  width: 100%;
+	  background: #000;
+	  text-align: left; /* or center, depending on style preference */
+	}
+  
+	#user-nav > ul > li {
+	  display: block;
+	  padding: 0;
+	  border-bottom: 1px solid #363E48;
+	}
+  
+	#user-nav > ul > li > a {
+	  display: block;
+	  padding: 5px 10px;
+	}
+  
+	/* Sidebar & Content */
+	#sidebar {
+	  position: relative;
+	  width: 100% !important;
+	  float: none;
+	  top: 0;
+	  margin: 0 auto;
+	  display: block;
+	  background: #2E363F; /* or keep original color */
+	}
+  
+	#sidebar .content {
+	  display: none; /* Hide or collapse full sidebar content on phone */
+	}
+  
+	#sidebar > ul {
+	  margin: 0;
+	  padding: 0;
+	  width: 100%;
+	  display: block;
+	  position: relative;
+	  z-index: 999;
+	}
+  
+	#sidebar > ul > li {
+	  list-style-type: none;
+	  display: block;
+	  border-top: 1px solid #41BEDD;
+	  float: none !important;
+	  margin: 0;
+	  padding: 2px 10px;
+	  cursor: pointer;
+	}
+  
+	#sidebar > ul > li:hover ul {
+	  display: none; /* Or turn into a dropdown if desired */
+	}
+  
+	#sidebar > ul > li:hover {
+	  background-color: #27a9e3;
+	}
+  
+	#sidebar > ul li ul {
+	  display: none;
+	  position: absolute;
+	  width: 100%;
+	  left: 0;
+	  top: 35px;
+	  margin: 0;
+	  padding: 0;
+	  z-index: 999;
+	}
+  
+	#sidebar > ul li ul li {
+	  list-style-type: none;
+	  margin: 0;
+	  font-size: 12px;
+	  line-height: 30px;
+	}
+  
+	/* Sidebar toggles, icons, etc. */
+	#sidebar > ul li span {
+	  cursor: pointer;
+	  margin: 0 2px 0 5px;
+	  font-weight: bold;
+	  font-size: 12px;
+	}
+  
+	#sidebar > ul li a i {
+	  margin-top: 4px;
+	  vertical-align: top;
+	}
+  
+	#sidebar > a {
+	  padding: 9px 20px 9px 15px;
+	  display: block !important;
+	  color: #eeeeee;
+	  font-size: 12px;
+	  font-weight: bold;
+	  float: none !important;
+	}
+  
+	#sidebar > ul > li > a {
+	  padding: 5px;
+	  display: block;
+	  color: #AAAAAA;
+	}
+  
+	/* Main Content area */
+	#content {
+	  margin-left: 0 !important;
+	  margin-top: 0;
+	  border-top-left-radius: 0;
+	  /* If you want spacing above the content, add some margin or padding here. */
+	}
+  
+	#content-header {
+	  margin-top: 0;
+	  text-align: center;
+	}
+  
+	#content-header h1,
+	#content-header .btn-group {
+	  float: none;
+	  display: block;
+	  text-align: center;
+	}
+  
+	#content-header h1 {
+	  margin-left: auto;
+	  margin-top: 0;
+	  padding-top: 15px;
+	  width: 100%;
+	  font-size: 18px; /* Adjust as needed */
+	}
+  
+	#content-header .btn-group {
+	  margin-top: 70px;
+	  margin-bottom: 0;
+	  margin-right: 0;
+	  left: 30%;
+	}
+  
+	/* Widgets, forms, tables, etc. */
+	.widget-title .buttons > .btn {
+	  width: auto; /* Instead of 11px if you need more space on phone */
+	  white-space: nowrap;
+	  overflow: hidden;
+	}
+  
+	.form-horizontal .control-label {
+	  padding-left: 30px;
+	}
+  
+	.form-horizontal .controls {
+	  margin-left: 0;
+	  padding: 10px 30px;
+	}
+  
+	.form-actions {
+	  text-align: center;
+	}
+  
+	.panel-right2 {
+	  width: 100%;
+	  background-color: #fff;
+	  border-right: 1px solid #dddddd;
+	  position: relative;
+	  left: 0;
+	  top: 0;
+	  height: auto; /* Let it adapt to content on phone */
+	  overflow: auto;
+	}
+  
+	.panel-left2 {
+	  margin-left: 0;
+	}
+  
+	/* DataTables or pagination classes if you use them */
+	.dataTables_paginate .ui-button, 
+	.pagination.alternate li a {
+	  padding: 4px 4px !important;
+	}
+  
+	.table th {
+	  padding: 5px 4px 2px;
+	}
+  }
+  
+  /***************************************************************
+   * Tablet Breakpoints (481px to 600px, 601px to 767px, etc.)
+   * Keep or remove as needed. Here is an example for 481px–970px 
+   ***************************************************************/
+  @media (min-width: 481px) and (max-width: 970px) {
+	body {
+	  background: #49CCED;
+	}
+	#header h1 {
+	  top: 10px;
+	  left: 35px;
+	}
+	#search {
+	  top: 5px;
+	}
+	#my_menu {
+	  display: none;
+	}
+	#my_menu_input {
+	  display: block;
+	}
+  
+	#content {
+	  margin-top: 0px;
+	}
+  
+	/* Collapsed Sidebar approach */
+	#sidebar, #sidebar > ul {
+	  width: 43px;
+	  display: block;
+	  position: absolute;
+	  height: 100%;
+	  z-index: 1;
+	}
+  
+	#sidebar > ul > li {
+	  float: none;
+	}
+  
+	#sidebar > ul > li:hover ul {
+	  display: block;
+	}
+  
+	/* Submenu slides out on hover */
+	#sidebar > ul ul {
+	  display: none;
+	  position: absolute;
+	  left: 43px;
+	  top: 0;
+	  min-width: 150px;
+	  list-style: none;
+	}
+  
+	#sidebar > ul ul li a {
+	  white-space: nowrap;
+	  padding: 10px 25px;
+	}
+  
+	#sidebar > ul ul:before,
+	#sidebar > ul ul:after {
+	  content: "";
+	  display: inline-block;
+	  position: absolute;
+	  left: -6px;
+	  top: 11px;
+	  border-top: 7px solid transparent;
+	  border-bottom: 7px solid transparent;
+	}
+	/* Adjust #sidebar > ul ul:after if you want a different arrow style */
+  
+	#sidebar > a {
+	  display: none !important;
+	}
+  
+	#sidebar > ul > li.open.submenu > a {
+	  border-bottom: none !important;
+	}
+  
+	#sidebar > ul > li > a > span {
+	  display: none;
+	}
+  
+	#content {
+	  margin-left: 43px;
+	}
+  
+	#sidebar .content {
+	  display: none;
+	}
+  }
+  
+  /* Additional breakpoints for narrower tablets or small devices */
+  @media (max-width: 600px) {
+	.widget-title .buttons {
+	  float: left;
+	}
+  
+	.panel-left {
+	  margin-right: 0;
+	}
+  
+	.panel-right {
+	  border-top: 1px solid #DDDDDD;
+	  border-left: none;
+	  position: relative;
+	  top: auto;
+	  right: auto;
+	  height: auto;
+	  width: auto;
+	}
+  
+	#sidebar .content {
+	  display: none;
+	}
+  }
+  
+  @media (max-width: 767px) {
+	body {
+	  padding: 0 !important;
+	}
+  
+	.container-fluid {
+	  padding-left: 20px;
+	  padding-right: 20px;
+	}
+  
+	#search {
+	  display: none;
+	}
+  
+	#user-nav > ul > li > a > span.text {
+	  display: none;
+	}
+  
+	#sidebar .content {
+	  display: none;
+	}
+  }
+  
+  /* For the 768px to 979px range */
+  @media (min-width: 768px) and (max-width: 979px) {
+	[class*="span"],
+	.row-fluid [class*="span"] {
+	  display: block;
+	  float: none;
+	  margin-left: 0;
+	  width: auto;
+	}
+  }
+  
+  /* For under 979px (common for many tablets or smaller desktops) */
+  @media (max-width: 979px) {
+	div.dataTables_wrapper .ui-widget-header {
+	  height: 68px;
+	}
+	.dataTables_filter {
+	  position: relative;
+	  top: 0px;
+	}
+	.dataTables_length {
+	  width: 100%;
+	  text-align: center;
+	}
+	.dataTables_filter,
+	.dataTables_paginate {
+	  text-align: center;
+	}
+	#sidebar .content {
+	  display: none;
+	}
+  }
+  
