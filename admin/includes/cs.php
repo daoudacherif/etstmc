@@ -9,3 +9,4 @@
 <link rel="stylesheet" href="css/jquery.gritter.css" />
 <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700,800' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="css/font-awesome.min.css" />
+<link rel="stylesheet" href="css/responsive.css" />

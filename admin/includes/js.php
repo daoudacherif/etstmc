@@ -43,4 +43,14 @@
 function resetMenu() {
    document.gomenu.selector.selectedIndex = 2;
 }
+document.getElementById('my_menu_input').addEventListener('click', function () {
+  var nav = document.getElementById('user-nav');
+  nav.classList.toggle('active');
+});
+document.addEventListener('click', function (event) {
+  var nav = document.getElementById('user-nav');
+  if (!nav.contains(event.target)) {
+    nav.classList.remove('active');
+  }
+});
 </script>
