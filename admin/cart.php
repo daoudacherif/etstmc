@@ -379,7 +379,7 @@ if (isset($_POST['submit'])) {
                                    name="mobilenumber"
                                    required
                                    pattern="^\+224[0-9]{9}$"
-                                   placeholder="+221787368793"
+                                   placeholder="+224xxxxxxxxx"
                                    title="Format: +224 suivi de 9 chiffres">
                         </div>
                     </div>
