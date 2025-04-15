@@ -1,4 +1,5 @@
 <!--Header-part-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <div id="header">
   <h2 style="padding-top: 20px;padding-left: 10px"><a href="dashboard.php"><strong style="color: red">IMS Admin</strong></a></h2>
 </div>
