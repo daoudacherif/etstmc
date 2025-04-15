@@ -4,164 +4,163 @@ error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
 /**
- * Fonction pour envoyer un SMS via l'API Nimba.
- * Cette fonction utilise une requête POST en JSON avec authentification Basic.
+ * Function to obtain the OAuth2 access token from Nimba using cURL.
  */
 function getAccessToken() {
-  $url = "https://api.nimbasms.com/v1/oauth/token"; // Vérifiez l'URL selon votre documentation Nimba.
-  
-  // Vérifiez que ces informations sont exactes et actives
-  $client_id = "1608e90e20415c7edf0226bf86e7effd";      // Exemple: "1608e90e20415c7edf0226bf86e7effd"
-  $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";  // Exemple: "4Up9v9s_Wzo6kj..."
-
-  // Calcul de l'authentification de base en encodant "client_id:client_secret"
-  $credentials = base64_encode($client_id . ":" . $client_secret);
-  
-  $headers = array(
-      "Authorization: Basic " . $credentials,
-      "Content-Type: application/x-www-form-urlencoded"
-  );
-  
-  $postData = http_build_query(array(
-      "grant_type" => "client_credentials"
-  ));
-  
-  // Utilisation de cURL pour effectuer la requête POST
-  $ch = curl_init();
-  curl_setopt($ch, CURLOPT_URL, $url);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // À utiliser en dev seulement
-  $response = curl_exec($ch);
-  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  
-  if ($response === FALSE) {
-      $error = curl_error($ch);
-      error_log("Erreur cURL lors de l'obtention du token: " . $error);
-      curl_close($ch);
-      return false;
-  }
-  
-  curl_close($ch);
-
-  if ($httpCode != 200) {
-      error_log("Erreur lors de la récupération du token d'accès. Code HTTP: $httpCode. Réponse: $response");
-      return false;
-  }
-  
-  $decoded = json_decode($response, true);
-  if (!isset($decoded['access_token'])) {
-      error_log("Erreur API (token): " . print_r($decoded, true));
-      return false;
-  }
-  return $decoded['access_token'];
+    $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
+    
+    // Replace with your real credentials
+    $client_id     = "1608e90e20415c7edf0226bf86e7effd";      
+    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
+    
+    // Encode the credentials in Base64 ("client_id:client_secret")
+    $credentials = base64_encode($client_id . ":" . $client_secret);
+    
+    $headers = array(
+        "Authorization: Basic " . $credentials,
+        "Content-Type: application/x-www-form-urlencoded"
+    );
+    
+    $postData = http_build_query(array(
+        "grant_type" => "client_credentials"
+    ));
+    
+    // Use cURL for the POST request
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // For development only!
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    
+    if ($response === FALSE) {
+        $error = curl_error($ch);
+        error_log("cURL error while obtaining token: " . $error);
+        curl_close($ch);
+        return false;
+    }
+    curl_close($ch);
+    
+    if ($httpCode != 200) {
+        error_log("Error obtaining access token. HTTP Code: $httpCode. Response: $response");
+        return false;
+    }
+    
+    $decoded = json_decode($response, true);
+    if (!isset($decoded['access_token'])) {
+        error_log("API error (token): " . print_r($decoded, true));
+        return false;
+    }
+    return $decoded['access_token'];
 }
 
 /**
-* 2. Fonction pour envoyer un SMS via l'API Nimba.
-*/
+ * Function to send an SMS via the Nimba API.
+ * The message content is passed via the $message parameter.
+ * The payload sent is logged so you can verify the SMS content.
+ */
 function sendSmsNotification($to, $message) {
-  // URL de l'API d'envoi de SMS (vérifiez l'URL selon votre documentation Nimba)
-  $url = "https://api.nimbasms.com/v1/messages";
-  
-  // Vérifiez que ces informations sont exactes et actives
-  $service_id    = "1608e90e20415c7edf0226bf86e7effd";     // Exemple: "1608e90e20415c7edf0226bf86e7effd"
-  $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";   // Exemple: "4Up9v9s_Wzo6kj..."
-  
-  // Calcul de l'authentification de base
-  $authString = base64_encode($service_id . ":" . $secret_token);
-  
-  // Préparez le corps de la requête avec le format requis par l'API Nimba
-  // Ici, on peut inclure aussi "sender_name" si nécessaire
-  $postData = json_encode(array(
-      "to"          => array($to),
-      "message"     => $message,
-      "sender_name" => "SMS 9080"  // Remplacez par le sender_name autorisé auprès de Nimba
-  ));
-  
-  $headers = array(
-      "Authorization: Basic " . $authString,
-      "Content-Type: application/json"
-  );
-  
-  // Nous utilisons file_get_contents avec un contexte HTTP, vous pouvez également passer en cURL
-  $options = array(
-      "http" => array(
-          "method"        => "POST",
-          "header"        => implode("\r\n", $headers),
-          "content"       => $postData,
-          "ignore_errors" => true
-      )
-  );
-  
-  $context = stream_context_create($options);
-  $response = file_get_contents($url, false, $context);
-  
-  // Journaliser la réponse complète pour debugging
-  error_log("Réponse API SMS: " . $response);
-  
-  // Récupération du code HTTP depuis les en-têtes de réponse
-  $http_response_header = isset($http_response_header) ? $http_response_header : array();
-  $status_line = $http_response_header[0];
-  preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
-  $status_code = isset($match[1]) ? $match[1] : 0;
-  
-  if ($status_code != 201) {
-      error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
-      return false;
-  }
-  
-  return true;
+    // Nimba API endpoint for sending SMS
+    $url = "https://api.nimbasms.com/v1/messages";
+    
+    // Replace with your actual service credentials (as provided by Nimba)
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";    
+    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
+    
+    // Build the Basic Auth string (Base64 of "service_id:secret_token")
+    $authString = base64_encode($service_id . ":" . $secret_token);
+    
+    // Prepare the JSON payload with recipient, message and sender_name
+    $payload = array(
+        "to"          => array($to),
+        "message"     => $message,
+        "sender_name" => "SMS 9080"   // Replace with your approved sender name with Nimba
+    );
+    $postData = json_encode($payload);
+    
+    // Log the payload for debugging (check your server error logs)
+    error_log("Nimba SMS Payload: " . $postData);
+    
+    $headers = array(
+        "Authorization: Basic " . $authString,
+        "Content-Type: application/json"
+    );
+    
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => $postData,
+            "ignore_errors" => true
+        )
+    );
+    
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+    
+    // Log complete API response for debugging
+    error_log("Nimba API SMS Response: " . $response);
+    
+    // Retrieve HTTP status code from response headers
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    if ($status_code != 201) {
+        error_log("SMS send failed. HTTP Code: $status_code. Details: " . print_r(json_decode($response, true), true));
+        return false;
+    }
+    
+    return true;
 }
 
+/* ------------------- End of SMS functions ------------------- */
 
 /**
  * Gestion du panier, remise et checkout
  */
 
-// Vérifie que l'admin est connecté
+// Verify that the admin is logged in.
 if (strlen($_SESSION['imsaid']) == 0) {
     header('location:logout.php');
     exit;
 }
 
-// ==========================
-// 0) Charger la liste de produits pour le datalist
-// ==========================
+// 0) Load product list for datalist.
 $allProdQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName ASC");
 $productNames = [];
 while ($rowProd = mysqli_fetch_assoc($allProdQuery)) {
     $productNames[] = $rowProd['ProductName'];
 }
 
-// ==========================
-// 1) Ajout au panier
-// ==========================
+// 1) Add to cart.
 if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
     $quantity  = intval($_POST['quantity']);
-    $price     = floatval($_POST['price']);  // prix saisi manuellement
-    
+    $price     = floatval($_POST['price']);  // manually entered price
+
     if ($quantity <= 0) {
         $quantity = 1;
     }
     if ($price < 0) {
         $price = 0;
     }
-  
-    // Vérifie si le produit est déjà dans le panier (IsCheckOut=0)
+
+    // Check if product is already in cart (IsCheckOut = 0)
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     if (mysqli_num_rows($checkCart) > 0) {
-        // Déjà dans le panier : on met à jour la quantité + le prix
+        // Already in cart – update quantity and price.
         $row    = mysqli_fetch_assoc($checkCart);
         $cartId = $row['ID'];
         $oldQty = $row['ProductQty'];
         $newQty = $oldQty + $quantity;
         mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='$cartId'");
     } else {
-        // Insère une nouvelle ligne
+        // Insert new line into cart.
         mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', '0')");
     }
     echo "<script>alert('Produit ajouté au panier !');</script>";
@@ -169,9 +168,7 @@ if (isset($_POST['addtocart'])) {
     exit;
 }
 
-// ==========================
-// 2) Supprimer du panier
-// ==========================
+// 2) Delete from cart.
 if (isset($_GET['delid'])) {
     $rid = intval($_GET['delid']);
     mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
@@ -180,77 +177,73 @@ if (isset($_GET['delid'])) {
     exit;
 }
 
-// ==========================
-// 3) Gestion de la remise (discount)
-// ==========================
+// 3) Apply discount.
 if (isset($_POST['applyDiscount'])) {
     $_SESSION['discount'] = floatval($_POST['discount']);
     echo "<script>window.location.href='dettecart.php'</script>";
     exit;
 }
-// Valeur par défaut si non définie
 $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 
-// ==========================
-// 4) Validation / Facturation
-// ==========================
+// 4) Checkout & Invoice creation.
 if (isset($_POST['submit'])) {
-    $custname = mysqli_real_escape_string($con, $_POST['customername']);
-    $custmobilenum = mysqli_real_escape_string($con, $_POST['mobilenumber']); // Doit être au format international, ex: "+221787368793"
-    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
+    $custname      = mysqli_real_escape_string($con, $_POST['customername']);
+    $custmobilenum = mysqli_real_escape_string($con, $_POST['mobilenumber']); // Must be in international format, e.g., "+221787368793"
+    $modepayment   = mysqli_real_escape_string($con, $_POST['modepayment']);
   
-    // Montant payé immédiatement
+    // Amount paid immediately
     $paidNow = floatval($_POST['paid']);
   
-    // Calcul du total du panier
+    // Calculate grand total from cart
     $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
     $grandTotal = 0;
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += ($row['ProductQty'] * $row['Price']);
     }
   
-    // Application de la remise
+    // Apply discount
     $netTotal = $grandTotal - $discount;
     if ($netTotal < 0) {
         $netTotal = 0;
     }
   
-    // Reste dû
+    // Remaining due amount
     $dues = $netTotal - $paidNow;
     if ($dues < 0) {
         $dues = 0;
     }
   
-    // Numéro de facture unique
+    // Generate unique invoice number
     $billingnum = mt_rand(100000000, 999999999);
   
-    // 1) On "check out" tous les items du panier
+    // 1) Set all cart items to checkout using BillingId.
     $query = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
-    // 2) On insère la facture dans tblcustomer
+    // 2) Insert invoice details into tblcustomer.
     $query .= "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
                VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues');";
   
     $result = mysqli_multi_query($con, $query);
     if ($result) {
         $_SESSION['invoiceid'] = $billingnum;
-        unset($_SESSION['discount']); // réinitialiser la remise
-        
-        // Préparer le SMS personnalisé
-        $customerPhone = $custmobilenum;  // Assurez-vous qu'il est au format international (ex: "+221787368793")
+        unset($_SESSION['discount']); // Reset discount
+      
+        // Prepare the personalized SMS:
+        // Ensure the phone number is in international format, e.g., "+221787368793"
+        $customerPhone = $custmobilenum;
         $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
-        
-        // Envoyer le SMS via l'API Nimba
+      
+        // Send SMS via Nimba API.
         $smsResult = sendSmsNotification($customerPhone, $smsMessage);
         if ($smsResult === true) {
             $smsMsg = "SMS envoyé avec succès";
         } else {
             $smsMsg = "Échec d'envoi SMS - Vérifier les logs serveur";
         }
-  
+      
         echo "<script>
-            alert('Facture créée. Numéro : $billingnum\\n$smsMsg');
-            window.location.href='dettecart.php';
-        </script>";
+                alert('Facture créée. Numéro : $billingnum\\n$smsMsg');
+                window.location.href='dettecart.php';
+              </script>";
         exit;
     } else {
         echo "<script>alert('Erreur lors de la facturation');</script>";
@@ -311,8 +304,7 @@ if (isset($_POST['submit'])) {
                     FROM tblproducts p
                     LEFT JOIN tblcategory c ON c.ID = p.CatID
                     LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
-                    WHERE (p.ProductName LIKE '%$searchTerm%' 
-                      OR p.ModelNumber LIKE '%$searchTerm%')
+                    WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
                 ";
                 $res = mysqli_query($con, $sql);
                 $count = mysqli_num_rows($res);
@@ -338,7 +330,7 @@ if (isset($_POST['submit'])) {
                                 </thead>
                                 <tbody>
                                 <?php
-                                $i=1;
+                                $i = 1;
                                 while ($row = mysqli_fetch_assoc($res)) {
                                     ?>
                                     <tr>
@@ -405,8 +397,8 @@ if (isset($_POST['submit'])) {
                                        class="span11"
                                        name="mobilenumber"
                                        required
-                                       pattern="^\+224[0-9]{9}$"
-                                       placeholder="+224XXXXXXXXX"
+                                       pattern="^\+221[0-9]{9}$"
+                                       placeholder="+221787368793"
                                        title="Format: +221 suivi de 9 chiffres">
                             </div>
                         </div>
@@ -469,8 +461,8 @@ if (isset($_POST['submit'])) {
                                     $num = mysqli_num_rows($ret);
                                     if ($num > 0) {
                                         while ($row = mysqli_fetch_array($ret)) {
-                                            $pq = $row['ProductQty'];
-                                            $ppu = $row['cartPrice'];
+                                            $pq    = $row['ProductQty'];
+                                            $ppu   = $row['cartPrice'];
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
                                             ?>
