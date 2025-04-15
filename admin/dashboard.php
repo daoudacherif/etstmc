@@ -5,11 +5,11 @@ include('includes/dbconnection.php');
 if (strlen($_SESSION['imsaid']==0)) {
   header('location:logout.php');
   } else{
-
-
-
-  ?>
+?>
 <!DOCTYPE html>
+<html lang="fr">
+<head>
+<title>Système de Gestion d'Inventaire || Tableau de Bord</title>
 <html lang="fr">
 <head>
 <title>Système de Gestion d'Inventaire || Tableau de Bord</title>
