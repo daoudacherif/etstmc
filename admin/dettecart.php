@@ -7,56 +7,113 @@ include('includes/dbconnection.php');
  * Fonction pour envoyer un SMS via l'API Nimba.
  * Cette fonction utilise une requête POST en JSON avec authentification Basic.
  */
-function sendSmsNotification($to, $message) {
-    // URL de l'API Nimba
-    $url = "https://api.nimbasms.com/v1/messages";
-    
-    // Remplacez par votre API KEY encodée en Base64 (fournie par Nimba)
-    // Exemple : "MTYwOGU5MGUyMDQxNWM3ZWRmMDIyNmJmODZlN2VmZmQ6NFVwOXY5c19Xem82a2praHlFNHFUNHEzc1JKb1JJSnM1WUIwRG1oVVZYWlA4ZUtlbW5TdVZPZ0J6clJMTWZPd3A1dGx0NWF3Mm1oN0R0dU1KMlk5dU5HSG1hRENyUktEblhqTGFwNGJDY2c="
-    $apiKey = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"; // Remplacez par votre clé API
+function getAccessToken() {
+  $url = "https://api.nimbasms.com/v1/oauth/token"; // Vérifiez l'URL selon votre documentation Nimba.
   
-    // Préparation des en-têtes (Basic Auth et Content-Type)
-    $headers = array(
-        "Authorization: Basic " . $apiKey,
-        "Content-Type: application/json"
-    );
-    
-    // Préparation du corps de la requête
-    $body = array(
-        "to"          => array($to),
-        "sender_name" => "SMS 9080",
-        "message"     => $message
-    );
-    $postData = json_encode($body);
-    
-    // Options du contexte HTTP (POST)
-    $options = array(
-        "http" => array(
-            "method"        => "POST",
-            "header"        => implode("\r\n", $headers),
-            "content"       => $postData,
-            "ignore_errors" => true
-        )
-    );
-    
-    $context = stream_context_create($options);
-    $response = file_get_contents($url, false, $context);
-    
-    // Journaliser la réponse complète pour débogage
-    error_log("Réponse API SMS: " . $response);
-    
-    // Récupération du code HTTP dans les en-têtes de réponse
-    $http_response_header = isset($http_response_header) ? $http_response_header : array();
-    $status_line = $http_response_header[0];
-    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
-    $status_code = isset($match[1]) ? $match[1] : 0;
-    
-    if ($status_code != 201) {
-        error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
-        return false;
-    }
-    
-    return true;
+  // Vérifiez que ces informations sont exactes et actives
+  $client_id = "1608e90e20415c7edf0226bf86e7effd";      // Exemple: "1608e90e20415c7edf0226bf86e7effd"
+  $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";  // Exemple: "4Up9v9s_Wzo6kj..."
+
+  // Calcul de l'authentification de base en encodant "client_id:client_secret"
+  $credentials = base64_encode($client_id . ":" . $client_secret);
+  
+  $headers = array(
+      "Authorization: Basic " . $credentials,
+      "Content-Type: application/x-www-form-urlencoded"
+  );
+  
+  $postData = http_build_query(array(
+      "grant_type" => "client_credentials"
+  ));
+  
+  // Utilisation de cURL pour effectuer la requête POST
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $url);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // À utiliser en dev seulement
+  $response = curl_exec($ch);
+  $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  
+  if ($response === FALSE) {
+      $error = curl_error($ch);
+      error_log("Erreur cURL lors de l'obtention du token: " . $error);
+      curl_close($ch);
+      return false;
+  }
+  
+  curl_close($ch);
+
+  if ($httpCode != 200) {
+      error_log("Erreur lors de la récupération du token d'accès. Code HTTP: $httpCode. Réponse: $response");
+      return false;
+  }
+  
+  $decoded = json_decode($response, true);
+  if (!isset($decoded['access_token'])) {
+      error_log("Erreur API (token): " . print_r($decoded, true));
+      return false;
+  }
+  return $decoded['access_token'];
+}
+
+/**
+* 2. Fonction pour envoyer un SMS via l'API Nimba.
+*/
+function sendSmsNotification($to, $message) {
+  // URL de l'API d'envoi de SMS (vérifiez l'URL selon votre documentation Nimba)
+  $url = "https://api.nimbasms.com/v1/messages";
+  
+  // Vérifiez que ces informations sont exactes et actives
+  $service_id    = "1608e90e20415c7edf0226bf86e7effd";     // Exemple: "1608e90e20415c7edf0226bf86e7effd"
+  $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";   // Exemple: "4Up9v9s_Wzo6kj..."
+  
+  // Calcul de l'authentification de base
+  $authString = base64_encode($service_id . ":" . $secret_token);
+  
+  // Préparez le corps de la requête avec le format requis par l'API Nimba
+  // Ici, on peut inclure aussi "sender_name" si nécessaire
+  $postData = json_encode(array(
+      "to"          => array($to),
+      "message"     => $message,
+      "sender_name" => "SMS 9080"  // Remplacez par le sender_name autorisé auprès de Nimba
+  ));
+  
+  $headers = array(
+      "Authorization: Basic " . $authString,
+      "Content-Type: application/json"
+  );
+  
+  // Nous utilisons file_get_contents avec un contexte HTTP, vous pouvez également passer en cURL
+  $options = array(
+      "http" => array(
+          "method"        => "POST",
+          "header"        => implode("\r\n", $headers),
+          "content"       => $postData,
+          "ignore_errors" => true
+      )
+  );
+  
+  $context = stream_context_create($options);
+  $response = file_get_contents($url, false, $context);
+  
+  // Journaliser la réponse complète pour debugging
+  error_log("Réponse API SMS: " . $response);
+  
+  // Récupération du code HTTP depuis les en-têtes de réponse
+  $http_response_header = isset($http_response_header) ? $http_response_header : array();
+  $status_line = $http_response_header[0];
+  preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+  $status_code = isset($match[1]) ? $match[1] : 0;
+  
+  if ($status_code != 201) {
+      error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
+      return false;
+  }
+  
+  return true;
 }
 
 
