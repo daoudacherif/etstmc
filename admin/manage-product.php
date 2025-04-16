@@ -32,8 +32,7 @@ $ret = mysqli_query($con, "
 <head>
   <title>Système de Gestion des Stocks || Gérer les Produits</title>
   <?php include_once('includes/cs.php'); ?>
-</head>
-<body>
+  <?php include_once('includes/responsive.php'); ?>
 
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>

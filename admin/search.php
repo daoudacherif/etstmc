@@ -31,8 +31,7 @@ $msg="Vous ne pouvez pas ajouter une quantité supérieure à la quantité resta
 <head>
 <title>Système de gestion des stocks || Ajouter des produits</title>
 <?php include_once('includes/cs.php');?>
-</head>
-<body>
+<?php include_once('includes/responsive.php'); ?>
 
 <?php include_once('includes/header.php');?>
 <?php include_once('includes/sidebar.php');?>

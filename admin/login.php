@@ -68,8 +68,7 @@ return true;
 } 
 
 </script>
-        </head>
-        <body>
+<?php include_once('includes/responsive.php'); ?>
                 <div id="loginbox">            
                         <form id="loginform" class="form-vertical" method="post">
                  <div class="control-group normal_text"> <h3>Inventaire</strong> <strong style="color: orange">Système</strong></h3></div>

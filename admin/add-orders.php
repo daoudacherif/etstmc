@@ -137,9 +137,7 @@ if (isset($_POST['submit'])) {
     }
   
     </style>
-</head>
-
-<body>
+ <?php include_once('includes/responsive.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">

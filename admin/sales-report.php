@@ -12,9 +12,7 @@ if (strlen($_SESSION['imsaid']==0)) {
 <head>
 <title>Système de Gestion d'Inventaire || Rapport de Ventes</title>
 <?php include_once('includes/cs.php');?>
-</head>
-<body>
-
+<?php include_once('includes/responsive.php'); ?>
 <!--Header-part-->
 <?php include_once('includes/header.php');?>
 <?php include_once('includes/sidebar.php');?>

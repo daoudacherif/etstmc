@@ -27,8 +27,7 @@ if (strlen($_SESSION['imsaid']==0)) {
 <head>
 <title>Système de gestion des stocks || Profil</title>
 <?php include_once('includes/cs.php');?>
-</head>
-<body>
+<?php include_once('includes/responsive.php'); ?>
 
 <!--Header-part-->
 <?php include_once('includes/header.php');?>

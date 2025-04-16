@@ -31,9 +31,7 @@ $status=$_POST['status'];
 <head>
 <title>Système de gestion des stocks || Mettre à jour la sous-catégorie</title>
 <?php include_once('includes/cs.php');?>
-</head>
-<body>
-
+<?php include_once('includes/responsive.php'); ?>
 <!--Header-part-->
 <?php include_once('includes/header.php');?>
 <?php include_once('includes/sidebar.php');?>

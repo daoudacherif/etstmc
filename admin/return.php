@@ -66,9 +66,7 @@ if (isset($_POST['submit'])) {
 <head>
   <title>Gestion des stocks | Retours de produits</title>
   <?php include_once('includes/cs.php'); ?>
-</head>
-<body>
-
+  <?php include_once('includes/responsive.php'); ?>
 <!-- Header + Sidebar -->
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>

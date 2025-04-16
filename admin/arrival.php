@@ -83,8 +83,9 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
 <head>
     <title>Inventory Management | Product Arrivals</title>
     <?php include_once('includes/cs.php'); ?>
-</head>
-<body>
+
+    <?php include_once('includes/responsive.php'); ?>
+
 
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>

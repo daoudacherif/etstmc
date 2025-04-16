@@ -67,8 +67,7 @@ if (isset($_POST['submit'])) {
         });
     }
     </script>
-</head>
-<body>
+<?php include_once('includes/responsive.php'); ?>
 
 <!--Header-part-->
 <?php include_once('includes/header.php'); ?>

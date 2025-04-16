@@ -12,8 +12,7 @@
 <?php include_once('includes/cs.php');
 include('includes/dbconnection.php');
 ?>
-</head>
-<body>
+<?php include_once('includes/responsive.php'); ?>
 
 <!--Partie En-Tête-->
 <?php include_once('includes/header.php');?>

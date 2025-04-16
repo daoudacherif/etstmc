@@ -148,9 +148,7 @@ if (mysqli_num_rows($resBal) > 0) {
 <head>
   <title>Gestion d'inventaire | Transactions en espèces</title>
   <?php include_once('includes/cs.php'); ?>
-</head>
-<body>
-
+  <?php include_once('includes/responsive.php'); ?>
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 

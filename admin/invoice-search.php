@@ -14,6 +14,7 @@ if (strlen($_SESSION['imsaid']==0)) {
 <head>
 <title>Système de Gestion d'Inventaire || Rechercher Facture</title>
 <?php include_once('includes/cs.php');?>
+<?php include_once('includes/responsive.php'); ?>
 <script type="text/javascript">
 
 function print1(strid)
