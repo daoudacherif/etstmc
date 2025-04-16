@@ -3,7 +3,5 @@ $con = mysqli_connect("mysql.hostinger.com", "u451994146_root", "Daoudacherif432
 
 if (!$con) {
     die("Connection failed: " . mysqli_connect_error());
-} else {
-    echo "Connected successfully"; // Remove this after testing
-}
+} 
 ?>

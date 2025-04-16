@@ -1,52 +1,47 @@
-<?php
-// This file contains CSS media queries and JavaScript
-// tweaks for mobile responsiveness.
-?>
-<!-- Responsive CSS -->
-<style>
-  /* Mobile responsiveness for screen sizes up to 767px */
-  @media only screen and (max-width: 767px) {
-    /* Make the sidebar full width, and hide it by default */
-    .sidebar {
-      width: 100%;
-      height: auto;
-      position: relative;
+  <!-- Optionally include additional responsive overrides -->
+  <style>
+    /* Example: Orientation overlay to prompt users to rotate device */
+    #rotate-overlay {
       display: none;
+      position: fixed;
+      z-index: 9999;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      text-align: center;
+      padding-top: 40%;
+      font-size: 18px;
     }
-    /* When active, the sidebar will be displayed */
-    .sidebar.active {
-      display: block;
+    /* Show overlay when device is in portrait */
+    @media screen and (orientation: portrait) {
+      #rotate-overlay {
+        display: block;
+      }
+      /* Optionally, hide main app container if you want to force landscape */
+      #app-container {
+        display: none;
+      }
     }
-    /* Remove left margin from the main content area */
-    #content {
-      margin-left: 0;
-      padding: 10px;
+    /* Landscape - hide overlay and show app */
+    @media screen and (orientation: landscape) {
+      #rotate-overlay {
+        display: none;
+      }
+      #app-container {
+        display: block;
+      }
     }
-    /* Show the menu toggle button */
-    .menu-toggle {
-      display: block;
-    }
-    /* Stack wrapper children vertically */
-    .wrapper {
-      flex-direction: column;
-    }
-  }
-</style>
-
-<!-- Responsive JavaScript -->
-<script>
-  // Ensure the DOM is loaded before attaching listeners
-  document.addEventListener('DOMContentLoaded', function() {
-    // Check if the menu toggle element exists on the page
-    const menuToggle = document.querySelector('.menu-toggle');
-    if (menuToggle) {
-      menuToggle.addEventListener('click', function() {
-        // Toggle the "active" class on the sidebar to show/hide it
-        const sidebar = document.querySelector('.sidebar');
-        if (sidebar) {
-          sidebar.classList.toggle('active');
-        }
-      });
-    }
-  });
-</script>
+    
+    /* The rest of your responsive CSS code (as provided in the previous integration)
+       can either be here or in your external responsive.css file included via cs.php */
+  </style>
+  </head>
+<body>
+     <!-- Orientation overlay -->
+  <div id="rotate-overlay">
+    <p>Pour une meilleure expérience, veuillez tourner votre appareil.</p>
+  </div>
+  
