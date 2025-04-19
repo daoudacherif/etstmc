@@ -1,392 +1,138 @@
+<?php
+session_start();
+error_reporting(0);
+include('includes/dbconnection.php');
+
+if(isset($_POST['login']))
+    {
+        $adminuser=$_POST['username'];
+        $password=md5($_POST['password']);
+        $query=mysqli_query($con,"select ID from tbladmin where  UserName='$adminuser' && Password='$password' ");
+        $ret=mysqli_fetch_array($query);
+        if($ret>0){
+            $_SESSION['imsaid']=$ret['ID'];
+         header('location:dashboard.php');
+        }
+        else{
+        
+        echo '<script>alert("Détails invalides.")</script>';
+
+        }
+    }
+    if(isset($_POST['submit']))
+    {
+        $contactno=$_POST['contactno'];
+        $email=$_POST['email'];
+$password=md5($_POST['newpassword']);
+                $query=mysqli_query($con,"select ID from tbladmin where  Email='$email' and MobileNumber='$contactno' ");
+                
+        $ret=mysqli_num_rows($query);
+        if($ret>0){
+            $_SESSION['contactno']=$contactno;
+            $_SESSION['email']=$email;
+            $query1=mysqli_query($con,"update tbladmin set Password='$password'  where  Email='$email' && MobileNumber='$contactno'");
+             if($query1)
+     {
+echo "<script>alert('Mot de passe changé avec succès');</script>";
+
+     }
+         
+        }
+        else{
+        
+            echo "<script>alert('Détails invalides. Veuillez réessayer.');</script>";
+        }
+    }
+    ?>
 <!DOCTYPE html>
 <html lang="fr">
+        
 <head>
-    <title>Système de gestion d'inventaire || Connexion</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-       * {
-  padding: 0;
-  margin: 0;
-  color: #1a1f36;
-  box-sizing: border-box;
-  word-wrap: break-word;
-  font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Ubuntu,sans-serif;
+                <title>Système de gestion d'inventaire || Page de connexion</title><meta charset="UTF-8" />
+                
+        <link rel="stylesheet" href="css/bootstrap.min.css" />
+        <link rel="stylesheet" href="css/bootstrap-responsive.min.css" />
+                <link rel="stylesheet" href="css/matrix-login.css" />
+                <link href="font-awesome/css/font-awesome.css" rel="stylesheet" />
+        <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700,800' rel='stylesheet' type='text/css'>
+<script type="text/javascript">
+function checkpass()
+{
+if(document.changepassword.newpassword.value!=document.changepassword.confirmpassword.value)
+{
+alert('Le nouveau mot de passe et le champ de confirmation du mot de passe ne correspondent pas');
+document.changepassword.confirmpassword.focus();
+return false;
 }
-body {
-    min-height: 100%;
-    background-color: #ffffff;
-}
-h1 {
-    letter-spacing: -1px;
-}
-a {
-  color: #5469d4;
-  text-decoration: unset;
-}
-.login-root {
-    background: #fff;
-    display: flex;
-    width: 100%;
-    min-height: 100vh;
-    overflow: hidden;
-}
-.loginbackground {
-    min-height: 692px;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: 0;
-    z-index: 0;
-    overflow: hidden;
-}
-.flex-flex {
-    display: flex;
-}
-.align-center {
-  align-items: center; 
-}
-.center-center {
-  align-items: center;
-  justify-content: center;
-}
-.box-root {
-    box-sizing: border-box;
-}
-.flex-direction--column {
-    -ms-flex-direction: column;
-    flex-direction: column;
-}
-.loginbackground-gridContainer {
-    display: -ms-grid;
-    display: grid;
-    -ms-grid-columns: [start] 1fr [left-gutter] (86.6px)[16] [left-gutter] 1fr [end];
-    grid-template-columns: [start] 1fr [left-gutter] repeat(16,86.6px) [left-gutter] 1fr [end];
-    -ms-grid-rows: [top] 1fr [top-gutter] (64px)[8] [bottom-gutter] 1fr [bottom];
-    grid-template-rows: [top] 1fr [top-gutter] repeat(8,64px) [bottom-gutter] 1fr [bottom];
-    justify-content: center;
-    margin: 0 -2%;
-    transform: rotate(-12deg) skew(-12deg);
-}
-.box-divider--light-all-2 {
-    box-shadow: inset 0 0 0 2px #e3e8ee;
-}
-.box-background--blue {
-    background-color: #5469d4;
-}
-.box-background--white {
-  background-color: #ffffff; 
-}
-.box-background--blue800 {
-    background-color: #212d63;
-}
-.box-background--gray100 {
-    background-color: #e3e8ee;
-}
-.box-background--cyan200 {
-    background-color: #7fd3ed;
-}
-.padding-top--64 {
-  padding-top: 64px;
-}
-.padding-top--24 {
-  padding-top: 24px;
-}
-.padding-top--48 {
-  padding-top: 48px;
-}
-.padding-bottom--24 {
-  padding-bottom: 24px;
-}
-.padding-horizontal--48 {
-  padding: 48px;
-}
-.padding-bottom--15 {
-  padding-bottom: 15px;
-}
-
-
-.flex-justifyContent--center {
-  -ms-flex-pack: center;
-  justify-content: center;
-}
-
-.formbg {
-    margin: 0px auto;
-    width: 100%;
-    max-width: 448px;
-    background: white;
-    border-radius: 4px;
-    box-shadow: rgba(60, 66, 87, 0.12) 0px 7px 14px 0px, rgba(0, 0, 0, 0.12) 0px 3px 6px 0px;
-}
-span {
-    display: block;
-    font-size: 20px;
-    line-height: 28px;
-    color: #1a1f36;
-}
-label {
-    margin-bottom: 10px;
-}
-.reset-pass a,label {
-    font-size: 14px;
-    font-weight: 600;
-    display: block;
-}
-.reset-pass > a {
-    text-align: right;
-    margin-bottom: 10px;
-}
-.grid--50-50 {
-    display: grid;
-    grid-template-columns: 50% 50%;
-    align-items: center;
-}
-
-.field input {
-    font-size: 16px;
-    line-height: 28px;
-    padding: 8px 16px;
-    width: 100%;
-    min-height: 44px;
-    border: unset;
-    border-radius: 4px;
-    outline-color: rgb(84 105 212 / 0.5);
-    background-color: rgb(255, 255, 255);
-    box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(60, 66, 87, 0.16) 0px 0px 0px 1px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px;
-}
-
-input[type="submit"] {
-    background-color: rgb(84, 105, 212);
-    box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0.12) 0px 1px 1px 0px, 
-                rgb(84, 105, 212) 0px 0px 0px 1px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
-                rgba(60, 66, 87, 0.08) 0px 2px 5px 0px;
-    color: #fff;
-    font-weight: 600;
-    cursor: pointer;
-}
-.field-checkbox input {
-    width: 20px;
-    height: 15px;
-    margin-right: 5px; 
-    box-shadow: unset;
-    min-height: unset;
-}
-.field-checkbox label {
-    display: flex;
-    align-items: center;
-    margin: 0;
-}
-a.ssolink {
-    display: block;
-    text-align: center;
-    font-weight: 600;
-}
-.footer-link span {
-    font-size: 14px;
-    text-align: center;
-}
-.listing a {
-    color: #697386;
-    font-weight: 600;
-    margin: 0 10px;
-}
-
-.animationRightLeft {
-  animation: animationRightLeft 2s ease-in-out infinite;
-}
-.animationLeftRight {
-  animation: animationLeftRight 2s ease-in-out infinite;
-}
-.tans3s {
-  animation: animationLeftRight 3s ease-in-out infinite;
-}
-.tans4s {
-  animation: animationLeftRight 4s ease-in-out infinite;
-}
-
-@keyframes animationLeftRight {
-  0% {
-    transform: translateX(0px);
-  }
-  50% {
-    transform: translateX(1000px);
-  }
-  100% {
-    transform: translateX(0px);
-  }
+return true;
 } 
 
-@keyframes animationRightLeft {
-  0% {
-    transform: translateX(0px);
-  }
-  50% {
-    transform: translateX(-1000px);
-  }
-  100% {
-    transform: translateX(0px);
-  }
-} 
-        
-        /* Custom modifications for the login system */
-        .formbg {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .error-message {
-            background: #f74f57;
-            color: white;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-        
-        .success-message {
-            background: #28b779;
-            color: white;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 24px;
-            font-size: 14px;
-        }
-        
-        #recoverform {
-            display: none;
-        }
-        
-        .toggle-forms {
-            text-align: center;
-            margin-top: 24px;
-        }
-    </style>
-</head>
+</script>
+<?php include_once('includes/responsive.php'); ?>
+                <div id="loginbox">            
+                        <form id="loginform" class="form-vertical" method="post">
+                 <div class="control-group normal_text"> <h3>Inventaire</strong> <strong style="color: orange">Système</strong></h3></div>
+                                <div class="control-group">
+                                        <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'utilisateur" name="username" required="true" />
+                                                </div>
+                                        </div>
+                                </div>
+                                <div class="control-group">
+                                        <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_ly"><i class="icon-lock"></i></span><input type="password" placeholder="Mot de passe" name="password" required="true"/>
+                                                </div>
+                                        </div>
+                                </div>
+                                <div class="form-actions">
+                                        <span class="pull-left"><a href="#" class="flip-link btn btn-info" id="to-recover">Mot de passe oublié?</a></span>
+                                        <span class="pull-right"><input type="submit" class="btn btn-success" name="login" value="Se connecter"></span>
 
-<body>
-    <div class="login-root">
-        <div class="loginbackground">
-            <div class="loginbackground-gridContainer">
-                <!-- Add your background grid elements here -->
-            </div>
-        </div>
-        
-        <div class="formbg-outer">
-            <div class="formbg">
-                <div class="formbg-inner padding-horizontal--48">
-                    <!-- Login Form -->
-                    <form id="loginform" method="post">
-                        <div class="padding-bottom--24">
-                            <h2>Connexion</h2>
-                        </div>
-                        
-                        <?php if(isset($error_message)): ?>
-                        <div class="error-message">
-                            <?php echo $error_message; ?>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <div class="field">
-                            <label>Nom d'utilisateur</label>
-                            <input type="text" name="username" required>
-                        </div>
-                        
-                        <div class="field" style="padding-bottom: 24px">
-                            <label>Mot de passe</label>
-                            <input type="password" name="password" required>
-                        </div>
-                        
-                        <div class="field">
-                            <input type="submit" name="login" value="Se connecter">
-                        </div>
-                    </form>
-                    
-                    <!-- Password Recovery Form -->
-                    <form id="recoverform" method="post" name="changepassword" onsubmit="return checkpass();">
-                        <div class="padding-bottom--24">
-                            <h2>Réinitialisation du mot de passe</h2>
-                        </div>
-                        
-                        <?php if(isset($reset_error)): ?>
-                        <div class="error-message">
-                            <?php echo $reset_error; ?>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <?php if(isset($success_message)): ?>
-                        <div class="success-message">
-                            <?php echo $success_message; ?>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <div class="field">
-                            <label>Adresse e-mail</label>
-                            <input type="email" name="email" required>
-                        </div>
-                        
-                        <div class="field">
-                            <label>Numéro de contact</label>
-                            <input type="text" name="contactno" required>
-                        </div>
-                        
-                        <div class="field">
-                            <label>Nouveau mot de passe</label>
-                            <input type="password" name="newpassword" required>
-                        </div>
-                        
-                        <div class="field">
-                            <label>Confirmer le mot de passe</label>
-                            <input type="password" name="confirmpassword" required>
-                        </div>
-                        
-                        <div class="field">
-                            <input type="submit" name="submit" value="Réinitialiser">
-                        </div>
-                    </form>
-                    
-                    <div class="toggle-forms">
-                        <a href="#" class="flip-link" id="to-recover">Mot de passe oublié?</a>
-                        <a href="#" class="flip-link" id="to-login" style="display: none;">Retour à la connexion</a>
-                    </div>
-                    
-                    <div class="footer-link">
-                        <a href="../index.php">← Retour à l'accueil</a>
-                    </div>
+                                </div>
+                        </form>
+                        <div style="padding-left: 180px;">
+                                        <a href="../index.php" class="flip-link btn btn-info" id="to-recover"><i class="icon-home"></i>  Retour à l'accueil</a>
+                                 
+                                </div>
+                                <br />
+                        <form id="recoverform" class="form-vertical" method="post" name="changepassword" onsubmit="return checkpass();">
+                <p class="normal_text">Entrez votre adresse e-mail ci-dessous et nous vous enverrons des instructions pour récupérer un mot de passe.</p>
+                
+                                        <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_lo"><i class="icon-envelope"></i></span><input type="text" placeholder="Adresse e-mail" name="email" required="true" />
+                                                </div>
+                                        </div>
+                                        <br />
+                             <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_lo"><i class="icon-phone-sign"></i></span><input type="text" placeholder="Numéro de contact" name="contactno" required="true" />
+                                                </div>
+                                        </div>
+                                        <br />
+                                        <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_lo"><i class="icon-lock"></i></span><input type="password" name="newpassword" placeholder="Nouveau mot de passe" required="true" />
+                                                </div>
+                                        </div>
+                                        <br />
+                                        <div class="controls">
+                                                <div class="main_input_box">
+                                                        <span class="add-on bg_lo"><i class="icon-lock"></i></span><input type="password" name="confirmpassword" placeholder="Confirmer le mot de passe" required="true" />
+                                                </div>
+                                        </div>
+                                <div class="form-actions">
+                                        <span class="pull-left"><a href="#" class="flip-link btn btn-success" id="to-login">&laquo; Retour à la connexion</a></span>
+                                        <span class="pull-right"><input type="submit" class="btn btn-success" name="submit" value="Réinitialiser"></span>
+
+                                </div>
+                        </form>
                 </div>
-            </div>
-        </div>
-    </div>
+                
+                <script src="js/jquery.min.js"></script>  
+                <script src="js/matrix.login.js"></script> 
+        </body>
 
-    <script src="js/jquery.min.js"></script>
-    <script>
-    function checkpass() {
-        if(document.changepassword.newpassword.value != document.changepassword.confirmpassword.value) {
-            alert('Les mots de passe ne correspondent pas');
-            document.changepassword.confirmpassword.focus();
-            return false;
-        }
-        return true;
-    }
-    
-    $(document).ready(function() {
-        $('.flip-link').click(function(e) {
-            e.preventDefault();
-            $('#loginform, #recoverform').toggle();
-            $('#to-recover, #to-login').toggle();
-        });
-    });
-    </script>
-</body>
 </html>
