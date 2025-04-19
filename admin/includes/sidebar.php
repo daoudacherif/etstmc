@@ -28,7 +28,7 @@
         </li>
 
         <!-- Sous-catégorie -->
-        <li>
+        <li class="submenu">
           <a href="#">
             <i class="icon icon-th-large"></i>
             <span>Sous-catégorie</span>
@@ -40,7 +40,7 @@
         </li>
 
         <!-- Marque -->
-        <li>
+        <li class="submenu">
           <a href="#">
             <i class="icon icon-tag"></i>
             <span>Marque</span>
@@ -52,7 +52,7 @@
         </li>
 
         <!-- Produit -->
-        <li>
+        <li class="submenu">
           <a href="#">
             <i class="icon icon-barcode"></i>
             <span>Produit</span>
