@@ -49,7 +49,7 @@
 
         .hero {
             min-height: 90vh;
-            background: linear-gradient(135deg, #0a9396, #94d2bd);
+            background-image:url();
             display: flex;
             flex-direction: column;
             justify-content: center;
