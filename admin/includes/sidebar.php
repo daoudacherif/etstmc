@@ -16,7 +16,7 @@
       </a>
       <ul>
         <!-- Catégorie -->
-        <li>
+        <li class="submenu">
           <a href="#">
             <i class="icon icon-th"></i>
             <span>Catégorie</span>
