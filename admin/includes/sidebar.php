@@ -8,87 +8,67 @@
       </a>
     </li>
 
-    <!-- Catalogues -->
+    <!-- Catégorie -->
     <li class="submenu">
       <a href="#">
-        <i class="icon icon-th-list"></i>
-        <span>Catalogues</span>
+        <i class="icon icon-th"></i>
+        <span>Catégorie</span>
       </a>
       <ul>
-        <!-- Catégorie -->
-        <li>
-          <a href="#">
-            <i class="icon icon-th"></i>
-            <span>Catégorie</span>
-          </a>
-          <ul  class="submenu">
-            <li><a href="add-category.php">Ajouter</a></li>
-            <li><a href="manage-category.php">Gérer</a></li>
-          </ul>
-        </li>
-
-        <!-- Sous-catégorie -->
-        <li>
-          <a href="#">
-            <i class="icon icon-th-large"></i>
-            <span>Sous-catégorie</span>
-          </a>
-          <ul  class="submenu">
-            <li><a href="add-subcategory.php">Ajouter</a></li>
-            <li><a href="manage-subcategory.php">Gérer</a></li>
-          </ul>
-        </li>
-
-        <!-- Marque -->
-        <li>
-          <a href="#">
-            <i class="icon icon-tag"></i>
-            <span>Marque</span>
-          </a>
-          <ul  class="submenu">
-            <li><a href="add-brand.php">Ajouter</a></li>
-            <li><a href="manage-brand.php">Gérer</a></li>
-          </ul>
-        </li>
-
-        <!-- Produit -->
-        <li">
-          <a href="#">
-            <i class="icon icon-barcode"></i>
-            <span>Produit</span>
-          </a>
-          <ul  class="submenu">
-            <li><a href="add-product.php">Ajouter</a></li>
-            <li><a href="manage-product.php">Gérer</a></li>
-          </ul>
-        </li>
+        <li><a href="add-category.php">Ajouter</a></li>
+        <li><a href="manage-category.php">Gérer</a></li>
       </ul>
     </li>
 
-    <!-- Ventes -->
+    <!-- Sous-catégorie -->
+    <li class="submenu">
+      <a href="#">
+        <i class="icon icon-th-large"></i>
+        <span>Sous-catégorie</span>
+      </a>
+      <ul>
+        <li><a href="add-subcategory.php">Ajouter</a></li>
+        <li><a href="manage-subcategory.php">Gérer</a></li>
+      </ul>
+    </li>
+
+    <!-- Marque -->
+    <li class="submenu">
+      <a href="#">
+        <i class="icon icon-tag"></i>
+        <span>Marque</span>
+      </a>
+      <ul>
+        <li><a href="add-brand.php">Ajouter</a></li>
+        <li><a href="manage-brand.php">Gérer</a></li>
+      </ul>
+    </li>
+
+    <!-- Produit -->
+    <li class="submenu">
+      <a href="#">
+        <i class="icon icon-barcode"></i>
+        <span>Produit</span>
+      </a>
+      <ul>
+        <li><a href="add-product.php">Ajouter</a></li>
+        <li><a href="manage-product.php">Gérer</a></li>
+      </ul>
+    </li>
+
+    <!-- Le reste du menu inchangé -->
     <li class="submenu">
       <a href="#">
         <i class="icon-shopping-cart"></i>
         <span>Ventes</span>
       </a>
       <ul>
-        <li>
-          <a href="cart.php">
-            Comptant
-            <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span>
-          </a>
-        </li>
-        <li>
-          <a href="dettecart.php">
-            Terme
-            <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span>
-          </a>
-        </li>
+        <li><a href="cart.php">Comptant <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
+        <li><a href="dettecart.php">Terme <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
         <li><a href="return.php">Retour</a></li>
       </ul>
     </li>
 
-    <!-- Fournisseurs -->
     <li class="submenu">
       <a href="#">
         <i class="icon icon-truck"></i>
@@ -101,7 +81,6 @@
       </ul>
     </li>
 
-    <!-- Clients -->
     <li class="submenu">
       <a href="#">
         <i class="icon icon-user"></i>
@@ -113,7 +92,6 @@
       </ul>
     </li>
 
-    <!-- Transactions -->
     <li class="submenu">
       <a href="#">
         <i class="icon icon-exchange"></i>
@@ -125,7 +103,6 @@
       </ul>
     </li>
 
-    <!-- Rapports -->
     <li class="submenu">
       <a href="#">
         <i class="icon icon-file"></i>
@@ -138,7 +115,6 @@
       </ul>
     </li>
 
-    <!-- Autres éléments -->
     <li><a href="inventory.php"><i class="icon icon-hdd"></i> <span>Inventaire</span></a></li>
     <li><a href="search.php"><i class="icon icon-search"></i> <span>Recherche</span></a></li>
   </ul>
