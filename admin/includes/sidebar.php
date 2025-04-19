@@ -16,24 +16,24 @@
       </a>
       <ul>
         <!-- Catégorie -->
-        <li class="submenu">
+        <li>
           <a href="#">
             <i class="icon icon-th"></i>
             <span>Catégorie</span>
           </a>
-          <ul>
+          <ul  class="submenu">
             <li><a href="add-category.php">Ajouter</a></li>
             <li><a href="manage-category.php">Gérer</a></li>
           </ul>
         </li>
 
         <!-- Sous-catégorie -->
-        <li class="submenu">
+        <li>
           <a href="#">
             <i class="icon icon-th-large"></i>
             <span>Sous-catégorie</span>
           </a>
-          <ul>
+          <ul  class="submenu">
             <li><a href="add-subcategory.php">Ajouter</a></li>
             <li><a href="manage-subcategory.php">Gérer</a></li>
           </ul>
@@ -45,7 +45,7 @@
             <i class="icon icon-tag"></i>
             <span>Marque</span>
           </a>
-          <ul>
+          <ul  class="submenu">
             <li><a href="add-brand.php">Ajouter</a></li>
             <li><a href="manage-brand.php">Gérer</a></li>
           </ul>
@@ -57,7 +57,7 @@
             <i class="icon icon-barcode"></i>
             <span>Produit</span>
           </a>
-          <ul>
+          <ul  class="submenu">
             <li><a href="add-product.php">Ajouter</a></li>
             <li><a href="manage-product.php">Gérer</a></li>
           </ul>
