@@ -98,7 +98,7 @@
 .button:hover {
   letter-spacing: 3px;
   background-color:  #0a9396;
-  color: hsl(0, 0%, 100%);
+  color: white;
   box-shadow:rgb(69, 225, 228) 0px 7px 29px 0px;
 }
 
