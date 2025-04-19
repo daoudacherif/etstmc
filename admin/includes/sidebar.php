@@ -40,7 +40,7 @@
         </li>
 
         <!-- Marque -->
-        <li class="submenu">
+        <li>
           <a href="#">
             <i class="icon icon-tag"></i>
             <span>Marque</span>
@@ -52,7 +52,7 @@
         </li>
 
         <!-- Produit -->
-        <li class="submenu">
+        <li">
           <a href="#">
             <i class="icon icon-barcode"></i>
             <span>Produit</span>
