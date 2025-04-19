@@ -1,5 +1,5 @@
 <div class="row-fluid">
-  <div id="footer" class="span12"> 2020 &copy; Inventory Management System  </div>
+  <div id="footer" class="span12"> Systeme de gestion de ETSTMC </div>
 </div>
 
 <!-- JavaScript for responsive functionality -->
