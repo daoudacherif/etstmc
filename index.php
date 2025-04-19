@@ -1,146 +1,242 @@
-<!doctype html>
-<html lang="fr">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <!-- Meta tags de base -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <title>Gescometstmc - Aluminium & Matériaux de Construction</title>
-    <meta name="description"
-          content="Gescometstmc est une entreprise spécialisée dans l'importation et la vente de matériaux de construction en aluminium en République de Guinée." />
-
-    <!-- Inter UI font -->
-    <link href="https://rsms.me/inter/inter-ui.css" rel="stylesheet">
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-
+    <!-- Existing meta tags -->
+    <meta name="description" content="ETSTMC Inventory Management System - Advanced aluminum inventory tracking solution for construction businesses">
+    <meta name="keywords" content="inventory management, aluminum tracking, construction materials, warehouse management">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+    
     <style>
-        html { scroll-behavior: smooth; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            color: #333;
-            background-color: #f8f9fa;
-            overflow-x: hidden;
+        /* Additional CSS improvements */
+        .hero h1 {
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-
-        header {
-            background: linear-gradient(135deg, #005f73, #0a9396);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
+        
+        .feature-card {
+            background: white;
+        }
+        
+        .carousel-control-prev,
+        .carousel-control-next {
+            width: 5%;
+        }
+        
+        .contact-card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.25rem rgba(13,110,253,0.25);
+        }
+        
+        .scroll-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: none;
             z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-
-        .navbar-brand {
-            color: #fff;
-            font-weight: 700;
-            transition: transform 0.3s ease;
-        }
-
-        .navbar-brand:hover { transform: scale(1.1); }
-
-        .nav-link { color:  #0a9396 !important; }
-
-        .hero {
-            min-height: 90vh;
-            background: linear-gradient(135deg, #0a9396, #94d2bd);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            text-align: center;
-            padding: 0 1rem;
-        }
-
-        .hero h1, .hero p, .hero button {
-            opacity: 0;
-            animation: fadeIn 1s forwards;
-        }
-
-        .hero h1 { animation-delay: 0.3s; }
-        .hero p { animation-delay: 0.6s; }
-        .hero button { animation-delay: 0.9s; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .btn-hero, .btn-pricing {
-            background-color: #ee9b00;
-            color: #fff;
-            transition: background-color 0.3s ease;
-        }
-
-        .btn-hero:hover, .btn-pricing:hover { background-color: #ca6702; }
-
-   /* From Uiverse.io by barisdogansutcu */ 
-.button {
-  padding: 17px 40px;
-  border-radius: 50px;
-  cursor: pointer;
-  border: 0;
-  background-color: white;
-  box-shadow: rgb(0 0 0 / 5%) 0 0 8px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  font-size: 15px;
-  transition: all 0.5s ease;
-}
-
-.button:hover {
-  letter-spacing: 3px;
-  background-color:  #0a9396;
-  color: hsl(0, 0%, 100%);
-  box-shadow:rgb(69, 225, 228) 0px 7px 29px 0px;
-}
-
-.button:active {
-  letter-spacing: 3px;
-  background-color: hsl(261deg 80% 48%);
-  color: hsl(0, 0%, 100%);
-  box-shadow: rgb(93 24 220) 0px 0px 0px 0px;
-  transform: translateY(10px);
-  transition: 100ms;
-}
-
     </style>
 </head>
-
 <body>
+    <!-- Existing navigation -->
 
-<!-- Header -->
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark">
+    <!-- Add scroll to top button -->
+    <button class="btn btn-primary scroll-top rounded-circle p-2">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Existing sections -->
+
+    <!-- Enhanced Contact Section -->
+    <section id="contact" class="py-5 py-lg-6">
         <div class="container">
-            <a class="navbar-brand" href="#">GESCOMETSTMC</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item "><a class="nav-link button" href="admin/login.php">Connexion</a></li>
-                </ul>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="contact-card p-4 p-md-5">
+                        <div class="text-center mb-5">
+                            <h2 class="fw-bold">Get Started Today</h2>
+                            <p class="lead text-muted">Schedule a demo or request more information</p>
+                        </div>
+                        <form id="contactForm" novalidate>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label for="name" class="form-label">Full Name</label>
+                                    <input type="text" class="form-control" id="name" required>
+                                    <div class="invalid-feedback">
+                                        Please enter your name
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" required>
+                                    <div class="invalid-feedback">
+                                        Please enter a valid email
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label for="company" class="form-label">Company Name</label>
+                                    <input type="text" class="form-control" id="company" required>
+                                    <div class="invalid-feedback">
+                                        Please enter your company name
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label for="message" class="form-label">Message</label>
+                                    <textarea class="form-control" id="message" rows="4" required></textarea>
+                                    <div class="invalid-feedback">
+                                        Please enter your message
+                                    </div>
+                                </div>
+                                <div class="col-12 text-center">
+                                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                                        Send Message
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
-    </nav>
-</header>
+    </section>
 
-<!-- Hero Section -->
-<section class="hero">
-    <h1>Matériaux en Aluminium pour la Guinée</h1>
-    <p>Gescometstmc est votre partenaire idéal pour l'importation et la vente de matériaux de construction en aluminium.</p>
-    <button class="btn btn-hero">Découvrir nos offres</button>
-</section>
+    <!-- Footer Section -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row g-5">
+                <div class="col-lg-4">
+                    <div class="footer-brand">
+                        <a href="#" class="d-flex align-items-center text-white text-decoration-none">
+                            <i class="fas fa-cubes text-primary me-2"></i>
+                            <span class="h4 mb-0">ETSTMC</span>
+                        </a>
+                    </div>
+                    <p class="mt-3 text-muted">Streamlining aluminum inventory management since 2020</p>
+                    <div class="social-links">
+                        <a href="#" class="social-icon">
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                        <a href="#" class="social-icon">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="social-icon">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-6">
+                    <h5 class="text-white mb-3">Solutions</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="#" class="footer-link">Inventory Tracking</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Warehouse Management</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Mobile App</a></li>
+                        <li><a href="#" class="footer-link">Analytics</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-2 col-6">
+                    <h5 class="text-white mb-3">Company</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="#" class="footer-link">About Us</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Careers</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Blog</a></li>
+                        <li><a href="#" class="footer-link">Partners</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-4">
+                    <h5 class="text-white mb-3">Legal</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="#" class="footer-link">Privacy Policy</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Terms of Service</a></li>
+                        <li class="mb-2"><a href="#" class="footer-link">Cookie Policy</a></li>
+                        <li><a href="#" class="footer-link">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-top mt-5 pt-4 text-center">
+                <p class="text-muted mb-0">&copy; 2023 ETSTMC Systems. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
 
-<!-- Include Bootstrap Bundle JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- JavaScript Enhancements -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Number Animation
+        function animateNumbers() {
+            const counters = document.querySelectorAll('.count-animation');
+            counters.forEach(counter => {
+                const updateCount = () => {
+                    const target = +counter.getAttribute('data-count');
+                    const count = +counter.innerText;
+                    const increment = target / 100;
+                    if(count < target) {
+                        counter.innerText = Math.ceil(count + increment);
+                        setTimeout(updateCount, 20);
+                    } else {
+                        counter.innerText = target;
+                    }
+                }
+                updateCount();
+            });
+        }
+
+        // Intersection Observer for animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    animateNumbers();
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.stat-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Smooth Scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Scroll to Top Button
+        window.addEventListener('scroll', function() {
+            const scrollTop = document.querySelector('.scroll-top');
+            if(window.scrollY > 300) {
+                scrollTop.style.display = 'block';
+            } else {
+                scrollTop.style.display = 'none';
+            }
+        });
+
+        document.querySelector('.scroll-top').addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+
+        // Form Validation
+        (function () {
+            'use strict'
+            const form = document.getElementById('contactForm');
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })()
+    </script>
 </body>
 </html>
