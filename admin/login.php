@@ -1,369 +1,379 @@
-<?php
-session_start();
-error_reporting(0);
-include('includes/dbconnection.php');
-
-// Fonction pour nettoyer les entrées
-function cleanInput($data) {
-    $data = trim($data);
-    $data = stripslashes($data);
-    $data = htmlspecialchars($data);
-    return $data;
-}
-
-if(isset($_POST['login'])) {
-    $adminuser = cleanInput($_POST['username']);
-    $password = md5(cleanInput($_POST['password']));
-    
-    // Utilisation de requête préparée pour éviter les injections SQL
-    $stmt = $con->prepare("SELECT ID FROM tbladmin WHERE UserName=? AND Password=?");
-    $stmt->bind_param("ss", $adminuser, $password);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if($result->num_rows > 0) {
-        $row = $result->fetch_assoc();
-        $_SESSION['imsaid'] = $row['ID'];
-        header('location: dashboard.php');
-        exit();
-    } else {
-        $error_message = "Identifiants invalides. Veuillez réessayer.";
-    }
-}
-
-if(isset($_POST['submit'])) {
-    $contactno = cleanInput($_POST['contactno']);
-    $email = cleanInput($_POST['email']);
-    $password = md5(cleanInput($_POST['newpassword']));
-    
-    // Utilisation de requête préparée
-    $stmt = $con->prepare("SELECT ID FROM tbladmin WHERE Email=? AND MobileNumber=?");
-    $stmt->bind_param("ss", $email, $contactno);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if($result->num_rows > 0) {
-        $_SESSION['contactno'] = $contactno;
-        $_SESSION['email'] = $email;
-        
-        $stmt = $con->prepare("UPDATE tbladmin SET Password=? WHERE Email=? AND MobileNumber=?");
-        $stmt->bind_param("sss", $password, $email, $contactno);
-        $stmt->execute();
-        
-        if($stmt->affected_rows > 0) {
-            $success_message = "Mot de passe changé avec succès!";
-        }
-    } else {
-        $reset_error = "Détails invalides. Veuillez réessayer.";
-    }
-}
-?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <title>Système de gestion d'inventaire || Connexion</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/bootstrap-responsive.min.css" />
-   
-    <link href="font-awesome/css/font-awesome.css" rel="stylesheet" />
-    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,600,700,800' rel='stylesheet' type='text/css'>
     <style>
-        :root {
-            --primary-color: #28b779;
-            --secondary-color: #2E363F;
-            --accent-color: #27a9e3;
-            --light-bg: #f5f5f5;
-            --dark-text: #333;
-            --light-text: #fff;
-            --danger: #f74f57;
-            --warning: #ffbb44;
-        }
+       * {
+  padding: 0;
+  margin: 0;
+  color: #1a1f36;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Ubuntu,sans-serif;
+}
+body {
+    min-height: 100%;
+    background-color: #ffffff;
+}
+h1 {
+    letter-spacing: -1px;
+}
+a {
+  color: #5469d4;
+  text-decoration: unset;
+}
+.login-root {
+    background: #fff;
+    display: flex;
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
+}
+.loginbackground {
+    min-height: 692px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 0;
+    overflow: hidden;
+}
+.flex-flex {
+    display: flex;
+}
+.align-center {
+  align-items: center; 
+}
+.center-center {
+  align-items: center;
+  justify-content: center;
+}
+.box-root {
+    box-sizing: border-box;
+}
+.flex-direction--column {
+    -ms-flex-direction: column;
+    flex-direction: column;
+}
+.loginbackground-gridContainer {
+    display: -ms-grid;
+    display: grid;
+    -ms-grid-columns: [start] 1fr [left-gutter] (86.6px)[16] [left-gutter] 1fr [end];
+    grid-template-columns: [start] 1fr [left-gutter] repeat(16,86.6px) [left-gutter] 1fr [end];
+    -ms-grid-rows: [top] 1fr [top-gutter] (64px)[8] [bottom-gutter] 1fr [bottom];
+    grid-template-rows: [top] 1fr [top-gutter] repeat(8,64px) [bottom-gutter] 1fr [bottom];
+    justify-content: center;
+    margin: 0 -2%;
+    transform: rotate(-12deg) skew(-12deg);
+}
+.box-divider--light-all-2 {
+    box-shadow: inset 0 0 0 2px #e3e8ee;
+}
+.box-background--blue {
+    background-color: #5469d4;
+}
+.box-background--white {
+  background-color: #ffffff; 
+}
+.box-background--blue800 {
+    background-color: #212d63;
+}
+.box-background--gray100 {
+    background-color: #e3e8ee;
+}
+.box-background--cyan200 {
+    background-color: #7fd3ed;
+}
+.padding-top--64 {
+  padding-top: 64px;
+}
+.padding-top--24 {
+  padding-top: 24px;
+}
+.padding-top--48 {
+  padding-top: 48px;
+}
+.padding-bottom--24 {
+  padding-bottom: 24px;
+}
+.padding-horizontal--48 {
+  padding: 48px;
+}
+.padding-bottom--15 {
+  padding-bottom: 15px;
+}
+
+
+.flex-justifyContent--center {
+  -ms-flex-pack: center;
+  justify-content: center;
+}
+
+.formbg {
+    margin: 0px auto;
+    width: 100%;
+    max-width: 448px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: rgba(60, 66, 87, 0.12) 0px 7px 14px 0px, rgba(0, 0, 0, 0.12) 0px 3px 6px 0px;
+}
+span {
+    display: block;
+    font-size: 20px;
+    line-height: 28px;
+    color: #1a1f36;
+}
+label {
+    margin-bottom: 10px;
+}
+.reset-pass a,label {
+    font-size: 14px;
+    font-weight: 600;
+    display: block;
+}
+.reset-pass > a {
+    text-align: right;
+    margin-bottom: 10px;
+}
+.grid--50-50 {
+    display: grid;
+    grid-template-columns: 50% 50%;
+    align-items: center;
+}
+
+.field input {
+    font-size: 16px;
+    line-height: 28px;
+    padding: 8px 16px;
+    width: 100%;
+    min-height: 44px;
+    border: unset;
+    border-radius: 4px;
+    outline-color: rgb(84 105 212 / 0.5);
+    background-color: rgb(255, 255, 255);
+    box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(60, 66, 87, 0.16) 0px 0px 0px 1px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px;
+}
+
+input[type="submit"] {
+    background-color: rgb(84, 105, 212);
+    box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0.12) 0px 1px 1px 0px, 
+                rgb(84, 105, 212) 0px 0px 0px 1px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(0, 0, 0, 0) 0px 0px 0px 0px, 
+                rgba(60, 66, 87, 0.08) 0px 2px 5px 0px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+}
+.field-checkbox input {
+    width: 20px;
+    height: 15px;
+    margin-right: 5px; 
+    box-shadow: unset;
+    min-height: unset;
+}
+.field-checkbox label {
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+a.ssolink {
+    display: block;
+    text-align: center;
+    font-weight: 600;
+}
+.footer-link span {
+    font-size: 14px;
+    text-align: center;
+}
+.listing a {
+    color: #697386;
+    font-weight: 600;
+    margin: 0 10px;
+}
+
+.animationRightLeft {
+  animation: animationRightLeft 2s ease-in-out infinite;
+}
+.animationLeftRight {
+  animation: animationLeftRight 2s ease-in-out infinite;
+}
+.tans3s {
+  animation: animationLeftRight 3s ease-in-out infinite;
+}
+.tans4s {
+  animation: animationLeftRight 4s ease-in-out infinite;
+}
+
+@keyframes animationLeftRight {
+  0% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(1000px);
+  }
+  100% {
+    transform: translateX(0px);
+  }
+} 
+
+@keyframes animationRightLeft {
+  0% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(-1000px);
+  }
+  100% {
+    transform: translateX(0px);
+  }
+} 
         
-        body {
-            background: linear-gradient(135deg, var(--secondary-color), #1a2129);
-            font-family: 'Open Sans', sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        #loginbox {
-            max-width: 400px;
-            width: 90%;
-            margin: 0 auto;
-            overflow: hidden;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        /* Custom modifications for the login system */
+        .formbg {
             position: relative;
+            z-index: 1;
         }
         
-        .form-vertical {
-            padding: 30px;
-        }
-        
-        .control-group.normal_text {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        
-        .control-group.normal_text h3 {
-            color: var(--secondary-color);
-            font-weight: 600;
-            font-size: 24px;
-            margin: 0;
-        }
-        
-        .controls {
-            margin-bottom: 20px;
-        }
-        
-        .main_input_box {
-            display: flex;
-            border: 1px solid #e0e0e0;
+        .error-message {
+            background: #f74f57;
+            color: white;
+            padding: 12px;
             border-radius: 4px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        
-        .main_input_box:focus-within {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 2px rgba(39, 169, 227, 0.2);
-        }
-        
-        .main_input_box .add-on {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 15px;
-            background: var(--light-bg);
-            color: #888;
-        }
-        
-        .main_input_box input {
-            flex: 1;
-            border: none;
-            padding: 12px 15px;
-            outline: none;
+            margin-bottom: 24px;
             font-size: 14px;
         }
         
-        .form-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 25px;
-        }
-        
-        .btn {
-            padding: 10px 20px;
+        .success-message {
+            background: #28b779;
+            color: white;
+            padding: 12px;
             border-radius: 4px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-        }
-        
-        .btn-success {
-            background: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background: #239c66;
-        }
-        
-        .btn-info {
-            background: var(--accent-color);
-            color: white;
-        }
-        
-        .btn-info:hover {
-            background: #1e96cc;
-        }
-        
-        .flip-link {
-            text-decoration: none;
-            font-size: 13px;
-        }
-        
-        #to-recover, #to-login {
-            font-weight: 600;
-        }
-        
-        .home-button {
-            text-align: center;
-            margin-top: 15px;
-        }
-        
-        .alert {
-            padding: 10px 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            color: white;
+            margin-bottom: 24px;
             font-size: 14px;
-        }
-        
-        .alert-danger {
-            background-color: var(--danger);
-        }
-        
-        .alert-success {
-            background-color: var(--primary-color);
-        }
-        
-        p.normal_text {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 20px;
-            text-align: center;
         }
         
         #recoverform {
             display: none;
         }
         
-        @media (max-width: 480px) {
-            #loginbox {
-                width: 95%;
-            }
-            
-            .form-vertical {
-                padding: 20px;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .pull-left, .pull-right {
-                text-align: center;
-                width: 100%;
-            }
-            
-            .btn {
-                width: 100%;
-            }
-        }
-        
-        /* Animation d'entrée */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .form-vertical {
-            animation: fadeIn 0.5s ease-out;
+        .toggle-forms {
+            text-align: center;
+            margin-top: 24px;
         }
     </style>
 </head>
 
 <body>
-    <div id="loginbox">
-        <!-- Formulaire de connexion -->
-        <form id="loginform" class="form-vertical" method="post">
-            <div class="control-group normal_text">
-                <h3><span style="color: var(--secondary-color)">Inventaire</span> <span style="color: var(--primary-color)">Système</span></h3>
+    <div class="login-root">
+        <div class="loginbackground">
+            <div class="loginbackground-gridContainer">
+                <!-- Add your background grid elements here -->
             </div>
-            
-            <?php if(isset($error_message)): ?>
-            <div class="alert alert-danger">
-                <i class="icon-warning-sign"></i> <?php echo $error_message; ?>
-            </div>
-            <?php endif; ?>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-user"></i></span>
-                    <input type="text" placeholder="Nom d'utilisateur" name="username" required />
-                </div>
-            </div>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-lock"></i></span>
-                    <input type="password" placeholder="Mot de passe" name="password" required />
-                </div>
-            </div>
-            
-            <div class="form-actions">
-                <span class="pull-left"><a href="#" class="flip-link btn btn-info" id="to-recover">Mot de passe oublié?</a></span>
-                <span class="pull-right"><input type="submit" class="btn btn-success" name="login" value="Se connecter"></span>
-            </div>
-        </form>
-        
-        <!-- Bouton de retour à l'accueil -->
-        <div class="home-button">
-            <a href="../index.php" class="btn btn-info"><i class="icon-home"></i> Retour à l'accueil</a>
         </div>
         
-        <!-- Formulaire de récupération de mot de passe -->
-        <form id="recoverform" class="form-vertical" method="post" name="changepassword" onsubmit="return checkpass();">
-            <div class="control-group normal_text">
-                <h3><span style="color: var(--secondary-color)">Récupération</span> <span style="color: var(--primary-color)">Mot de passe</span></h3>
-            </div>
-            
-            <?php if(isset($reset_error)): ?>
-            <div class="alert alert-danger">
-                <i class="icon-warning-sign"></i> <?php echo $reset_error; ?>
-            </div>
-            <?php endif; ?>
-            
-            <?php if(isset($success_message)): ?>
-            <div class="alert alert-success">
-                <i class="icon-ok"></i> <?php echo $success_message; ?>
-            </div>
-            <?php endif; ?>
-            
-            <p class="normal_text">Entrez vos coordonnées pour réinitialiser votre mot de passe</p>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-envelope"></i></span>
-                    <input type="email" placeholder="Adresse e-mail" name="email" required />
+        <div class="formbg-outer">
+            <div class="formbg">
+                <div class="formbg-inner padding-horizontal--48">
+                    <!-- Login Form -->
+                    <form id="loginform" method="post">
+                        <div class="padding-bottom--24">
+                            <h2>Connexion</h2>
+                        </div>
+                        
+                        <?php if(isset($error_message)): ?>
+                        <div class="error-message">
+                            <?php echo $error_message; ?>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="field">
+                            <label>Nom d'utilisateur</label>
+                            <input type="text" name="username" required>
+                        </div>
+                        
+                        <div class="field" style="padding-bottom: 24px">
+                            <label>Mot de passe</label>
+                            <input type="password" name="password" required>
+                        </div>
+                        
+                        <div class="field">
+                            <input type="submit" name="login" value="Se connecter">
+                        </div>
+                    </form>
+                    
+                    <!-- Password Recovery Form -->
+                    <form id="recoverform" method="post" name="changepassword" onsubmit="return checkpass();">
+                        <div class="padding-bottom--24">
+                            <h2>Réinitialisation du mot de passe</h2>
+                        </div>
+                        
+                        <?php if(isset($reset_error)): ?>
+                        <div class="error-message">
+                            <?php echo $reset_error; ?>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <?php if(isset($success_message)): ?>
+                        <div class="success-message">
+                            <?php echo $success_message; ?>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <div class="field">
+                            <label>Adresse e-mail</label>
+                            <input type="email" name="email" required>
+                        </div>
+                        
+                        <div class="field">
+                            <label>Numéro de contact</label>
+                            <input type="text" name="contactno" required>
+                        </div>
+                        
+                        <div class="field">
+                            <label>Nouveau mot de passe</label>
+                            <input type="password" name="newpassword" required>
+                        </div>
+                        
+                        <div class="field">
+                            <label>Confirmer le mot de passe</label>
+                            <input type="password" name="confirmpassword" required>
+                        </div>
+                        
+                        <div class="field">
+                            <input type="submit" name="submit" value="Réinitialiser">
+                        </div>
+                    </form>
+                    
+                    <div class="toggle-forms">
+                        <a href="#" class="flip-link" id="to-recover">Mot de passe oublié?</a>
+                        <a href="#" class="flip-link" id="to-login" style="display: none;">Retour à la connexion</a>
+                    </div>
+                    
+                    <div class="footer-link">
+                        <a href="../index.php">← Retour à l'accueil</a>
+                    </div>
                 </div>
             </div>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-phone-sign"></i></span>
-                    <input type="text" placeholder="Numéro de contact" name="contactno" required />
-                </div>
-            </div>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-lock"></i></span>
-                    <input type="password" name="newpassword" placeholder="Nouveau mot de passe" required />
-                </div>
-            </div>
-            
-            <div class="controls">
-                <div class="main_input_box">
-                    <span class="add-on"><i class="icon-lock"></i></span>
-                    <input type="password" name="confirmpassword" placeholder="Confirmer le mot de passe" required />
-                </div>
-            </div>
-            
-            <div class="form-actions">
-                <span class="pull-left"><a href="#" class="flip-link btn btn-info" id="to-login">&laquo; Retour à la connexion</a></span>
-                <span class="pull-right"><input type="submit" class="btn btn-success" name="submit" value="Réinitialiser"></span>
-            </div>
-        </form>
+        </div>
     </div>
-    
+
     <script src="js/jquery.min.js"></script>
     <script>
     function checkpass() {
         if(document.changepassword.newpassword.value != document.changepassword.confirmpassword.value) {
-            alert('Le nouveau mot de passe et le champ de confirmation du mot de passe ne correspondent pas');
+            alert('Les mots de passe ne correspondent pas');
             document.changepassword.confirmpassword.focus();
             return false;
         }
@@ -371,19 +381,10 @@ if(isset($_POST['submit'])) {
     }
     
     $(document).ready(function() {
-        // Animations pour basculer entre les formulaires
         $('.flip-link').click(function(e) {
             e.preventDefault();
-            
-            if($(this).attr('id') == 'to-recover') {
-                $('#loginform').hide('flip', function() {
-                    $('#recoverform').show('flip');
-                });
-            } else if($(this).attr('id') == 'to-login') {
-                $('#recoverform').hide('flip', function() {
-                    $('#loginform').show('flip');
-                });
-            }
+            $('#loginform, #recoverform').toggle();
+            $('#to-recover, #to-login').toggle();
         });
     });
     </script>
