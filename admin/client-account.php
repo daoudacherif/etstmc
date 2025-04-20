@@ -42,9 +42,8 @@ $res = mysqli_query($con, $sql);
   <title>Compte Client</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
-  <?php include_once('includes/sidebar.php'); ?>
 <?php include_once('includes/header.php'); ?>
-
+<?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">
   <div id="content-header">
