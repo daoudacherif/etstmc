@@ -37,6 +37,7 @@
     .control-label { 
   font-weight: bold;
   font-size: 20px;
+  color:black;
 }
 
     /* The rest of your responsive CSS code (as provided in the previous integration)
