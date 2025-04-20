@@ -82,7 +82,7 @@
     </li>
 
     <li class="submenu">
-      <a href="#">
+      <a href="">
         <i class="icon icon-user"></i>
         <span>Clients</span>
       </a>
