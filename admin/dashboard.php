@@ -21,7 +21,7 @@ if (strlen($_SESSION['imsaid']==0)) {
 
 
   <!-- Main application container -->
-  
+  <div id="app-container">
     <?php include_once('includes/header.php'); ?>
     <?php include_once('includes/sidebar.php'); ?>
     <!--sidebar-menu-->
@@ -35,7 +35,7 @@ if (strlen($_SESSION['imsaid']==0)) {
             <i class="icon-home"></i> Accueil
           </a>
         </div>
-     
+      </div>
       <!--End-breadcrumbs-->
 
       <!--Action boxes-->

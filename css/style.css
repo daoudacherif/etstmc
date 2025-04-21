@@ -4989,3 +4989,8 @@ td.invert-image a img {
 		margin-bottom: 1em;
 	}
 }
+.control-label {
+	font-size: 14px;
+	font-weight: bolder;
+	color: black;
+  }
