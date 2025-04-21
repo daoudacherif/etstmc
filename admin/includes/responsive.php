@@ -36,8 +36,8 @@
     }
     .control-label { 
   font-weight: bold;
-  font-size: 20px;
-  color:black;
+  font-size: 23px;
+  color:red;
 }
 
     /* The rest of your responsive CSS code (as provided in the previous integration)
