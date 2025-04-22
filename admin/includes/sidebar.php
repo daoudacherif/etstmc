@@ -1,49 +1,80 @@
-<!--Menu latéral-->
+<!-- Menu latéral modernisé et organisé -->
 <div id="sidebar">
   <ul>
-    <li class="active"><a href="dashboard.php"><i class="icon icon-home"></i> <span>Tableau de bord</span></a> </li>
-    <li class="submenu"> <a href="#"><i class="icon icon-th-list"></i> <span>Catégorie</span></a>
+    <!-- Tableau de bord -->
+    <li class="active">
+      <a href="dashboard.php"><i class="icon icon-home"></i> <span>Tableau de bord</span></a>
+    </li>
+
+    <!-- Gestion des catégories -->
+    <li class="submenu">
+      <a href="#"><i class="icon icon-th-list"></i> <span>Catégories</span></a>
       <ul>
         <li><a href="add-category.php">Ajouter une catégorie</a></li>
         <li><a href="manage-category.php">Gérer les catégories</a></li>
-      </ul>
-    </li>
-    <li class="submenu"> <a href="#"><i class="icon icon-inbox"></i> <span>Sous-catégorie</span></a>
-      <ul>
         <li><a href="add-subcategory.php">Ajouter une sous-catégorie</a></li>
         <li><a href="manage-subcategory.php">Gérer les sous-catégories</a></li>
-      </ul>
-    </li>
-    <li class="submenu"> <a href="#"><i class="icon icon-file"></i> <span>Marque</span></a>
-      <ul>
         <li><a href="add-brand.php">Ajouter une marque</a></li>
         <li><a href="manage-brand.php">Gérer les marques</a></li>
       </ul>
     </li>
-    <li class="submenu"> <a href="#"><i class="icon icon-info-sign"></i> <span>Produit</span></a>
+
+    <!-- Produits -->
+    <li class="submenu">
+      <a href="#"><i class="icon icon-info-sign"></i> <span>Produits</span></a>
       <ul>
         <li><a href="add-product.php">Ajouter un produit</a></li>
         <li><a href="manage-product.php">Gérer les produits</a></li>
+        <li><a href="inventory.php">Inventaire</a></li>
       </ul>
     </li>
-    <li> <a href="inventory.php"><i class="icon icon-info-sign"></i> <span>Inventaire</span></a></li>
-    <li> <a href="cart.php"><i class="icon-shopping-cart"></i> <span>Comptant</span><span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
-    <li> <a href="dettecart.php"><i class="icon-shopping-cart"></i> <span>Terme</span><span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
-    <li> <a href="search.php"><i class="icon-search"></i> <span>Rechercher</span></a></li>
-    <li> <a href="transact.php"><i class="icon-search"></i> <span>Transactions</span></a></li>
-    <li> <a href="return.php"><i class="icon-search"></i> <span>Retour</span></a></li>
-    <li> <a href="invoice-search.php"><i class="icon-search"></i> <span>Rechercher une facture</span></a></li>
-    <li> <a href="arrival.php"><i class="icon-group"></i> <span>Arrivage</span></a></li>  
-    <li> <a href="supplier.php"><i class="icon-group"></i> <span>fournisseur</span></a></li>  
-    <li> <a href="supplier-payments.php"><i class="icon-group"></i> <span>payment fournisseur</span></a></li>  
-    
-    <li> <a href="client-account.php"><i class="icon-group"></i> <span>compte client</span></a></li>
-    <li> <a href="customer-details.php"><i class="icon-group"></i> <span>Détails client</span></a></li>
-    <li class="submenu"> <a href="#"><i class="icon icon-th-list"></i> <span>Rapports</span></a>
+
+    <!-- Ventes -->
+    <li class="submenu">
+      <a href="#"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
       <ul>
-        <li><a href="stock-report.php">Rapport de stock</a></li>
-        <li><a href="sales-report.php">Rapport des ventes</a></li>
-        <li><a href="daily-repport.php">Rapport des journalier</a></li>
+        <li><a href="cart.php">Comptant <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
+        <li><a href="dettecart.php">Terme <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
+        <li><a href="return.php">Retour</a></li>
+        <li><a href="transact.php">Transactions</a></li>
+      </ul>
+    </li>
+
+    <!-- Recherche -->
+    <li class="submenu">
+      <a href="#"><i class="icon-search"></i> <span>Recherche</span></a>
+      <ul>
+        <li><a href="search.php">Rechercher</a></li>
+        <li><a href="invoice-search.php">Factures</a></li>
+      </ul>
+    </li>
+
+    <!-- Fournisseurs -->
+    <li class="submenu">
+      <a href="#"><i class="icon-group"></i> <span>Fournisseurs</span></a>
+      <ul>
+        <li><a href="arrival.php">Arrivage</a></li>
+        <li><a href="supplier.php">Liste des fournisseurs</a></li>
+        <li><a href="supplier-payments.php">Paiements</a></li>
+      </ul>
+    </li>
+
+    <!-- Clients -->
+    <li class="submenu">
+      <a href="#"><i class="icon-group"></i> <span>Clients</span></a>
+      <ul>
+        <li><a href="client-account.php">Compte client</a></li>
+        <li><a href="customer-details.php">Détails client</a></li>
+      </ul>
+    </li>
+
+    <!-- Rapports -->
+    <li class="submenu">
+      <a href="#"><i class="icon icon-th-list"></i> <span>Rapports</span></a>
+      <ul>
+        <li><a href="stock-report.php">Stock</a></li>
+        <li><a href="sales-report.php">Ventes</a></li>
+        <li><a href="daily-repport.php">Journalier</a></li>
       </ul>
     </li>
   </ul>
