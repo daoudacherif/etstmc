@@ -98,12 +98,18 @@
 .button:hover {
   letter-spacing: 3px;
   background-color:  #0a9396;
-  color: white;
+  color: hsl(0, 0%, 100%);
   box-shadow:rgb(69, 225, 228) 0px 7px 29px 0px;
 }
 
-
-
+.button:active {
+  letter-spacing: 3px;
+  background-color: hsl(261deg 80% 48%);
+  color: hsl(0, 0%, 100%);
+  box-shadow: rgb(93 24 220) 0px 0px 0px 0px;
+  transform: translateY(10px);
+  transition: 100ms;
+}
 
     </style>
 </head>
