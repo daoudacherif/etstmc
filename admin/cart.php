@@ -3,451 +3,425 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
-// Security headers
-header("Content-Security-Policy: default-src 'self'");
-header("X-Content-Type-Options: nosniff");
-
-// Initialize variables
-$discount = $_SESSION['discount'] ?? 0;
-$productNames = [];
-$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
-// Fetch product names for datalist
-$stmt = mysqli_prepare($con, "SELECT DISTINCT ProductName FROM tblproducts");
-if ($stmt && mysqli_stmt_execute($stmt)) {
-    $result = mysqli_stmt_get_result($stmt);
-    while ($row = mysqli_fetch_assoc($result)) {
-        $productNames[] = htmlspecialchars($row['ProductName']);
-    }
-}
-
-// Security functions
-function sanitizeInput($data) {
-    return htmlspecialchars(trim($data));
-}
-
-function validatePhone($number) {
-    return preg_match('/^\+224\d{9}$/', $number);
-}
-
-// SMS API Functions
 function getAccessToken() {
     $url = "https://api.nimbasms.com/v1/oauth/token";
     $client_id = "1608e90e20415c7edf0226bf86e7effd";
     $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
-    
+    $credentials = base64_encode($client_id . ":" . $client_secret);
+
+    $headers = [
+        "Authorization: Basic $credentials",
+        "Content-Type: application/x-www-form-urlencoded"
+    ];
+
+    $postData = http_build_query([
+        "grant_type" => "client_credentials"
+    ]);
+
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $url,
         CURLOPT_POST => true,
-        CURLOPT_USERPWD => $client_id . ":" . $client_secret,
-        CURLOPT_POSTFIELDS => http_build_query(['grant_type' => 'client_credentials']),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $postData,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2
+        CURLOPT_SSL_VERIFYPEER => false
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200) {
-        error_log("SMS API Error ($httpCode): $response");
+    if ($httpCode != 200) {
+        error_log("Erreur token HTTP $httpCode : $response");
         return false;
     }
 
-    $data = json_decode($response, true);
-    return $data['access_token'] ?? false;
+    $decoded = json_decode($response, true);
+    return $decoded['access_token'] ?? false;
 }
 
 function sendSmsNotification($to, $message) {
-    if (!validatePhone($to)) return false;
-    
     $token = getAccessToken();
     if (!$token) return false;
 
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => "https://api.nimbasms.com/v1/messages",
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            "Authorization: Bearer $token",
-            "Content-Type: application/json"
-        ],
-        CURLOPT_POSTFIELDS => json_encode([
-            "to" => [$to],
-            "message" => $message,
-            "sender_name" => "SMS 9080"
-        ]),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2
+    $url = "https://api.nimbasms.com/v1/messages";
+    $postData = json_encode([
+        "to" => [$to],
+        "message" => $message,
+        "sender_name" => "SMS 9080"
     ]);
 
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $headers = [
+        "Authorization: Bearer $token",
+        "Content-Type: application/json"
+    ];
 
-    return $httpCode === 201;
+    $options = [
+        "http" => [
+            "method" => "POST",
+            "header" => implode("\r\n", $headers),
+            "content" => $postData,
+            "ignore_errors" => true
+        ]
+    ];
+
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+    preg_match('{HTTP\/\S*\s(\d{3})}', $http_response_header[0], $match);
+    $status_code = $match[1] ?? 0;
+
+    return $status_code == 201;
 }
 
-// Session validation
-if (empty($_SESSION['imsaid'])) {
-    header('Location: logout.php');
+if (strlen($_SESSION['imsaid'] ?? '') == 0) {
+    header('location:logout.php');
     exit;
 }
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // CSRF validation
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die("Invalid CSRF token");
+if (isset($_POST['addtocart'])) {
+    $productId = intval($_POST['productid']);
+    $quantity = max(1, intval($_POST['quantity']));
+    $price = max(0, floatval($_POST['price']));
+
+    $stockRes = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+    if (!$stockRes || mysqli_num_rows($stockRes) == 0) {
+        echo "<script>alert('Produit introuvable'); window.location.href='cart.php';</script>";
+        exit;
     }
+    $stock = intval(mysqli_fetch_assoc($stockRes)['Stock']);
 
-    if (isset($_POST['addtocart'])) {
-        // Add to cart processing
-        $productId = filter_input(INPUT_POST, 'productid', FILTER_VALIDATE_INT);
-        $quantity = max(1, filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT));
-        $price = max(0, filter_input(INPUT_POST, 'price', FILTER_VALIDATE_FLOAT));
-
-        // Stock validation
-        $stmt = mysqli_prepare($con, "SELECT Stock FROM tblproducts WHERE ID = ?");
-        mysqli_stmt_bind_param($stmt, 'i', $productId);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-
-        if (mysqli_num_rows($result) === 0) {
-            die("<script>alert('Produit introuvable'); window.location.href='cart.php';</script>");
-        }
-
-        $stock = mysqli_fetch_assoc($result)['Stock'];
-        if ($quantity > $stock) {
-            die("<script>alert('Quantité demandée ($quantity) supérieure au stock disponible ($stock)'); window.location.href='cart.php';</script>");
-        }
-
-        // Update cart
-        $stmt = mysqli_prepare($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId = ? AND IsCheckOut = 0 LIMIT 1");
-        mysqli_stmt_bind_param($stmt, 'i', $productId);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-
-        if (mysqli_num_rows($result) > 0) {
-            $row = mysqli_fetch_assoc($result);
-            $newQty = $row['ProductQty'] + $quantity;
-            $stmt = mysqli_prepare($con, "UPDATE tblcart SET ProductQty = ?, Price = ? WHERE ID = ?");
-            mysqli_stmt_bind_param($stmt, 'idi', $newQty, $price, $row['ID']);
-        } else {
-            $stmt = mysqli_prepare($con, "INSERT INTO tblcart (ProductId, ProductQty, Price, IsCheckOut) VALUES (?, ?, ?, 0)");
-            mysqli_stmt_bind_param($stmt, 'iid', $productId, $quantity, $price);
-        }
-
-        mysqli_stmt_execute($stmt);
-        die("<script>alert('Produit ajouté au panier!');window.location.href='cart.php';</script>");
-    }
-
-    if (isset($_POST['applyDiscount'])) {
-        // Discount handling
-        $_SESSION['discount'] = max(0, filter_input(INPUT_POST, 'discount', FILTER_VALIDATE_FLOAT));
-        header('Location: cart.php');
+    if ($quantity > $stock) {
+        echo "<script>alert('Quantité demandée ($quantity) supérieure au stock disponible ($stock)'); window.location.href='cart.php';</script>";
         exit;
     }
 
-    if (isset($_POST['submit'])) {
-        // Checkout processing
-        $custname = sanitizeInput($_POST['customername']);
-        $custmobile = preg_replace('/[^0-9+]/', '', $_POST['mobilenumber']);
-        $modepayment = sanitizeInput($_POST['modepayment']);
-
-        if (!validatePhone($custmobile)) {
-            die("<script>alert('Format de numéro mobile invalide'); window.history.back();</script>");
-        }
-
-        // Calculate totals
-        $stmt = mysqli_prepare($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut = 0");
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-
-        $grandTotal = 0;
-        while ($row = mysqli_fetch_assoc($result)) {
-            $grandTotal += $row['ProductQty'] * $row['Price'];
-        }
-        $netTotal = max(0, $grandTotal - $discount);
-        $billNum = mt_rand(100000000, 999999999);
-
-        // Database transaction
-        mysqli_begin_transaction($con);
-        try {
-            // Update cart
-            $stmt = mysqli_prepare($con, "UPDATE tblcart SET BillingId = ?, IsCheckOut = 1 WHERE IsCheckOut = 0");
-            mysqli_stmt_bind_param($stmt, 'i', $billNum);
-            mysqli_stmt_execute($stmt);
-
-            // Create customer record
-            $stmt = mysqli_prepare($con, "INSERT INTO tblcustomer (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES (?, ?, ?, ?, ?)");
-            mysqli_stmt_bind_param($stmt, 'isssd', $billNum, $custname, $custmobile, $modepayment, $netTotal);
-            mysqli_stmt_execute($stmt);
-
-            mysqli_commit($con);
-            
-            // Send SMS
-            $_SESSION['invoiceid'] = $billNum;
-            unset($_SESSION['discount']);
-            $smsMessage = "Bonjour $custname, votre commande (Facture No: $billNum) a été validée.";
-            $smsSent = sendSmsNotification($custmobile, $smsMessage);
-
-            $alert = $smsSent ? 'SMS envoyé avec succès' : 'Échec d\'envoi SMS';
-            die("<script>alert('Facture créée: $billNum\\n$alert');window.location.href='invoice.php';</script>");
-        } catch (Exception $e) {
-            mysqli_rollback($con);
-            error_log("Transaction error: " . $e->getMessage());
-            die("<script>alert('Erreur lors du paiement'); window.location.href='cart.php';</script>");
-        }
+    $chk = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
+    if (mysqli_num_rows($chk) > 0) {
+        $r = mysqli_fetch_assoc($chk);
+        $newQty = $r['ProductQty'] + $quantity;
+        mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$r['ID']}'");
+    } else {
+        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId','$quantity','$price','0')");
     }
+    echo "<script>alert('Produit ajouté au panier!');window.location.href='cart.php';</script>";
+    exit;
 }
 
-// Handle cart deletion
 if (isset($_GET['delid'])) {
-    $rid = filter_input(INPUT_GET, 'delid', FILTER_VALIDATE_INT);
-    if ($rid) {
-        $stmt = mysqli_prepare($con, "DELETE FROM tblcart WHERE ID = ?");
-        mysqli_stmt_bind_param($stmt, 'i', $rid);
-        mysqli_stmt_execute($stmt);
+    $rid = intval($_GET['delid']);
+    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
+    echo "<script>alert('Produit retiré du panier');window.location.href='cart.php';</script>";
+    exit;
+}
+
+if (isset($_POST['applyDiscount'])) {
+    $_SESSION['discount'] = floatval($_POST['discount']);
+    echo "<script>window.location.href='cart.php';</script>";
+    exit;
+}
+
+if (isset($_POST['submit'])) {
+    $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
+    $custmobile = preg_replace('/[^0-9]/', '', $_POST['mobilenumber']);
+    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
+
+    $discount = $_SESSION['discount'] ?? 0;
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $grand = 0;
+    while ($row = mysqli_fetch_assoc($cartQ)) {
+        $grand += $row['ProductQty'] * $row['Price'];
     }
-    die("<script>alert('Produit retiré du panier');window.location.href='cart.php';</script>");
+    $netTotal = max(0, $grand - $discount);
+    $billNum = mt_rand(100000000, 999999999);
+
+    mysqli_begin_transaction($con);
+    try {
+        mysqli_query($con, "UPDATE tblcart SET BillingId='$billNum', IsCheckOut=1 WHERE IsCheckOut=0");
+        mysqli_query($con, "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES('$billNum','$custname','$custmobile','$modepayment','$netTotal')");
+        mysqli_commit($con);
+        $_SESSION['invoiceid'] = $billNum;
+        unset($_SESSION['discount']);
+
+        $smsSent = sendSmsNotification($custmobile, "Bonjour $custname, votre commande (Facture No: $billNum) a été validée.");
+        $alert = $smsSent ? 'SMS envoyé avec succès' : 'Echec d\'envoi SMS';
+
+        echo "<script>alert('Facture créée: $billNum\n$alert');window.location.href='invoice.php';</script>";
+        exit;
+    } catch (Exception $e) {
+        mysqli_rollback($con);
+        error_log("Erreur transaction : " . $e->getMessage());
+        echo "<script>alert('Erreur lors du paiement');</script>";
+    }
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8">
     <title>Système de gestion des stocks | Panier</title>
     <?php include_once('includes/cs.php'); ?>
-</head>
-<body>
+    <?php include_once('includes/responsive.php'); ?>
+
+<!-- Header + Sidebar -->
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">
     <div id="content-header">
         <div id="breadcrumb">
-            <a href="dashboard.php" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
-            <a href="cart.php" class="current">Panier</a>
+            <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
+                <i class="icon-home"></i> Accueil
+            </a>
+            <a href="cart.php" class="current">Panier de produits</a>
         </div>
-        <h1>Gestion du Panier</h1>
+        <h1>Panier de produits</h1>
     </div>
 
     <div class="container-fluid">
-        <!-- Search Form -->
+        <hr>
+        <!-- ========== FORMULAIRE DE RECHERCHE (avec datalist) ========== -->
         <div class="row-fluid">
             <div class="span12">
                 <form method="get" action="cart.php" class="form-inline">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <input type="text" name="searchTerm" class="span3" placeholder="Rechercher produit..." 
-                           list="productsList" value="<?= htmlspecialchars($_GET['searchTerm'] ?? '') ?>">
+                    <label>Rechercher des produits :</label>
+                    <input type="text" name="searchTerm" class="span3" placeholder="Nom du produit..." list="productsList" />
                     <datalist id="productsList">
-                        <?php foreach ($productNames as $pname): ?>
-                            <option value="<?= $pname ?>">
-                        <?php endforeach; ?>
+                        <?php
+                        foreach ($productNames as $pname) {
+                            echo '<option value="' . htmlspecialchars($pname) . '"></option>';
+                        }
+                        ?>
                     </datalist>
                     <button type="submit" class="btn btn-primary">Rechercher</button>
                 </form>
             </div>
         </div>
+        <hr>
 
-        <!-- Search Results -->
-        <?php if (!empty($_GET['searchTerm'])): ?>
+        <!-- ========== AFFICHAGE DES RÉSULTATS DE RECHERCHE ========== -->
         <?php
-        $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
-        $stmt = mysqli_prepare($con, "
-            SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price,
-                   c.CategoryName, s.SubCategoryName
-            FROM tblproducts p
-            LEFT JOIN tblcategory c ON c.ID = p.CatID
-            LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
-            WHERE p.ProductName LIKE CONCAT('%', ?, '%') 
-               OR p.ModelNumber LIKE CONCAT('%', ?, '%')
-        ");
-        mysqli_stmt_bind_param($stmt, 'ss', $searchTerm, $searchTerm);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        ?>
-        <div class="row-fluid">
-            <div class="span12">
-                <h4>Résultats pour "<?= htmlspecialchars($searchTerm) ?>"</h4>
-                <?php if (mysqli_num_rows($result) > 0): ?>
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Produit</th>
-                            <th>Catégorie</th>
-                            <th>Sous-catégorie</th>
-                            <th>Marque</th>
-                            <th>Modèle</th>
-                            <th>Prix</th>
-                            <th>Quantité</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php $i = 1; while ($row = mysqli_fetch_assoc($result)): ?>
-                        <tr>
-                            <td><?= $i++ ?></td>
-                            <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                            <td><?= htmlspecialchars($row['CategoryName']) ?></td>
-                            <td><?= htmlspecialchars($row['SubCategoryName']) ?></td>
-                            <td><?= htmlspecialchars($row['BrandName']) ?></td>
-                            <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                            <td><?= number_format($row['Price'], 2) ?></td>
-                            <td>
-                                <form method="post" class="form-inline">
-                                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                                    <input type="hidden" name="productid" value="<?= $row['ID'] ?>">
-                                    <input type="number" name="quantity" value="1" min="1" class="input-mini">
-                                    <button type="submit" name="addtocart" class="btn btn-success btn-small">
-                                        <i class="icon-plus"></i> Ajouter
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
-                    </tbody>
-                </table>
-                <?php else: ?>
-                <div class="alert alert-info">Aucun produit trouvé</div>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
-        <!-- Cart Management -->
-        <div class="row-fluid">
-            <div class="span12">
-                <!-- Discount Form -->
-                <form method="post" class="form-inline text-right">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <label>Remise:</label>
-                    <input type="number" name="discount" step="0.01" value="<?= $discount ?>" class="input-small">
-                    <button type="submit" name="applyDiscount" class="btn btn-info">Appliquer</button>
-                </form>
-
-                <!-- Cart Items -->
-                <div class="widget-box">
-                    <div class="widget-title">
-                        <h5>Contenu du Panier</h5>
-                    </div>
-                    <div class="widget-content">
-                        <table class="table table-bordered">
+        if (!empty($_GET['searchTerm'])) {
+            $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
+            $sql = "
+                SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price,
+                       c.CategoryName, s.SubCategoryName
+                FROM tblproducts p
+                LEFT JOIN tblcategory c ON c.ID = p.CatID
+                LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
+                WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
+            ";
+            $res = mysqli_query($con, $sql);
+            $count = mysqli_num_rows($res);
+            ?>
+            <div class="row-fluid">
+                <div class="span12">
+                    <h4>Résultats de recherche pour "<em><?php echo htmlentities($searchTerm); ?></em>"</h4>
+                    <?php if ($count > 0) { ?>
+                        <table class="table table-bordered table-striped">
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Produit</th>
+                                    <th>Nom du produit</th>
+                                    <th>Catégorie</th>
+                                    <th>Sous-catégorie</th>
+                                    <th>Marque</th>
+                                    <th>Modèle</th>
+                                    <th>Prix par défaut</th>
+                                    <th>Prix personnalisé</th>
                                     <th>Quantité</th>
-                                    <th>Prix Unitaire</th>
+                                    <th>Ajouter</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $i = 1;
+                                while ($row = mysqli_fetch_assoc($res)) {
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $i++; ?></td>
+                                        <td><?php echo $row['ProductName']; ?></td>
+                                        <td><?php echo $row['CategoryName']; ?></td>
+                                        <td><?php echo $row['SubCategoryName']; ?></td>
+                                        <td><?php echo $row['BrandName']; ?></td>
+                                        <td><?php echo $row['ModelNumber']; ?></td>
+                                        <td><?php echo $row['Price']; ?></td>
+                                        <td>
+                                            <form method="post" action="cart.php" style="margin:0;">
+                                                <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
+                                                <input type="number" name="price" step="any" value="<?php echo $row['Price']; ?>" style="width:80px;" />
+                                        </td>
+                                        <td>
+                                            <input type="number" name="quantity" value="1" min="1" style="width:60px;" />
+                                        </td>
+                                        <td>
+                                            <button type="submit" name="addtocart" class="btn btn-success btn-small">
+                                                <i class="icon-plus"></i> Ajouter
+                                            </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <?php
+                                }
+                                ?>
+                            </tbody>
+                        </table>
+                    <?php } else { ?>
+                        <p style="color:red;">Aucun produit correspondant trouvé.</p>
+                    <?php } ?>
+                </div>
+            </div>
+            <hr>
+        <?php } ?>
+
+        <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
+        <div class="row-fluid">
+            <div class="span12">
+                <form method="post" class="form-inline" style="text-align:right;">
+                    <label>Remise :</label>
+                    <input type="number" name="discount" step="any" value="<?php echo $discount; ?>" style="width:80px;" />
+                    <button class="btn btn-info" type="submit" name="applyDiscount">Appliquer</button>
+                </form>
+                <hr>
+
+                <!-- Formulaire checkout (informations client) -->
+                <form method="post" class="form-horizontal" name="submit">
+                    <div class="control-group">
+                        <label class="control-label">Nom du client :</label>
+                        <div class="controls">
+                            <input type="text" class="span11" id="customername" name="customername" required />
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Numéro de mobile du client :</label>
+                        <div class="controls">
+                            <input type="tel"
+                                   class="span11"
+                                   id="mobilenumber"
+                                   name="mobilenumber"
+                                   required
+                                   pattern="^\+224[0-9]{9}$"
+                                   placeholder="+224xxxxxxxxx"
+                                   title="Format: +224 suivi de 9 chiffres">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Mode de paiement :</label>
+                        <div class="controls">
+                            <label><input type="radio" name="modepayment" value="cash" checked> Espèces</label>
+                            <label><input type="radio" name="modepayment" value="card"> Carte</label>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <button class="btn btn-primary" type="submit" name="submit">
+                            Paiement & Créer une facture
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Tableau du panier -->
+                <div class="widget-box">
+                    <div class="widget-title">
+                        <span class="icon"><i class="icon-th"></i></span>
+                        <h5>Produits dans le panier</h5>
+                    </div>
+                    <div class="widget-content nopadding">
+                        <table class="table table-bordered" style="font-size: 15px">
+                            <thead>
+                                <tr>
+                                    <th>N°</th>
+                                    <th>Nom du produit</th>
+                                    <th>Quantité</th>
+                                    <th>Prix (par unité)</th>
                                     <th>Total</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php
-                                $stmt = mysqli_prepare($con, "
-                                    SELECT c.ID, c.ProductQty, c.Price, p.ProductName 
-                                    FROM tblcart c
-                                    JOIN tblproducts p ON p.ID = c.ProductId
-                                    WHERE c.IsCheckOut = 0
+                                $ret = mysqli_query($con, "
+                                  SELECT 
+                                    tblcart.ID as cid,
+                                    tblcart.ProductQty,
+                                    tblcart.Price as cartPrice,
+                                    tblproducts.ProductName
+                                  FROM tblcart
+                                  LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
+                                  WHERE tblcart.IsCheckOut = 0
+                                  ORDER BY tblcart.ID ASC
                                 ");
-                                mysqli_stmt_execute($stmt);
-                                $result = mysqli_stmt_get_result($stmt);
-                                $total = 0;
+                                $cnt = 1;
+                                $grandTotal = 0;
+                                $num = mysqli_num_rows($ret);
+                                if ($num > 0) {
+                                    while ($row = mysqli_fetch_array($ret)) {
+                                        $pq = $row['ProductQty'];
+                                        $ppu = $row['cartPrice'];
+                                        $lineTotal = $pq * $ppu;
+                                        $grandTotal += $lineTotal;
+                                        ?>
+                                        <tr class="gradeX">
+                                            <td><?php echo $cnt; ?></td>
+                                            <td><?php echo $row['ProductName']; ?></td>
+                                            <td><?php echo $pq; ?></td>
+                                            <td><?php echo number_format($ppu, 2); ?></td>
+                                            <td><?php echo number_format($lineTotal, 2); ?></td>
+                                            <td>
+                                                <a href="cart.php?delid=<?php echo $row['cid']; ?>"
+                                                   onclick="return confirm('Voulez-vous vraiment retirer cet article?');">
+                                                    <i class="icon-trash"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        <?php
+                                        $cnt++;
+                                    }
+                                    $netTotal = $grandTotal - $discount;
+                                    if ($netTotal < 0) {
+                                        $netTotal = 0;
+                                    }
+                                    ?>
+                                    <tr>
+                                        <th colspan="4" style="text-align: right; font-weight: bold;">Total général</th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="4" style="text-align: right; font-weight: bold;">Remise</th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total net</th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
+                                    </tr>
+                                    <?php
+                                } else {
+                                    ?>
+                                    <tr>
+                                        <td colspan="6" style="color:red; text-align:center">Aucun article trouvé dans le panier</td>
+                                    </tr>
+                                    <?php
+                                }
                                 ?>
-                                <?php if (mysqli_num_rows($result) > 0): ?>
-                                <?php $cnt = 1; while ($row = mysqli_fetch_assoc($result)): ?>
-                                <?php
-                                $lineTotal = $row['ProductQty'] * $row['Price'];
-                                $total += $lineTotal;
-                                ?>
-                                <tr>
-                                    <td><?= $cnt++ ?></td>
-                                    <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                                    <td><?= $row['ProductQty'] ?></td>
-                                    <td><?= number_format($row['Price'], 2) ?></td>
-                                    <td><?= number_format($lineTotal, 2) ?></td>
-                                    <td>
-                                        <a href="cart.php?delid=<?= $row['ID'] ?>" 
-                                           onclick="return confirm('Supprimer cet article?')"
-                                           class="btn btn-danger btn-mini">
-                                            <i class="icon-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endwhile; ?>
-                                <tr class="info">
-                                    <td colspan="4" class="text-right"><strong>Total:</strong></td>
-                                    <td colspan="2"><?= number_format($total, 2) ?></td>
-                                </tr>
-                                <tr class="warning">
-                                    <td colspan="4" class="text-right"><strong>Remise:</strong></td>
-                                    <td colspan="2"><?= number_format($discount, 2) ?></td>
-                                </tr>
-                                <tr class="success">
-                                    <td colspan="4" class="text-right"><strong>Total Net:</strong></td>
-                                    <td colspan="2"><?= number_format(max(0, $total - $discount), 2) ?></td>
-                                </tr>
-                                <?php else: ?>
-                                <tr>
-                                    <td colspan="6" class="text-center">Panier vide</td>
-                                </tr>
-                                <?php endif; ?>
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                <!-- Checkout Form -->
-                <form method="post" class="form-horizontal">
-                    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
-                    <div class="control-group">
-                        <label class="control-label">Nom Client:</label>
-                        <div class="controls">
-                            <input type="text" name="customername" required class="span11">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Téléphone:</label>
-                        <div class="controls">
-                            <input type="tel" name="mobilenumber" 
-                                   pattern="^\+224\d{9}$"
-                                   placeholder="+224XXXXXXXXX"
-                                   required class="span11">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Paiement:</label>
-                        <div class="controls">
-                            <label class="radio inline">
-                                <input type="radio" name="modepayment" value="cash" checked> Espèces
-                            </label>
-                            <label class="radio inline">
-                                <input type="radio" name="modepayment" value="card"> Carte
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button type="submit" name="submit" class="btn btn-primary btn-large">
-                            <i class="icon-shopping-cart"></i> Finaliser la Commande
-                        </button>
-                    </div>
-                </form>
+                    </div><!-- widget-content -->
+                </div><!-- widget-box -->
             </div>
-        </div>
-    </div>
-</div>
+        </div><!-- row-fluid -->
+    </div><!-- container-fluid -->
+</div><!-- content -->
 
+<!-- Footer -->
 <?php include_once('includes/footer.php'); ?>
+
+<!-- SCRIPTS -->
 <script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
 <script src="js/matrix.js"></script>
+<script src="js/matrix.tables.js"></script>
 </body>
 </html>
