@@ -1,10 +1,9 @@
-<?php
+<?php 
 session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
-// Vérifier si l'admin est connecté
-if (strlen($_SESSION['imsaid']) == 0) {
+if (strlen($_SESSION['imsaid'] ?? '') == 0) {
   header('location:logout.php');
   exit;
 }
@@ -15,6 +14,8 @@ if (strlen($_SESSION['imsaid']) == 0) {
   <title>Système de Gestion d'Inventaire || Voir l'Inventaire des Produits</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+</head>
+<body>
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 
@@ -32,7 +33,6 @@ if (strlen($_SESSION['imsaid']) == 0) {
     <hr>
     <div class="row-fluid">
       <div class="span12">
-        
         <div class="widget-box">
           <div class="widget-title">
             <span class="icon"><i class="icon-th"></i></span>
@@ -45,8 +45,6 @@ if (strlen($_SESSION['imsaid']) == 0) {
                   <th>N°</th>
                   <th>Nom du Produit</th>
                   <th>Catégorie</th>
-                  <th>Sous-Catégorie</th>
-                  <th>Marque</th>
                   <th>Modèle</th>
                   <th>Stock Restant</th>
                   <th>Statut</th>
@@ -58,16 +56,13 @@ if (strlen($_SESSION['imsaid']) == 0) {
                   SELECT
                     p.ID as pid,
                     p.ProductName,
-                    p.BrandName,
                     p.ModelNumber,
                     p.Stock,
                     p.Status,
                     c.CategoryName,
-                    sc.SubCategoryname as subcat,
                     SUM(cart.ProductQty) as selledqty
                   FROM tblproducts p
                   LEFT JOIN tblcategory c ON c.ID = p.CatID
-                  LEFT JOIN tblsubcategory sc ON sc.ID = p.SubcatID
                   LEFT JOIN tblcart cart ON cart.ProductId = p.ID
                   GROUP BY p.ID
                   ORDER BY p.ID DESC
@@ -80,14 +75,11 @@ if (strlen($_SESSION['imsaid']) == 0) {
                     $qtySold = $row['selledqty'] ?? 0;
                     $stockRemain = $row['Stock'] - $qtySold;
                     $catName = $row['CategoryName'] ?: "N/A";
-                    $subcatName = $row['subcat'] ?: "N/A";
                     ?>
                     <tr class="gradeX">
                       <td><?= $cnt ?></td>
                       <td><?= htmlspecialchars($row['ProductName']) ?></td>
                       <td><?= htmlspecialchars($catName) ?></td>
-                      <td><?= htmlspecialchars($subcatName) ?></td>
-                      <td><?= htmlspecialchars($row['BrandName']) ?></td>
                       <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
                       <td>
                         <?= ($stockRemain <= 0) ? '<span class="text-danger">Vide</span>' : $stockRemain ?>
@@ -102,7 +94,7 @@ if (strlen($_SESSION['imsaid']) == 0) {
                 } else {
                   ?>
                   <tr>
-                    <td colspan="8" class="text-center">Aucun enregistrement trouvé.</td>
+                    <td colspan="6" class="text-center">Aucun enregistrement trouvé.</td>
                   </tr>
                   <?php
                 }
