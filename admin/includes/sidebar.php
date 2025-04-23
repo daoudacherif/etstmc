@@ -12,10 +12,6 @@
       <ul>
         <li><a href="add-category.php">Ajouter une catégorie</a></li>
         <li><a href="manage-category.php">Gérer les catégories</a></li>
-        <li><a href="add-subcategory.php">Ajouter une sous-catégorie</a></li>
-        <li><a href="manage-subcategory.php">Gérer les sous-catégories</a></li>
-        <li><a href="add-brand.php">Ajouter une marque</a></li>
-        <li><a href="manage-brand.php">Gérer les marques</a></li>
       </ul>
     </li>
 
