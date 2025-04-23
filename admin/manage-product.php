@@ -9,37 +9,37 @@ if (strlen($_SESSION['imsaid']) == 0) {
     exit;
 }
 
-// 1) Désactivation / suppression du produit
+// Désactivation (ou suppression) d'un produit
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    // Désactiver le produit (Statut = 0)
-    mysqli_query($con, "UPDATE tblproducts SET Status = 0 WHERE ID = $delid");
-    // Ou suppression physique :
-    // mysqli_query($con, "DELETE FROM tblproducts WHERE ID = $delid");
+    // Désactivation (Statut = 0)
+    mysqli_query($con, "UPDATE tblproducts SET Status=0 WHERE ID=$delid");
+    // Pour suppression physique, décommentez :
+    // mysqli_query($con, "DELETE FROM tblproducts WHERE ID=$delid");
+
     header('location:manage-product.php');
     exit;
 }
 
-// 2) Récupération des produits avec catégories et sous-catégories
-$ret = mysqli_query($con, "
-    SELECT 
-      p.ID           AS pid,
-      p.ProductName,
-      p.CatID,
-      c.CategoryName,
-      p.SubcatID,
-      sc.SubCategoryName AS SubCategoryName,
-      p.BrandName,
-      p.ModelNumber,
-      p.Stock,
-      p.Price,
-      p.Status,
-      p.CreationDate
-    FROM tblproducts p
-    LEFT JOIN tblcategory c ON c.ID = p.CatID
-    LEFT JOIN tblsubcategory sc ON sc.ID = p.SubcatID
-    ORDER BY p.ID DESC
-");
+// Récupération des produits + noms catégories/sous-catégories
+$sql = "
+SELECT
+  p.ID AS pid,
+  p.ProductName,
+  c.CategoryName,
+  sc.SubCategoryName,
+  p.BrandName,
+  p.ModelNumber,
+  p.Stock,
+  p.Price,
+  p.Status,
+  p.CreationDate
+FROM tblproducts p
+LEFT JOIN tblcategory c ON c.ID = p.CatID
+LEFT JOIN tblsubcategory sc ON sc.ID = p.SubcatID
+ORDER BY p.ID DESC
+";
+$ret = mysqli_query($con, $sql) or die('Erreur SQL : '.mysqli_error($con));
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -75,18 +75,16 @@ $ret = mysqli_query($con, "
                             <thead>
                                 <tr>
                                     <th>N°</th>
-                                    <th>Nom du Produit</th>
-                                    <th>CatID</th>
+                                    <th>Produit</th>
                                     <th>Catégorie</th>
-                                    <th>SubcatID</th>
                                     <th>Sous-catégorie</th>
                                     <th>Marque</th>
                                     <th>Modèle</th>
                                     <th>Stock</th>
                                     <th>Prix</th>
                                     <th>Statut</th>
-                                    <th>Date de Création</th>
-                                    <th>Actions</th>
+                                    <th>Créé le</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -96,32 +94,24 @@ $ret = mysqli_query($con, "
                                 $statusLabel = $row['Status'] == 1
                                     ? '<span class="label label-success">Actif</span>'
                                     : '<span class="label label-danger">Inactif</span>';
+                                echo '<tr class="gradeX">';
+                                echo '<td>'. $cnt++ .'</td>';
+                                echo '<td>'. htmlspecialchars($row['ProductName']) .'</td>';
+                                echo '<td>'. htmlspecialchars($row['CategoryName'] ?: '—') .'</td>';
+                                echo '<td>'. htmlspecialchars($row['SubCategoryName'] ?: '—') .'</td>';
+                                echo '<td>'. htmlspecialchars($row['BrandName']) .'</td>';
+                                echo '<td>'. htmlspecialchars($row['ModelNumber']) .'</td>';
+                                echo '<td>'. intval($row['Stock']) .'</td>';
+                                echo '<td>'. number_format($row['Price'], 2) .'</td>';
+                                echo '<td class="center">'. $statusLabel .'</td>';
+                                echo '<td>'. date('d/m/Y H:i', strtotime($row['CreationDate'])) .'</td>';
+                                echo '<td class="center">';
+                                echo '<a href="editproducts.php?editid='. $row['pid'] .'" class="btn btn-mini btn-info"><i class="icon-edit"></i></a> ';
+                                echo '<a href="manage-product.php?delid='. $row['pid'] .'" onclick="return confirm(\'Désactiver ce produit ?\')" class="btn btn-mini btn-danger"><i class="icon-trash"></i></a>';
+                                echo '</td>';
+                                echo '</tr>';
+                            }
                             ?>
-                                <tr class="gradeX">
-                                    <td><?= $cnt++ ?></td>
-                                    <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                                    <td><?= intval($row['CatID']) ?></td>
-                                    <td><?= htmlspecialchars($row['CategoryName'] ?: 'Inconnue') ?></td>
-                                    <td><?= intval($row['SubcatID']) ?></td>
-                                    <td><?= htmlspecialchars($row['SubCategoryName'] ?: 'Inconnue') ?></td>
-                                    <td><?= htmlspecialchars($row['BrandName']) ?></td>
-                                    <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                                    <td><?= intval($row['Stock']) ?></td>
-                                    <td><?= number_format($row['Price'], 2) ?></td>
-                                    <td class="center"><?= $statusLabel ?></td>
-                                    <td><?= date('d/m/Y H:i', strtotime($row['CreationDate'])) ?></td>
-                                    <td class="center">
-                                        <a href="editproducts.php?editid=<?= $row['pid'] ?>" class="btn btn-mini btn-info">
-                                            <i class="icon-edit"></i>
-                                        </a>
-                                        <a href="manage-product.php?delid=<?= $row['pid'] ?>"
-                                           onclick="return confirm('Voulez-vous vraiment désactiver ce produit ?')"
-                                           class="btn btn-mini btn-danger">
-                                            <i class="icon-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php } ?>
                             </tbody>
                         </table>
                     </div>
