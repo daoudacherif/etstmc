@@ -34,7 +34,11 @@
         display: block;
       }
     }
-    
+    .control-label{
+      font-size: 15px;
+      font-weight: bold;
+      color: black;
+    }
     /* The rest of your responsive CSS code (as provided in the previous integration)
        can either be here or in your external responsive.css file included via cs.php */
   </style>
