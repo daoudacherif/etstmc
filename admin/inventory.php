@@ -56,7 +56,7 @@ if (strlen($_SESSION['imsaid'] ?? '') == 0) {
                   SELECT
                     p.ID as pid,
                     p.ProductName,
-                    p.ModelNumber,
+                   
                     p.Stock,
                     p.Status,
                     c.CategoryName,
@@ -80,7 +80,7 @@ if (strlen($_SESSION['imsaid'] ?? '') == 0) {
                       <td><?= $cnt ?></td>
                       <td><?= htmlspecialchars($row['ProductName']) ?></td>
                       <td><?= htmlspecialchars($catName) ?></td>
-                      <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                      
                       <td>
                         <?= ($stockRemain <= 0) ? '<span class="text-danger">Vide</span>' : $stockRemain ?>
                       </td>
