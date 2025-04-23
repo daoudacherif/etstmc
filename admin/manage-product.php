@@ -24,7 +24,6 @@ SELECT
   p.ID AS pid,
   p.ProductName,
   c.CategoryName,
-  p.BrandName,
   p.ModelNumber,
   p.Stock,
   p.Status,
