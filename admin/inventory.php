@@ -3,7 +3,7 @@ session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
-if (strlen($_SESSION['imsaid'] ?? '') == 0) {
+if (empty($_SESSION['imsaid'])) {
   header('location:logout.php');
   exit;
 }
@@ -45,58 +45,56 @@ if (strlen($_SESSION['imsaid'] ?? '') == 0) {
                   <th>N°</th>
                   <th>Nom du Produit</th>
                   <th>Catégorie</th>
-                 
+                  <th>Marque</th>
+                  <th>Modèle</th>
+                  <th>Stock Initial</th>
+                  <th>Vendus</th>
                   <th>Stock Restant</th>
                   <th>Statut</th>
                 </tr>
               </thead>
               <tbody>
                 <?php
-                $sql = "
-                  SELECT
-                    p.ID as pid,
-                    p.ProductName,
-                   
-                    p.Stock,
-                    p.Status,
-                    c.CategoryName,
-                    SUM(cart.ProductQty) as selledqty
-                  FROM tblproducts p
-                  LEFT JOIN tblcategory c ON c.ID = p.CatID
-                  LEFT JOIN tblcart cart ON cart.ProductId = p.ID
-                  GROUP BY p.ID
-                  ORDER BY p.ID DESC
-                ";
+                $sql = "SELECT 
+                        p.ID as pid,
+                        p.ProductName,
+                        p.BrandName,
+                        p.ModelNumber,
+                        p.Stock,
+                        p.Status,
+                        c.CategoryName,
+                        COALESCE(SUM(cart.ProductQty), 0) as sold_qty
+                      FROM tblproducts p
+                      LEFT JOIN tblcategory c ON c.ID = p.CatID
+                      LEFT JOIN tblcart cart ON cart.ProductId = p.ID 
+                        AND cart.OrderStatus = 'Completed' /* Only count completed orders */
+                      GROUP BY p.ID
+                      ORDER BY p.ID DESC";
+                
                 $ret = mysqli_query($con, $sql);
-                $num = mysqli_num_rows($ret);
-                if ($num > 0) {
+                if(mysqli_num_rows($ret) > 0) {
                   $cnt = 1;
-                  while ($row = mysqli_fetch_assoc($ret)) {
-                    $qtySold = $row['selledqty'] ?? 0;
-                    $stockRemain = $row['Stock'] - $qtySold;
-                    $catName = $row['CategoryName'] ?: "N/A";
+                  while($row = mysqli_fetch_assoc($ret)) {
+                    $remaining_stock = $row['Stock'] - $row['sold_qty'];
                     ?>
-                    <tr class="gradeX">
+                    <tr>
                       <td><?= $cnt ?></td>
                       <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                      <td><?= htmlspecialchars($catName) ?></td>
-                      
-                      <td>
-                        <?= ($stockRemain <= 0) ? '<span class="text-danger">Vide</span>' : $stockRemain ?>
+                      <td><?= htmlspecialchars($row['CategoryName'] ?? 'N/A') ?></td>
+                      <td><?= htmlspecialchars($row['BrandName']) ?></td>
+                      <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                      <td><?= $row['Stock'] ?></td>
+                      <td><?= $row['sold_qty'] ?></td>
+                      <td class="<?= ($remaining_stock <= 0) ? 'text-error' : '' ?>">
+                        <?= ($remaining_stock <= 0) ? 'Épuisé' : $remaining_stock ?>
                       </td>
-                      <td>
-                        <?= ($row['Status'] == "1") ? 'Actif' : 'Inactif' ?>
-                      </td>
+                      <td><?= ($row['Status'] == 1) ? 'Actif' : 'Inactif' ?></td>
                     </tr>
                     <?php
                     $cnt++;
                   }
                 } else {
-                  ?>
-                  <tr>
-                    <td colspan="6" class="text-center">Aucun enregistrement trouvé.</td>
-                  </tr>
-                  <?php
+                  echo '<tr><td colspan="9" class="text-center">Aucun produit trouvé</td></tr>';
                 }
                 ?>
               </tbody>
@@ -109,14 +107,5 @@ if (strlen($_SESSION['imsaid'] ?? '') == 0) {
 </div>
 
 <?php include_once('includes/footer.php'); ?>
-
-<script src="js/jquery.min.js"></script>
-<script src="js/jquery.ui.custom.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.uniform.js"></script>
-<script src="js/select2.min.js"></script>
-<script src="js/jquery.dataTables.min.js"></script>
-<script src="js/matrix.js"></script>
-<script src="js/matrix.tables.js"></script>
 </body>
 </html>
