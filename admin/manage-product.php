@@ -9,30 +9,32 @@ if (strlen($_SESSION['imsaid']) == 0) {
     exit;
 }
 
-// Désactivation / Suppression du produit
+// 1) Désactivation / suppression du produit
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    // Option 1: désactiver le produit
+    // Désactiver le produit (Statut = 0)
     mysqli_query($con, "UPDATE tblproducts SET Status = 0 WHERE ID = $delid");
-    // Option 2: suppression physique
+    // Ou suppression physique :
     // mysqli_query($con, "DELETE FROM tblproducts WHERE ID = $delid");
-
     header('location:manage-product.php');
     exit;
 }
 
-// Récupérer la liste des produits avec catégories / sous-catégories
+// 2) Récupération des produits avec catégories et sous-catégories
 $ret = mysqli_query($con, "
     SELECT 
-      p.ID AS pid,
+      p.ID           AS pid,
       p.ProductName,
+      p.CatID,
+      c.CategoryName,
+      p.SubcatID,
+      sc.SubCategoryName AS SubCategoryName,
       p.BrandName,
       p.ModelNumber,
       p.Stock,
+      p.Price,
       p.Status,
-      p.CreationDate,
-      c.CategoryName,
-      sc.SubCategoryName AS subcat
+      p.CreationDate
     FROM tblproducts p
     LEFT JOIN tblcategory c ON c.ID = p.CatID
     LEFT JOIN tblsubcategory sc ON sc.ID = p.SubcatID
@@ -73,14 +75,17 @@ $ret = mysqli_query($con, "
                             <thead>
                                 <tr>
                                     <th>N°</th>
-                                    <th>Nom</th>
+                                    <th>Nom du Produit</th>
+                                    <th>CatID</th>
                                     <th>Catégorie</th>
+                                    <th>SubcatID</th>
                                     <th>Sous-catégorie</th>
                                     <th>Marque</th>
                                     <th>Modèle</th>
                                     <th>Stock</th>
+                                    <th>Prix</th>
                                     <th>Statut</th>
-                                    <th>Créé le</th>
+                                    <th>Date de Création</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -88,8 +93,6 @@ $ret = mysqli_query($con, "
                             <?php
                             $cnt = 1;
                             while ($row = mysqli_fetch_assoc($ret)) {
-                                $catName    = $row['CategoryName'] ?: 'Inconnue';
-                                $subcatName = $row['subcat'] ?: 'Inconnue';
                                 $statusLabel = $row['Status'] == 1
                                     ? '<span class="label label-success">Actif</span>'
                                     : '<span class="label label-danger">Inactif</span>';
@@ -97,11 +100,14 @@ $ret = mysqli_query($con, "
                                 <tr class="gradeX">
                                     <td><?= $cnt++ ?></td>
                                     <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                                    <td><?= htmlspecialchars($catName) ?></td>
-                                    <td><?= htmlspecialchars($subcatName) ?></td>
+                                    <td><?= intval($row['CatID']) ?></td>
+                                    <td><?= htmlspecialchars($row['CategoryName'] ?: 'Inconnue') ?></td>
+                                    <td><?= intval($row['SubcatID']) ?></td>
+                                    <td><?= htmlspecialchars($row['SubCategoryName'] ?: 'Inconnue') ?></td>
                                     <td><?= htmlspecialchars($row['BrandName']) ?></td>
                                     <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
                                     <td><?= intval($row['Stock']) ?></td>
+                                    <td><?= number_format($row['Price'], 2) ?></td>
                                     <td class="center"><?= $statusLabel ?></td>
                                     <td><?= date('d/m/Y H:i', strtotime($row['CreationDate'])) ?></td>
                                     <td class="center">
