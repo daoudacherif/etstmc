@@ -45,7 +45,7 @@ if (strlen($_SESSION['imsaid'] ?? '') == 0) {
                   <th>N°</th>
                   <th>Nom du Produit</th>
                   <th>Catégorie</th>
-                  <th>Modèle</th>
+                 
                   <th>Stock Restant</th>
                   <th>Statut</th>
                 </tr>
