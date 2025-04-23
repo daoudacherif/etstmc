@@ -87,7 +87,7 @@ $ret = mysqli_query($con, $sql) or die('Erreur SQL : '.mysqli_error($con));
                                     echo '<td>'.$cnt++.'</td>';
                                     echo '<td>'.htmlspecialchars($row['ProductName']).'</td>';
                                     echo '<td>'.htmlspecialchars($row['CategoryName'] ?: '—').'</td>';
-                                    echo '<td>'.htmlspecialchars($row['BrandName'] ?: '—').'</td>';
+                                    
                                     echo '<td>'.htmlspecialchars($row['ModelNumber']).'</td>';
                                     echo '<td>'.intval($row['Stock']).'</td>';
                                     echo '<td class="center">'.$statusLabel.'</td>';
