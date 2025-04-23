@@ -1,17 +1,19 @@
 <?php 
 session_start();
-error_reporting(0);
+error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
+// Vérifier si l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
-  header('location:logout.php');
-  exit;
+    header('location:logout.php');
+    exit;
 }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <title>Système de Gestion d'Inventaire || Voir l'Inventaire des Produits</title>
+  <meta charset="UTF-8">
+  <title>Inventaire des Produits</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
 </head>
@@ -22,12 +24,12 @@ if (empty($_SESSION['imsaid'])) {
 <div id="content">
   <div id="content-header">
     <div id="breadcrumb">
-      <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
+      <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
       </a>
       <strong>Voir l'Inventaire des Produits</strong>
     </div>
-    <h1>Voir l'Inventaire des Produits</h1>
+    <h1>Inventaire des Produits</h1>
   </div>
   <div class="container-fluid">
     <hr>
@@ -55,40 +57,48 @@ if (empty($_SESSION['imsaid'])) {
               </thead>
               <tbody>
                 <?php
-                $sql = "SELECT 
-                        p.ID as pid,
-                        p.ProductName,
-                        p.BrandName,
-                        p.ModelNumber,
-                        p.Stock,
-                        p.Status,
-                        c.CategoryName,
-                        COALESCE(SUM(cart.ProductQty), 0) as sold_qty
-                      FROM tblproducts p
-                      LEFT JOIN tblcategory c ON c.ID = p.CatID
-                      LEFT JOIN tblcart cart ON cart.ProductId = p.ID 
-                        AND cart.OrderStatus = 'Completed' /* Only count completed orders */
-                      GROUP BY p.ID
-                      ORDER BY p.ID DESC";
-                
-                $ret = mysqli_query($con, $sql);
-                if(mysqli_num_rows($ret) > 0) {
+                // On ne prend que les lignes de panier validées (IsCheckOut = 1)
+                $sql = "
+                  SELECT 
+                    p.ID            AS pid,
+                    p.ProductName,
+                    COALESCE(c.CategoryName, 'N/A') AS CategoryName,
+                    p.BrandName,
+                    p.ModelNumber,
+                    p.Stock         AS initial_stock,
+                    COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                    p.Status
+                  FROM tblproducts p
+                  LEFT JOIN tblcategory c 
+                    ON c.ID = p.CatID
+                  LEFT JOIN tblcart cart 
+                    ON cart.ProductId = p.ID 
+                   AND cart.IsCheckOut = 1
+                  GROUP BY p.ID
+                  ORDER BY p.ID DESC
+                ";
+                $ret = mysqli_query($con, $sql) 
+                  or die('Erreur SQL : ' . mysqli_error($con));
+
+                if (mysqli_num_rows($ret) > 0) {
                   $cnt = 1;
-                  while($row = mysqli_fetch_assoc($ret)) {
-                    $remaining_stock = $row['Stock'] - $row['sold_qty'];
+                  while ($row = mysqli_fetch_assoc($ret)) {
+                    // Calcul du stock restant
+                    $remaining = intval($row['initial_stock']) - intval($row['sold_qty']);
+                    $remaining = max(0, $remaining);
                     ?>
                     <tr>
                       <td><?= $cnt ?></td>
                       <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                      <td><?= htmlspecialchars($row['CategoryName'] ?? 'N/A') ?></td>
+                      <td><?= htmlspecialchars($row['CategoryName']) ?></td>
                       <td><?= htmlspecialchars($row['BrandName']) ?></td>
                       <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                      <td><?= $row['Stock'] ?></td>
-                      <td><?= $row['sold_qty'] ?></td>
-                      <td class="<?= ($remaining_stock <= 0) ? 'text-error' : '' ?>">
-                        <?= ($remaining_stock <= 0) ? 'Épuisé' : $remaining_stock ?>
+                      <td><?= intval($row['initial_stock']) ?></td>
+                      <td><?= intval($row['sold_qty']) ?></td>
+                      <td class="<?= $remaining === 0 ? 'text-danger' : '' ?>">
+                        <?= $remaining === 0 ? 'Épuisé' : $remaining ?>
                       </td>
-                      <td><?= ($row['Status'] == 1) ? 'Actif' : 'Inactif' ?></td>
+                      <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
                     </tr>
                     <?php
                     $cnt++;
@@ -99,13 +109,23 @@ if (empty($_SESSION['imsaid'])) {
                 ?>
               </tbody>
             </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+          </div><!-- widget-content -->
+        </div><!-- widget-box -->
+      </div><!-- span12 -->
+    </div><!-- row-fluid -->
+  </div><!-- container-fluid -->
+</div><!-- content -->
 
 <?php include_once('includes/footer.php'); ?>
+
+<!-- scripts pour DataTable si nécessaire -->
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
+<script src="js/matrix.tables.js"></script>
 </body>
 </html>
