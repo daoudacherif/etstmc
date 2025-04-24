@@ -3,102 +3,124 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
-// -- Obtenir un token OAuth et le mettre en cache --
 function getAccessToken() {
-    if (isset($_SESSION['nimba_token']) && $_SESSION['nimba_token_expire'] > time()) {
-        return $_SESSION['nimba_token'];
-    }
-
     $url = "https://api.nimbasms.com/v1/oauth/token";
     $client_id = "1608e90e20415c7edf0226bf86e7effd";
     $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
-    $credentials = base64_encode("{$client_id}:{$client_secret}");
+    $credentials = base64_encode($client_id . ":" . $client_secret);
 
     $headers = [
-        "Authorization: Basic {$credentials}",
+        "Authorization: Basic $credentials",
         "Content-Type: application/x-www-form-urlencoded"
     ];
 
-    $postData = http_build_query(['grant_type' => 'client_credentials']);
+    $postData = http_build_query([
+        "grant_type" => "client_credentials"
+    ]);
 
-    $ch = curl_init($url);
+    $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_POSTFIELDS     => $postData,
+        CURLOPT_URL => $url,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $postData,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYPEER => false
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($httpCode !== 200) {
-        error_log("Erreur token HTTP {$httpCode}: {$response}");
+    if ($httpCode != 200) {
+        error_log("Erreur token HTTP $httpCode : $response");
         return false;
     }
 
-    $data = json_decode($response, true);
-    if (isset($data['access_token'])) {
-        $_SESSION['nimba_token'] = $data['access_token'];
-        $_SESSION['nimba_token_expire'] = time() + $data['expires_in'] - 60;
-        return $data['access_token'];
-    }
-
-    return false;
+    $decoded = json_decode($response, true);
+    return $decoded['access_token'] ?? false;
 }
 
-// -- Envoi du SMS avec cURL --
 function sendSmsNotification($to, $message) {
     $token = getAccessToken();
     if (!$token) return false;
 
     $url = "https://api.nimbasms.com/v1/messages";
-    $payload = json_encode([
-        'to'         => [$to],
-        'message'    => $message,
-        'sender_name'=> 'SMS 9080'
+    $postData = json_encode([
+        "to" => [$to],
+        "message" => $message,
+        "sender_name" => "SMS 9080"
     ]);
+
     $headers = [
-        "Authorization: Bearer {$token}",
+        "Authorization: Bearer $token",
         "Content-Type: application/json"
     ];
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $options = [
+        "http" => [
+            "method" => "POST",
+            "header" => implode("\r\n", $headers),
+            "content" => $postData,
+            "ignore_errors" => true
+        ]
+    ];
 
-    return $httpCode === 201;
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+    preg_match('{HTTP\/\S*\s(\d{3})}', $http_response_header[0], $match);
+    $status_code = $match[1] ?? 0;
+
+    return $status_code == 201;
 }
 
-// -- Sécurité session --
-if (empty($_SESSION['imsaid'])) {
+if (strlen($_SESSION['imsaid'] ?? '') == 0) {
     header('location:logout.php');
     exit;
 }
 
-// -- Logique panier (ajout, suppression, remise) --
 if (isset($_POST['addtocart'])) {
-    // Gérer ajout au panier ici...
-}
-if (isset($_GET['delid'])) {
-    $delid = intval($_GET['delid']);
-    mysqli_query($con, "DELETE FROM tblcart WHERE ID=$delid");
-}
-if (isset($_POST['applyDiscount'])) {
-    $_SESSION['discount'] = floatval($_POST['discount']);
+    $productId = intval($_POST['productid']);
+    $quantity = max(1, intval($_POST['quantity']));
+    $price = max(0, floatval($_POST['price']));
+
+    $stockRes = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+    if (!$stockRes || mysqli_num_rows($stockRes) == 0) {
+        echo "<script>alert('Produit introuvable'); window.location.href='cart.php';</script>";
+        exit;
+    }
+    $stock = intval(mysqli_fetch_assoc($stockRes)['Stock']);
+
+    if ($quantity > $stock) {
+        echo "<script>alert('Quantité demandée ($quantity) supérieure au stock disponible ($stock)'); window.location.href='cart.php';</script>";
+        exit;
+    }
+
+    $chk = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
+    if (mysqli_num_rows($chk) > 0) {
+        $r = mysqli_fetch_assoc($chk);
+        $newQty = $r['ProductQty'] + $quantity;
+        mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$r['ID']}'");
+    } else {
+        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId','$quantity','$price','0')");
+    }
+    echo "<script>alert('Produit ajouté au panier!');window.location.href='cart.php';</script>";
+    exit;
 }
 
-// -- Paiement et génération facture --
+if (isset($_GET['delid'])) {
+    $rid = intval($_GET['delid']);
+    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
+    echo "<script>alert('Produit retiré du panier');window.location.href='cart.php';</script>";
+    exit;
+}
+
+if (isset($_POST['applyDiscount'])) {
+    $_SESSION['discount'] = floatval($_POST['discount']);
+    echo "<script>window.location.href='cart.php';</script>";
+    exit;
+}
+
 if (isset($_POST['submit'])) {
     $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
     $raw = trim($_POST['mobilenumber']);
@@ -113,36 +135,33 @@ if (isset($_POST['submit'])) {
         echo "<script>alert('Format de numéro invalide');window.location.href='cart.php';</script>";
         exit;
     }
-
     $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
-    $discount = $_SESSION['discount'] ?? 0;
 
-    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut = 0");
+    $discount = $_SESSION['discount'] ?? 0;
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
     $grand = 0;
-    while ($r = mysqli_fetch_assoc($cartQ)) {
-        $grand += $r['ProductQty'] * $r['Price'];
+    while ($row = mysqli_fetch_assoc($cartQ)) {
+        $grand += $row['ProductQty'] * $row['Price'];
     }
     $netTotal = max(0, $grand - $discount);
     $billNum = mt_rand(100000000, 999999999);
 
     mysqli_begin_transaction($con);
     try {
-        mysqli_query($con, "UPDATE tblcart SET BillingId='{$billNum}',IsCheckOut=1 WHERE IsCheckOut=0");
-        mysqli_query($con, "INSERT INTO tblcustomer(BillingNumber,CustomerName,MobileNumber,ModeofPayment,FinalAmount)
-            VALUES('{$billNum}','{$custname}','{$custmobile}','{$modepayment}','{$netTotal}')");
+        mysqli_query($con, "UPDATE tblcart SET BillingId='$billNum', IsCheckOut=1 WHERE IsCheckOut=0");
+        mysqli_query($con, "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES('$billNum','$custname','$custmobile','$modepayment','$netTotal')");
         mysqli_commit($con);
-
         $_SESSION['invoiceid'] = $billNum;
         unset($_SESSION['discount']);
 
-        $smsOK = sendSmsNotification($custmobile, "Bonjour {$custname}, facture No: {$billNum} validée.");
-        $msg = $smsOK ? 'SMS envoyé' : 'Échec SMS';
-        echo "<script>alert('Facture {$billNum}\n{$msg}');location='invoice.php';</script>";
-        exit;
+        $smsSent = sendSmsNotification($custmobile, "Bonjour $custname, votre commande (Facture No: $billNum) a été validée.");
+        $alert = $smsSent ? 'SMS envoyé avec succès' : 'Echec d\'envoi SMS';
 
+        echo "<script>alert('Facture créée: $billNum\n$alert');window.location.href='invoice.php';</script>";
+        exit;
     } catch (Exception $e) {
         mysqli_rollback($con);
-        error_log('Erreur transaction: ' . $e->getMessage());
+        error_log("Erreur transaction : " . $e->getMessage());
         echo "<script>alert('Erreur lors du paiement');</script>";
     }
 }
