@@ -145,20 +145,37 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
-    // Get initial stock
-$stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
-if (!$stockQuery) die("Database error: " . mysqli_error($con));
+    // Vérifier le stock disponible avant l'ajout
+$productId = mysqli_real_escape_string($con, $productId); // Security measure
+
+// Get initial stock
+$stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
 $stockRow = mysqli_fetch_assoc($stockQuery);
 $initialStock = $stockRow['Stock'] ?? 0;
 
-// Get total reserved quantity
-$cartQuery = mysqli_query($con, "SELECT SUM(Quantity) AS TotalInCart FROM tblcart WHERE ProductID='$productId'");
-if (!$cartQuery) die("Database error: " . mysqli_error($con));
-$cartRow = mysqli_fetch_assoc($cartQuery);
-$quantityInCart = $cartRow['TotalInCart'] ?? 0;
+// Get total reserved quantity (both checked out and in carts)
+$reservedQuery = mysqli_query($con, "SELECT SUM(Quantity) AS TotalReserved 
+                                   FROM tblcart 
+                                   WHERE ProductID='$productId'");
+$reservedRow = mysqli_fetch_assoc($reservedQuery);
+$totalReserved = $reservedRow['TotalReserved'] ?? 0;
 
-// Calculate available stock
-$availableStock = max(0, $initialStock - $quantityInCart);  // Ensure non-negative
+// Calculate real available stock
+$availableStock = $initialStock - $totalReserved;
+
+// Si pas assez de stock
+if ($availableStock <= 0) {
+    echo "<script>alert('Impossible d\'ajouter ce produit: stock épuisé!');</script>";
+    echo "<script>window.location.href='cart.php'</script>";
+    exit;
+}
+
+// Vérifier la quantité demandée
+if ($quantity > $availableStock) {
+    echo "<script>alert('Quantité demandée non disponible! Stock disponible: $availableStock');</script>";
+    echo "<script>window.location.href='cart.php'</script>";
+    exit;
+}
     // Vérifier si ce produit est déjà dans le panier
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     
