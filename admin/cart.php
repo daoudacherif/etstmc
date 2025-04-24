@@ -145,25 +145,20 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
-    // Vérifier le stock disponible avant l'ajout
-    $stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
-    $stockRow = mysqli_fetch_assoc($stockQuery);
-    $availableStock = $stockRow['Stock'];
-    
-    // Si pas assez de stock, afficher un message d'erreur
-    if ($availableStock <= 0) {
-        echo "<script>alert('Impossible d\'ajouter ce produit: stock épuisé!');</script>";
-        echo "<script>window.location.href='cart.php'</script>";
-        exit;
-    }
-    
-    // Vérifier que la quantité demandée est disponible en stock
-    if ($quantity > $availableStock) {
-        echo "<script>alert('Quantité demandée non disponible! Stock disponible: " . $availableStock . "');</script>";
-        echo "<script>window.location.href='cart.php'</script>";
-        exit;
-    }
-    
+    // Get initial stock
+$stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+if (!$stockQuery) die("Database error: " . mysqli_error($con));
+$stockRow = mysqli_fetch_assoc($stockQuery);
+$initialStock = $stockRow['Stock'] ?? 0;
+
+// Get total reserved quantity
+$cartQuery = mysqli_query($con, "SELECT SUM(Quantity) AS TotalInCart FROM tblcart WHERE ProductID='$productId'");
+if (!$cartQuery) die("Database error: " . mysqli_error($con));
+$cartRow = mysqli_fetch_assoc($cartQuery);
+$quantityInCart = $cartRow['TotalInCart'] ?? 0;
+
+// Calculate available stock
+$availableStock = max(0, $initialStock - $quantityInCart);  // Ensure non-negative
     // Vérifier si ce produit est déjà dans le panier
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     
