@@ -145,6 +145,25 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
+    // Vérifier le stock disponible avant l'ajout
+    $stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
+    $stockRow = mysqli_fetch_assoc($stockQuery);
+    $availableStock = $stockRow['Stock'];
+    
+    // Si pas assez de stock, afficher un message d'erreur
+    if ($availableStock <= 0) {
+        echo "<script>alert('Impossible d\'ajouter ce produit: stock épuisé!');</script>";
+        echo "<script>window.location.href='cart.php'</script>";
+        exit;
+    }
+    
+    // Vérifier que la quantité demandée est disponible en stock
+    if ($quantity > $availableStock) {
+        echo "<script>alert('Quantité demandée non disponible! Stock disponible: " . $availableStock . "');</script>";
+        echo "<script>window.location.href='cart.php'</script>";
+        exit;
+    }
+    
     // Vérifier si ce produit est déjà dans le panier
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     
@@ -154,6 +173,14 @@ if (isset($_POST['addtocart'])) {
         $cartId = $row['ID'];
         $oldQty = $row['ProductQty'];
         $newQty = $oldQty + $quantity;
+        
+        // Vérifier que la nouvelle quantité ne dépasse pas le stock disponible
+        if ($newQty > $availableStock) {
+            echo "<script>alert('Impossible d\'ajouter cette quantité! Stock disponible: " . $availableStock . "');</script>";
+            echo "<script>window.location.href='cart.php'</script>";
+            exit;
+        }
+        
         mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='$cartId'");
     } else {
         // Insérer un nouvel article dans le panier
@@ -203,12 +230,48 @@ if (isset($_POST['submit'])) {
     // Générer un numéro de facture unique
     $billingnum = mt_rand(100000000, 999999999);
     
-    // Marquer le panier comme validé et insérer dans tblcustomer
-    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
-    $query .= "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', '$netTotal');";
+    // Récupérer les produits du panier pour mise à jour du stock
+    $cartItems = mysqli_query($con, "SELECT ProductId, ProductQty FROM tblcart WHERE IsCheckOut=0");
     
-    $result = mysqli_multi_query($con, $query);
-    if ($result) {
+    // Débuter une transaction pour garantir l'intégrité des données
+    mysqli_begin_transaction($con);
+    
+    try {
+        // Marquer le panier comme validé et insérer dans tblcustomer
+        $query = "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) 
+                 VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', '$netTotal')";
+        
+        $result = mysqli_query($con, $query);
+        
+        if (!$result) {
+            throw new Exception("Erreur lors de la création de la facture client");
+        }
+        
+        // Marquer tous les articles du panier avec le numéro de facturation
+        $updateCart = mysqli_query($con, "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0");
+        
+        if (!$updateCart) {
+            throw new Exception("Erreur lors de la mise à jour du panier");
+        }
+        
+        // Mise à jour des stocks pour chaque produit
+        while ($item = mysqli_fetch_assoc($cartItems)) {
+            $prodId = $item['ProductId'];
+            $qty = $item['ProductQty'];
+            
+            // Soustraire la quantité achetée du stock
+            $updateStock = mysqli_query($con, "UPDATE tblproducts 
+                                              SET Stock = Stock - $qty 
+                                              WHERE ID = '$prodId'");
+            
+            if (!$updateStock) {
+                throw new Exception("Erreur lors de la mise à jour du stock pour le produit #" . $prodId);
+            }
+        }
+        
+        // Si tout s'est bien passé, on valide la transaction
+        mysqli_commit($con);
+        
         $_SESSION['invoiceid'] = $billingnum;
         unset($_SESSION['discount']); // Réinitialisation de la remise
         
@@ -229,8 +292,11 @@ if (isset($_POST['submit'])) {
             window.location.href='invoice.php';
         </script>";
         exit;
-    } else {
-        echo "<script>alert('Erreur lors du paiement');</script>";
+        
+    } catch (Exception $e) {
+        // En cas d'erreur, on annule toutes les opérations
+        mysqli_rollback($con);
+        echo "<script>alert('Erreur: " . $e->getMessage() . "');</script>";
     }
 }
 ?>
@@ -282,7 +348,7 @@ if (isset($_POST['submit'])) {
         if (!empty($_GET['searchTerm'])) {
             $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
             $sql = "
-                SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price,
+                SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price, p.Stock,
                        c.CategoryName, s.SubCategoryName
                 FROM tblproducts p
                 LEFT JOIN tblcategory c ON c.ID = p.CatID
@@ -306,6 +372,7 @@ if (isset($_POST['submit'])) {
                                     <th>Marque</th>
                                     <th>Modèle</th>
                                     <th>Prix par défaut</th>
+                                    <th>Stock disponible</th>
                                     <th>Prix personnalisé</th>
                                     <th>Quantité</th>
                                     <th>Ajouter</th>
@@ -315,6 +382,7 @@ if (isset($_POST['submit'])) {
                                 <?php
                                 $i = 1;
                                 while ($row = mysqli_fetch_assoc($res)) {
+                                    $stock = intval($row['Stock']);
                                     ?>
                                     <tr>
                                         <td><?php echo $i++; ?></td>
@@ -324,16 +392,17 @@ if (isset($_POST['submit'])) {
                                         <td><?php echo $row['BrandName']; ?></td>
                                         <td><?php echo $row['ModelNumber']; ?></td>
                                         <td><?php echo $row['Price']; ?></td>
+                                        <td><?php echo $stock; ?></td>
                                         <td>
                                             <form method="post" action="cart.php" style="margin:0;">
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
-                                                <input type="number" name="price" step="any" value="<?php echo $row['Price']; ?>" style="width:80px;" />
+                                                <input type="number" name="price" step="any" value="<?php echo $row['Price']; ?>" style="width:80px;" <?php if ($stock <= 0) echo 'disabled'; ?> />
                                         </td>
                                         <td>
-                                            <input type="number" name="quantity" value="1" min="1" style="width:60px;" />
+                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $stock; ?>" style="width:60px;" <?php if ($stock <= 0) echo 'disabled'; ?> />
                                         </td>
                                         <td>
-                                            <button type="submit" name="addtocart" class="btn btn-success btn-small">
+                                            <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php if ($stock <= 0) echo 'disabled title="Stock épuisé"'; ?>>
                                                 <i class="icon-plus"></i> Ajouter
                                             </button>
                                             </form>
