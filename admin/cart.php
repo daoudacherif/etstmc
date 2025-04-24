@@ -3,7 +3,12 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
+// -- Obtenir un token OAuth et le mettre en cache --
 function getAccessToken() {
+    if (isset($_SESSION['nimba_token']) && $_SESSION['nimba_token_expire'] > time()) {
+        return $_SESSION['nimba_token'];
+    }
+
     $url = "https://api.nimbasms.com/v1/oauth/token";
     $client_id = "1608e90e20415c7edf0226bf86e7effd";
     $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
@@ -15,6 +20,7 @@ function getAccessToken() {
     ];
 
     $postData = http_build_query(['grant_type' => 'client_credentials']);
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
@@ -32,80 +38,92 @@ function getAccessToken() {
         error_log("Erreur token HTTP {$httpCode}: {$response}");
         return false;
     }
+
     $data = json_decode($response, true);
-    return $data['access_token'] ?? false;
+    if (isset($data['access_token'])) {
+        $_SESSION['nimba_token'] = $data['access_token'];
+        $_SESSION['nimba_token_expire'] = time() + $data['expires_in'] - 60;
+        return $data['access_token'];
+    }
+
+    return false;
 }
 
+// -- Envoi du SMS avec cURL --
 function sendSmsNotification($to, $message) {
     $token = getAccessToken();
     if (!$token) return false;
 
     $url = "https://api.nimbasms.com/v1/messages";
     $payload = json_encode([
-        'to'      => [$to],
-        'message' => $message,
-        'sender_name' => 'SMS 9080'
+        'to'         => [$to],
+        'message'    => $message,
+        'sender_name'=> 'SMS 9080'
     ]);
     $headers = [
         "Authorization: Bearer {$token}",
         "Content-Type: application/json"
     ];
-    $context = stream_context_create(['http' => [
-        'method'  => 'POST',
-        'header'  => implode("\r\n", $headers),
-        'content' => $payload,
-        'ignore_errors' => true,
-    ]]);
 
-    $response = file_get_contents($url, false, $context);
-    if (preg_match('{HTTP\/\S+\s(\d{3})}', $http_response_header[0], $m)) {
-        return $m[1] === '201';
-    }
-    return false;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return $httpCode === 201;
 }
 
+// -- Sécurité session --
 if (empty($_SESSION['imsaid'])) {
     header('location:logout.php');
     exit;
 }
 
-// -- logistique du panier (add, delete, discount) --
+// -- Logique panier (ajout, suppression, remise) --
 if (isset($_POST['addtocart'])) {
-    // ... inchangé
+    // Gérer ajout au panier ici...
 }
 if (isset($_GET['delid'])) {
-    // ... inchangé
+    $delid = intval($_GET['delid']);
+    mysqli_query($con, "DELETE FROM tblcart WHERE ID=$delid");
 }
 if (isset($_POST['applyDiscount'])) {
-    // ... inchangé
+    $_SESSION['discount'] = floatval($_POST['discount']);
 }
 
-// Checkout avec correction du +224
+// -- Paiement et génération facture --
 if (isset($_POST['submit'])) {
-    $custname   = mysqli_real_escape_string($con, trim($_POST['customername']));
-    $raw        = trim($_POST['mobilenumber']);
-    // conserver + et chiffres
+    $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
+    $raw = trim($_POST['mobilenumber']);
     $custmobile = preg_replace('/[^\d+]/', '', $raw);
-    // normaliser +224
+
+    // Normalisation numéro
     if (preg_match('/^0(\d{8,9})$/', $custmobile, $m)) {
         $custmobile = '+224' . $m[1];
-    } elseif (preg_match('/^(224)(\d{8,9})$/', $custmobile, $m)) {
-        $custmobile = '+224' . $m[2];
+    } elseif (preg_match('/^224(\d{8,9})$/', $custmobile, $m)) {
+        $custmobile = '+224' . $m[1];
     } elseif (!preg_match('/^\+224\d{8,9}$/', $custmobile)) {
         echo "<script>alert('Format de numéro invalide');window.location.href='cart.php';</script>";
         exit;
     }
-    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
 
-    // calcul total, transaction, insertion...
+    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
     $discount = $_SESSION['discount'] ?? 0;
-    $cartQ = mysqli_query($con, "SELECT ProductQty,Price FROM tblcart WHERE IsCheckOut=0");
+
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut = 0");
     $grand = 0;
     while ($r = mysqli_fetch_assoc($cartQ)) {
         $grand += $r['ProductQty'] * $r['Price'];
     }
     $netTotal = max(0, $grand - $discount);
-    $billNum  = mt_rand(100000000, 999999999);
+    $billNum = mt_rand(100000000, 999999999);
 
     mysqli_begin_transaction($con);
     try {
@@ -113,12 +131,15 @@ if (isset($_POST['submit'])) {
         mysqli_query($con, "INSERT INTO tblcustomer(BillingNumber,CustomerName,MobileNumber,ModeofPayment,FinalAmount)
             VALUES('{$billNum}','{$custname}','{$custmobile}','{$modepayment}','{$netTotal}')");
         mysqli_commit($con);
+
         $_SESSION['invoiceid'] = $billNum;
         unset($_SESSION['discount']);
+
         $smsOK = sendSmsNotification($custmobile, "Bonjour {$custname}, facture No: {$billNum} validée.");
         $msg = $smsOK ? 'SMS envoyé' : 'Échec SMS';
         echo "<script>alert('Facture {$billNum}\n{$msg}');location='invoice.php';</script>";
         exit;
+
     } catch (Exception $e) {
         mysqli_rollback($con);
         error_log('Erreur transaction: ' . $e->getMessage());
