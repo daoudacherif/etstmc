@@ -145,23 +145,35 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
-    // Vérifier le stock disponible avant l'ajout
-$productId = mysqli_real_escape_string($con, $productId); // Security measure
+   // Vérifier le stock disponible avant l'ajout
+$productId = mysqli_real_escape_string($con, $productId);
 
-// Get initial stock
+// Get initial stock from products table
 $stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
 $stockRow = mysqli_fetch_assoc($stockQuery);
 $initialStock = $stockRow['Stock'] ?? 0;
 
-// Get total reserved quantity (both checked out and in carts)
-$reservedQuery = mysqli_query($con, "SELECT SUM(Quantity) AS TotalReserved 
-                                   FROM tblcart 
-                                   WHERE ProductID='$productId'");
+// Get total sold quantity (checked out items)
+$soldQuery = mysqli_query($con, 
+    "SELECT SUM(Quantity) AS TotalSold 
+     FROM tblcart 
+     WHERE ProductID='$productId' AND IsCheckOut = 1");
+$soldRow = mysqli_fetch_assoc($soldQuery);
+$totalSold = $soldRow['TotalSold'] ?? 0;
+
+// Get total reserved quantity (in carts but not checked out)
+$reservedQuery = mysqli_query($con, 
+    "SELECT SUM(Quantity) AS TotalReserved 
+     FROM tblcart 
+     WHERE ProductID='$productId' AND IsCheckOut = 0");
 $reservedRow = mysqli_fetch_assoc($reservedQuery);
 $totalReserved = $reservedRow['TotalReserved'] ?? 0;
 
-// Calculate real available stock
-$availableStock = $initialStock - $totalReserved;
+// Calculate REAL available stock
+$availableStock = $initialStock - $totalSold - $totalReserved;
+
+// Ensure stock doesn't go negative
+$availableStock = max(0, $availableStock);
 
 // Si pas assez de stock
 if ($availableStock <= 0) {
