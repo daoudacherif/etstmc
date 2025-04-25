@@ -145,42 +145,45 @@ if (isset($_POST['addtocart'])) {
         $price = 0;
     }
     
-   // Vérifier le stock disponible avant l'ajout
+   // Vérifier le stock disponible avant l'ajout 
 $productId = mysqli_real_escape_string($con, $productId);
 
-// Get initial stock from products table
+// 1. Récupérer le stock initial depuis la table produits
 $stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
-$stockRow = mysqli_fetch_assoc($stockQuery);
-$initialStock = $stockRow['Stock'] ?? 0;
+$stockRow   = mysqli_fetch_assoc($stockQuery);
+$initialStock = intval($stockRow['Stock'] ?? 0);
 
-// Get total sold quantity (checked out items)
+// 2. Récupérer la quantité totale vendue (checkout = 1)
 $soldQuery = mysqli_query($con, 
     "SELECT SUM(Quantity) AS TotalSold 
      FROM tblcart 
      WHERE ProductID='$productId' AND IsCheckOut = 1");
-$soldRow = mysqli_fetch_assoc($soldQuery);
-$totalSold = $soldRow['TotalSold'] ?? 0;
+$soldRow   = mysqli_fetch_assoc($soldQuery);
+$totalSold = intval($soldRow['TotalSold'] ?? 0);
 
-// Get total reserved quantity (in carts but not checked out)
+// 3. Calculer le stock restant après ventes
+$remainingStock = max(0, $initialStock - $totalSold);
+
+// 4. Récupérer la quantité réservée (non check-out)
 $reservedQuery = mysqli_query($con, 
     "SELECT SUM(Quantity) AS TotalReserved 
      FROM tblcart 
      WHERE ProductID='$productId' AND IsCheckOut = 0");
-$reservedRow = mysqli_fetch_assoc($reservedQuery);
-$totalReserved = $reservedRow['TotalReserved'] ?? 0;
+$reservedRow   = mysqli_fetch_assoc($reservedQuery);
+$totalReserved = intval($reservedRow['TotalReserved'] ?? 0);
 
-// Calculate REAL available stock
-$availableStock = $initialStock - $totalSold - $totalReserved;
+// 5. Calculer le stock disponible (restant – réservé)
+$availableStock = max(0, $remainingStock - $totalReserved);
 
-// Ensure stock doesn't go negative
-$availableStock = max(0, $availableStock);
-
-// Si pas assez de stock
+// 6. Si pas assez de stock
 if ($availableStock <= 0) {
-    echo "<script>alert('Impossible d\'ajouter ce produit: stock épuisé!');</script>";
+    echo "<script>alert('Impossible d\\'ajouter ce produit : stock épuisé!');</script>";
     echo "<script>window.location.href='cart.php'</script>";
     exit;
 }
+
+// À ce point, $availableStock contient bien le stock réellement disponible
+
 
 // Vérifier la quantité demandée
 if ($quantity > $availableStock) {
