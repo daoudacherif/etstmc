@@ -3,191 +3,96 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
-/**
- * 1. Fonction pour obtenir le token d'accès OAuth2 de Nimba via cURL.
- */
 function getAccessToken() {
-    $url = "https://api.nimbasms.com/v1/oauth/token"; // Vérifiez l'URL selon votre documentation Nimba.
-    
-    // Vérifiez que ces informations sont exactes et actives
-    $client_id = "1608e90e20415c7edf0226bf86e7effd";      // Exemple: "1608e90e20415c7edf0226bf86e7effd"
-    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";  // Exemple: "4Up9v9s_Wzo6kj..."
-
-    // Calcul de l'authentification de base en encodant "client_id:client_secret"
+    $url = "https://api.nimbasms.com/v1/oauth/token";
+    $client_id = "1608e90e20415c7edf0226bf86e7effd";
+    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
     $credentials = base64_encode($client_id . ":" . $client_secret);
-    
-    $headers = array(
-        "Authorization: Basic " . $credentials,
+
+    $headers = [
+        "Authorization: Basic $credentials",
         "Content-Type: application/x-www-form-urlencoded"
-    );
-    
-    $postData = http_build_query(array(
+    ];
+
+    $postData = http_build_query([
         "grant_type" => "client_credentials"
-    ));
-    
-    // Utilisation de cURL pour effectuer la requête POST
+    ]);
+
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // À utiliser en dev seulement
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $postData,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false
+    ]);
+
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    
-    if ($response === FALSE) {
-        $error = curl_error($ch);
-        error_log("Erreur cURL lors de l'obtention du token: " . $error);
-        curl_close($ch);
-        return false;
-    }
-    
     curl_close($ch);
 
     if ($httpCode != 200) {
-        error_log("Erreur lors de la récupération du token d'accès. Code HTTP: $httpCode. Réponse: $response");
+        error_log("Erreur token HTTP $httpCode : $response");
         return false;
     }
-    
+
     $decoded = json_decode($response, true);
-    if (!isset($decoded['access_token'])) {
-        error_log("Erreur API (token): " . print_r($decoded, true));
-        return false;
-    }
-    return $decoded['access_token'];
+    return $decoded['access_token'] ?? false;
 }
 
-/**
- * 2. Fonction pour envoyer un SMS via l'API Nimba.
- */
 function sendSmsNotification($to, $message) {
-    // URL de l'API d'envoi de SMS (vérifiez l'URL selon votre documentation Nimba)
+    $token = getAccessToken();
+    if (!$token) return false;
+
     $url = "https://api.nimbasms.com/v1/messages";
-    
-    // Vérifiez que ces informations sont exactes et actives
-    $service_id    = "1608e90e20415c7edf0226bf86e7effd";     // Exemple: "1608e90e20415c7edf0226bf86e7effd"
-    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";   // Exemple: "4Up9v9s_Wzo6kj..."
-    
-    // Calcul de l'authentification de base
-    $authString = base64_encode($service_id . ":" . $secret_token);
-    
-    // Préparez le corps de la requête avec le format requis par l'API Nimba
-    // Ici, on peut inclure aussi "sender_name" si nécessaire
-    $postData = json_encode(array(
-        "to"          => array($to),
-        "message"     => $message,
-        "sender_name" => "SMS 9080"  // Remplacez par le sender_name autorisé auprès de Nimba
-    ));
-    
-    $headers = array(
-        "Authorization: Basic " . $authString,
+    $postData = json_encode([
+        "to" => [$to],
+        "message" => $message,
+        "sender_name" => "SMS 9080"
+    ]);
+
+    $headers = [
+        "Authorization: Bearer $token",
         "Content-Type: application/json"
-    );
-    
-    // Nous utilisons file_get_contents avec un contexte HTTP, vous pouvez également passer en cURL
-    $options = array(
-        "http" => array(
-            "method"        => "POST",
-            "header"        => implode("\r\n", $headers),
-            "content"       => $postData,
+    ];
+
+    $options = [
+        "http" => [
+            "method" => "POST",
+            "header" => implode("\r\n", $headers),
+            "content" => $postData,
             "ignore_errors" => true
-        )
-    );
-    
+        ]
+    ];
+
     $context = stream_context_create($options);
     $response = file_get_contents($url, false, $context);
-    
-    // Journaliser la réponse complète pour debugging
-    error_log("Réponse API SMS: " . $response);
-    
-    // Récupération du code HTTP depuis les en-têtes de réponse
-    $http_response_header = isset($http_response_header) ? $http_response_header : array();
-    $status_line = $http_response_header[0];
-    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
-    $status_code = isset($match[1]) ? $match[1] : 0;
-    
-    if ($status_code != 201) {
-        error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
-        return false;
-    }
-    
-    return true;
+    preg_match('{HTTP\/\S*\s(\d{3})}', $http_response_header[0], $match);
+    $status_code = $match[1] ?? 0;
+
+    return $status_code == 201;
 }
 
-/**
- * Reste du code de gestion du panier et du checkout
- */
-
-// Vérifier si l'admin est connecté
-if (strlen($_SESSION['imsaid']) == 0) {
+if (strlen($_SESSION['imsaid'] ?? '') == 0) {
     header('location:logout.php');
     exit;
 }
 
-// 1) Préparer la liste de tous les produits pour le <datalist>
-$allProdQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName ASC");
-$productNames = array();
-while ($rowProd = mysqli_fetch_assoc($allProdQuery)) {
-    $productNames[] = $rowProd['ProductName'];
-}
-
-// 2) Ajouter un produit au panier
 if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
-    $quantity  = intval($_POST['quantity']);
-    $price     = floatval($_POST['price']);  // Prix saisi manuellement
-    
-    if ($quantity <= 0) {
-        $quantity = 1;
+    $quantity = max(1, intval($_POST['quantity']));
+    $price = max(0, floatval($_POST['price']));
+
+    $stockRes = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+    if (!$stockRes || mysqli_num_rows($stockRes) == 0) {
+        echo "<script>alert('Produit introuvable'); window.location.href='cart.php';</script>";
+        exit;
     }
     if ($price < 0) {
         $price = 0;
     }
     
-   // Vérifier le stock disponible avant l'ajout
-$productId = mysqli_real_escape_string($con, $productId);
-
-// Get initial stock from products table
-$stockQuery = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId' LIMIT 1");
-$stockRow = mysqli_fetch_assoc($stockQuery);
-$initialStock = $stockRow['Stock'] ?? 0;
-
-// Get total sold quantity (checked out items)
-$soldQuery = mysqli_query($con, 
-    "SELECT SUM(Quantity) AS TotalSold 
-     FROM tblcart 
-     WHERE ProductID='$productId' AND IsCheckOut = 1");
-$soldRow = mysqli_fetch_assoc($soldQuery);
-$totalSold = $soldRow['TotalSold'] ?? 0;
-
-// Get total reserved quantity (in carts but not checked out)
-$reservedQuery = mysqli_query($con, 
-    "SELECT SUM(Quantity) AS TotalReserved 
-     FROM tblcart 
-     WHERE ProductID='$productId' AND IsCheckOut = 0");
-$reservedRow = mysqli_fetch_assoc($reservedQuery);
-$totalReserved = $reservedRow['TotalReserved'] ?? 0;
-
-// Calculate REAL available stock
-$availableStock = $initialStock - $totalSold - $totalReserved;
-
-// Ensure stock doesn't go negative
-$availableStock = max(0, $availableStock);
-
-// Si pas assez de stock
-if ($availableStock <= 0) {
-    echo "<script>alert('Impossible d\'ajouter ce produit: stock épuisé!');</script>";
-    echo "<script>window.location.href='cart.php'</script>";
-    exit;
-}
-
-// Vérifier la quantité demandée
-if ($quantity > $availableStock) {
-    echo "<script>alert('Quantité demandée non disponible! Stock disponible: $availableStock');</script>";
-    echo "<script>window.location.href='cart.php'</script>";
-    exit;
-}
     // Vérifier si ce produit est déjà dans le panier
     $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     
@@ -197,52 +102,37 @@ if ($quantity > $availableStock) {
         $cartId = $row['ID'];
         $oldQty = $row['ProductQty'];
         $newQty = $oldQty + $quantity;
-        
-        // Vérifier que la nouvelle quantité ne dépasse pas le stock disponible
-        if ($newQty > $availableStock) {
-            echo "<script>alert('Impossible d\'ajouter cette quantité! Stock disponible: " . $availableStock . "');</script>";
-            echo "<script>window.location.href='cart.php'</script>";
-            exit;
-        }
-        
         mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='$cartId'");
     } else {
-        // Insérer un nouvel article dans le panier
-        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', '0')");
+        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId','$quantity','$price','0')");
     }
-    echo "<script>alert('Produit ajouté au panier!');</script>";
-    echo "<script>window.location.href='cart.php'</script>";
+    echo "<script>alert('Produit ajouté au panier!');window.location.href='cart.php';</script>";
     exit;
 }
 
-// 3) Retirer un produit du panier
 if (isset($_GET['delid'])) {
     $rid = intval($_GET['delid']);
     mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
-    echo "<script>alert('Produit retiré du panier');</script>";
-    echo "<script>window.location.href='cart.php'</script>";
+    echo "<script>alert('Produit retiré du panier');window.location.href='cart.php';</script>";
     exit;
 }
 
-// 4) Gérer la remise (discount) en session
 if (isset($_POST['applyDiscount'])) {
     $_SESSION['discount'] = floatval($_POST['discount']);
-    echo "<script>window.location.href='cart.php'</script>";
+    echo "<script>window.location.href='cart.php';</script>";
     exit;
 }
-$discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 
-// 5) Validation du panier (checkout) & création de facture
 if (isset($_POST['submit'])) {
-    $custname = $_POST['customername'];
-    $custmobilenum = $_POST['mobilenumber']; // Le numéro de mobile saisi par le client (doit être au format +221xxxxxxxxx)
-    $modepayment = $_POST['modepayment'];
-    
-    // Calculer le total du panier
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
-    $grandTotal = 0;
-    while ($row = mysqli_fetch_assoc($cartQuery)) {
-        $grandTotal += ($row['ProductQty'] * $row['Price']);
+    $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
+    $custmobile = preg_replace('/[^0-9]/', '', $_POST['mobilenumber']);
+    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
+
+    $discount = $_SESSION['discount'] ?? 0;
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $grand = 0;
+    while ($row = mysqli_fetch_assoc($cartQ)) {
+        $grand += $row['ProductQty'] * $row['Price'];
     }
     
     // Appliquer la remise
@@ -254,48 +144,12 @@ if (isset($_POST['submit'])) {
     // Générer un numéro de facture unique
     $billingnum = mt_rand(100000000, 999999999);
     
-    // Récupérer les produits du panier pour mise à jour du stock
-    $cartItems = mysqli_query($con, "SELECT ProductId, ProductQty FROM tblcart WHERE IsCheckOut=0");
+    // Marquer le panier comme validé et insérer dans tblcustomer
+    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
+    $query .= "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', '$netTotal');";
     
-    // Débuter une transaction pour garantir l'intégrité des données
-    mysqli_begin_transaction($con);
-    
-    try {
-        // Marquer le panier comme validé et insérer dans tblcustomer
-        $query = "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) 
-                 VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', '$netTotal')";
-        
-        $result = mysqli_query($con, $query);
-        
-        if (!$result) {
-            throw new Exception("Erreur lors de la création de la facture client");
-        }
-        
-        // Marquer tous les articles du panier avec le numéro de facturation
-        $updateCart = mysqli_query($con, "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0");
-        
-        if (!$updateCart) {
-            throw new Exception("Erreur lors de la mise à jour du panier");
-        }
-        
-        // Mise à jour des stocks pour chaque produit
-        while ($item = mysqli_fetch_assoc($cartItems)) {
-            $prodId = $item['ProductId'];
-            $qty = $item['ProductQty'];
-            
-            // Soustraire la quantité achetée du stock
-            $updateStock = mysqli_query($con, "UPDATE tblproducts 
-                                              SET Stock = Stock - $qty 
-                                              WHERE ID = '$prodId'");
-            
-            if (!$updateStock) {
-                throw new Exception("Erreur lors de la mise à jour du stock pour le produit #" . $prodId);
-            }
-        }
-        
-        // Si tout s'est bien passé, on valide la transaction
-        mysqli_commit($con);
-        
+    $result = mysqli_multi_query($con, $query);
+    if ($result) {
         $_SESSION['invoiceid'] = $billingnum;
         unset($_SESSION['discount']); // Réinitialisation de la remise
         
@@ -316,14 +170,12 @@ if (isset($_POST['submit'])) {
             window.location.href='invoice.php';
         </script>";
         exit;
-        
-    } catch (Exception $e) {
-        // En cas d'erreur, on annule toutes les opérations
-        mysqli_rollback($con);
-        echo "<script>alert('Erreur: " . $e->getMessage() . "');</script>";
+    } else {
+        echo "<script>alert('Erreur lors du paiement');</script>";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
