@@ -3,29 +3,29 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
+/**
+ * Récupère un token d'accès OAuth2 depuis NimbaSMS
+ */
 function getAccessToken() {
     $url = "https://api.nimbasms.com/v1/oauth/token";
-    $client_id = "1608e90e20415c7edf0226bf86e7effd";
+    $client_id     = "1608e90e20415c7edf0226bf86e7effd";
     $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
-    $credentials = base64_encode($client_id . ":" . $client_secret);
+    $credentials   = base64_encode("$client_id:$client_secret");
 
     $headers = [
         "Authorization: Basic $credentials",
         "Content-Type: application/x-www-form-urlencoded"
     ];
-
-    $postData = http_build_query([
-        "grant_type" => "client_credentials"
-    ]);
+    $postData = http_build_query([ "grant_type" => "client_credentials" ]);
 
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_POSTFIELDS => $postData,
+        CURLOPT_URL            => $url,
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_POSTFIELDS     => $postData,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => false
+        CURLOPT_SSL_VERIFYPEER => false,
     ]);
 
     $response = curl_exec($ch);
@@ -41,80 +41,86 @@ function getAccessToken() {
     return $decoded['access_token'] ?? false;
 }
 
+/**
+ * Envoie un SMS via NimbaSMS
+ */
 function sendSmsNotification($to, $message) {
     $token = getAccessToken();
-    if (!$token) return false;
+    if (!$token) {
+        return false;
+    }
 
     $url = "https://api.nimbasms.com/v1/messages";
     $postData = json_encode([
-        "to" => [$to],
-        "message" => $message,
+        "to"          => [$to],
+        "message"     => $message,
         "sender_name" => "SMS 9080"
     ]);
-
     $headers = [
         "Authorization: Bearer $token",
         "Content-Type: application/json"
     ];
 
-    $options = [
-        "http" => [
-            "method" => "POST",
-            "header" => implode("\r\n", $headers),
-            "content" => $postData,
-            "ignore_errors" => true
-        ]
-    ];
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_POSTFIELDS     => $postData,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $response = curl_exec($ch);
+    $status  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-    $context = stream_context_create($options);
-    $response = file_get_contents($url, false, $context);
-    preg_match('{HTTP\/\S*\s(\d{3})}', $http_response_header[0], $match);
-    $status_code = $match[1] ?? 0;
-
-    return $status_code == 201;
+    return ($status === 201);
 }
 
+//////////////////////////////////////////////////////////////////////////
+// GESTION DE L’AJOUT AU PANIER
+//////////////////////////////////////////////////////////////////////////
 if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
     $quantity  = max(1, intval($_POST['quantity']));
     $price     = max(0, floatval($_POST['price']));
 
-    // 1) Récupérer initial_stock et sold_qty
+    // 1) Récupérer le stock actuel
     $stockRes = mysqli_query($con, "
-        SELECT initial_stock, sold_qty 
+        SELECT Stock 
         FROM tblproducts 
         WHERE ID = '$productId' 
         LIMIT 1
     ");
-    if (!$stockRes || mysqli_num_rows($stockRes) == 0) {
-        echo "<script>alert('Produit introuvable'); window.location.href='cart.php';</script>";
-        exit;
-    }
-    $row = mysqli_fetch_assoc($stockRes);
-
-    // 2) Calculer le stock restant et normaliser à ≥ 0
-    $remaining = intval($row['initial_stock']) - intval($row['sold_qty']);
-    $remaining = max(0, $remaining);
-
-    // 3) Empêcher l’ajout si stock épuisé
-    if ($remaining === 0) {
+    if (!$stockRes || mysqli_num_rows($stockRes) === 0) {
         echo "<script>
-            alert('Stock épuisé pour ce produit.');
-            window.location.href='cart.php';
-        </script>";
+                alert('Produit introuvable');
+                window.location.href='cart.php';
+              </script>";
         exit;
     }
+    $row   = mysqli_fetch_assoc($stockRes);
+    $stock = intval($row['Stock']);
 
-    // 4) Vérifier que la quantité demandée ne dépasse pas le restant
-    if ($quantity > $remaining) {
+    // 2) Interdire si stock épuisé
+    if ($stock <= 0) {
         echo "<script>
-            alert('Quantité demandée (' + $quantity + ') supérieure au stock disponible ($remaining).');
-            window.location.href='cart.php';
-        </script>";
+                alert('Désolé, ce produit est en rupture de stock.');
+                window.location.href='cart.php';
+              </script>";
         exit;
     }
 
-    // 5) Poursuivre comme avant : INSERT ou UPDATE dans tblcart
+    // 3) Interdire si quantité demandée > stock
+    if ($quantity > $stock) {
+        echo "<script>
+                alert('Vous avez demandé $quantity exemplaire(s), il ne reste que $stock en stock.');
+                window.location.href='cart.php';
+              </script>";
+        exit;
+    }
+
+    // 4) INSERT ou UPDATE dans tblcart
     $checkCart = mysqli_query($con, "
         SELECT ID, ProductQty 
         FROM tblcart 
@@ -122,9 +128,8 @@ if (isset($_POST['addtocart'])) {
         LIMIT 1
     ");
     if (mysqli_num_rows($checkCart) > 0) {
-        $c = mysqli_fetch_assoc($checkCart);
+        $c      = mysqli_fetch_assoc($checkCart);
         $newQty = $c['ProductQty'] + $quantity;
-        // (Optionnel) Re-vérifier que $newQty <= $remaining avant UPDATE
         mysqli_query($con, "
             UPDATE tblcart 
             SET ProductQty='$newQty', Price='$price' 
@@ -138,12 +143,93 @@ if (isset($_POST['addtocart'])) {
     }
 
     echo "<script>
-        alert('Produit ajouté au panier !');
-        window.location.href='cart.php';
-    </script>";
+            alert('Produit ajouté au panier !');
+            window.location.href='cart.php';
+          </script>";
     exit;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// SUPPRESSION D’UN ARTICLE DU PANIER
+//////////////////////////////////////////////////////////////////////////
+if (isset($_GET['delid'])) {
+    $rid = intval($_GET['delid']);
+    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
+    echo "<script>
+            alert('Produit retiré du panier');
+            window.location.href='cart.php';
+          </script>";
+    exit;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// APPLICATION D’UNE REMISE
+//////////////////////////////////////////////////////////////////////////
+if (isset($_POST['applyDiscount'])) {
+    $_SESSION['discount'] = floatval($_POST['discount']);
+    echo "<script>window.location.href='cart.php';</script>";
+    exit;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// VALIDATION DU PANIER / CHECKOUT
+//////////////////////////////////////////////////////////////////////////
+if (isset($_POST['submit'])) {
+    // Récupération des infos client
+    $custname     = mysqli_real_escape_string($con, trim($_POST['customername']));
+    $custmobile   = preg_replace('/[^0-9+]/','', $_POST['mobilenumber']);
+    $modepayment  = mysqli_real_escape_string($con, $_POST['modepayment']);
+    $discount     = $_SESSION['discount'] ?? 0;
+
+    // Calcul du total
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $grand = 0;
+    while ($r = mysqli_fetch_assoc($cartQ)) {
+        $grand += $r['ProductQty'] * $r['Price'];
+    }
+    $netTotal = max(0, $grand - $discount);
+
+    // Générer un numéro de facture unique
+    $billingnum = mt_rand(100000000, 999999999);
+
+    // Mise à jour du panier + insertion client
+    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
+    $query .= "INSERT INTO tblcustomer
+                 (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount)
+               VALUES
+                 ('$billingnum','$custname','$custmobile','$modepayment','$netTotal');";
+    $result = mysqli_multi_query($con, $query);
+
+    if ($result) {
+        // Décrémenter le stock dans tblproducts
+        $updateStockSql = "
+            UPDATE tblproducts p
+            JOIN tblcart c ON p.ID = c.ProductId
+            SET p.Stock = p.Stock - c.ProductQty
+            WHERE c.BillingId = '$billingnum'
+              AND c.IsCheckOut  = 1
+        ";
+        mysqli_query($con, $updateStockSql);
+
+        // Envoi du SMS de confirmation
+        $smsMessage = "Bonjour $custname, votre commande (Facture No:$billingnum) est confirmée. Merci !";
+        $smsResult  = sendSmsNotification($custmobile, $smsMessage);
+        $smsMsg     = $smsResult ? "SMS envoyé" : "Échec SMS";
+
+        $_SESSION['invoiceid'] = $billingnum;
+        unset($_SESSION['discount']);
+
+        echo "<script>
+                alert('Facture créée : $billingnum\\n$smsMsg');
+                window.location.href='invoice.php';
+              </script>";
+        exit;
+    } else {
+        echo "<script>alert('Erreur lors du paiement');</script>";
+    }
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -223,38 +309,57 @@ if (isset($_POST['addtocart'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php
-                                $i = 1;
-                                while ($row = mysqli_fetch_assoc($res)) {
-                                    $stock = intval($row['Stock']);
-                                    ?>
-                                    <tr>
-                                        <td><?php echo $i++; ?></td>
-                                        <td><?php echo $row['ProductName']; ?></td>
-                                        <td><?php echo $row['CategoryName']; ?></td>
-                                        <td><?php echo $row['SubCategoryName']; ?></td>
-                                        <td><?php echo $row['BrandName']; ?></td>
-                                        <td><?php echo $row['ModelNumber']; ?></td>
-                                        <td><?php echo $row['Price']; ?></td>
-                                        <td><?php echo $stock; ?></td>
-                                        <td>
-                                            <form method="post" action="cart.php" style="margin:0;">
-                                                <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
-                                                <input type="number" name="price" step="any" value="<?php echo $row['Price']; ?>" style="width:80px;" <?php if ($stock <= 0) echo 'disabled'; ?> />
-                                        </td>
-                                        <td>
-                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $stock; ?>" style="width:60px;" <?php if ($stock <= 0) echo 'disabled'; ?> />
-                                        </td>
-                                        <td>
-                                            <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php if ($stock <= 0) echo 'disabled title="Stock épuisé"'; ?>>
-                                                <i class="icon-plus"></i> Ajouter
-                                            </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    <?php
-                                }
-                                ?>
+                            <?php
+    $i = 1;
+    while ($row = mysqli_fetch_assoc($res)) {
+        $stock = intval($row['Stock']);
+        ?>
+        <tr>
+            <td><?= $i++; ?></td>
+            <td><?= htmlspecialchars($row['ProductName']); ?></td>
+            <td><?= htmlspecialchars($row['CategoryName']); ?></td>
+            <td><?= htmlspecialchars($row['SubCategoryName']); ?></td>
+            <td><?= htmlspecialchars($row['BrandName']); ?></td>
+            <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
+            <td><?= number_format($row['Price'], 2, ',', ' '); ?> €</td>
+            <td><?= $stock; ?></td>
+
+            <td colspan="3">
+            <?php if ($stock > 0): ?>
+                <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px;">
+                    <!-- On n'expose plus price en input number -->
+                    <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
+                    <input type="hidden" name="price"     value="<?= $row['Price']; ?>">
+
+                    <!-- Quantité (max = stock) -->
+                    <input
+                        type="number"
+                        name="quantity"
+                        value="1"
+                        min="1"
+                        max="<?= $stock; ?>"
+                        style="width:60px;"
+                        required
+                    >
+
+                    <!-- Bouton Ajouter -->
+                    <button
+                        type="submit"
+                        name="addtocart"
+                        class="btn btn-success btn-sm"
+                    >
+                        <i class="icon-plus"></i> Ajouter
+                    </button>
+                </form>
+            <?php else: ?>
+                <span class="text-danger fw-bold">Rupture de stock</span>
+            <?php endif; ?>
+            </td>
+        </tr>
+        <?php
+    }
+?>
+
                             </tbody>
                         </table>
                     <?php } else { ?>
