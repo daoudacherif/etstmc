@@ -154,28 +154,6 @@ if (isset($_POST['addtocart'])) {
 }
 
 //////////////////////////////////////////////////////////////////////////
-// SUPPRESSION D’UN ARTICLE DU PANIER
-//////////////////////////////////////////////////////////////////////////
-if (isset($_GET['delid'])) {
-    $rid = intval($_GET['delid']);
-    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
-    echo "<script>
-            alert('Produit retiré du panier');
-            window.location.href='cart.php';
-          </script>";
-    exit;
-}
-
-//////////////////////////////////////////////////////////////////////////
-// APPLICATION D’UNE REMISE
-//////////////////////////////////////////////////////////////////////////
-if (isset($_POST['applyDiscount'])) {
-    $_SESSION['discount'] = floatval($_POST['discount']);
-    echo "<script>window.location.href='cart.php';</script>";
-    exit;
-}
-
-//////////////////////////////////////////////////////////////////////////
 // VALIDATION DU PANIER / CHECKOUT
 //////////////////////////////////////////////////////////////////////////
 if (isset($_POST['submit'])) {
@@ -205,6 +183,11 @@ if (isset($_POST['submit'])) {
     $result = mysqli_multi_query($con, $query);
 
     if ($result) {
+        // Vider les résultats de la multi_query pour éviter le 'out of sync'
+        while (mysqli_more_results($con) && mysqli_next_result($con)) {
+            // rien à faire, on boucle juste
+        }
+
         // Décrémenter le stock dans tblproducts
         $updateStockSql = "
             UPDATE tblproducts p
@@ -233,6 +216,7 @@ if (isset($_POST['submit'])) {
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="fr">
