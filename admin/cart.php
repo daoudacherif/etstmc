@@ -81,8 +81,33 @@ function sendSmsNotification($to, $message) {
     return ($status === 201);
 }
 
+// Initialiser la variable de remise
+$discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
+
+// Traitement de l'application de remise
+if (isset($_POST['applyDiscount'])) {
+    $discount = max(0, floatval($_POST['discount']));
+    $_SESSION['discount'] = $discount;
+    // Redirection pour éviter re-soumission du formulaire
+    header("Location: cart.php");
+    exit;
+}
+
+// Traitement de la suppression d'un élément du panier
+if (isset($_GET['delid'])) {
+    $delid = intval($_GET['delid']);
+    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0");
+    if ($deleteQuery) {
+        echo "<script>
+                alert('Article retiré du panier');
+                window.location.href='cart.php';
+              </script>";
+        exit;
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////
-// GESTION DE L’AJOUT AU PANIER
+// GESTION DE L'AJOUT AU PANIER
 //////////////////////////////////////////////////////////////////////////
 if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
@@ -215,6 +240,15 @@ if (isset($_POST['submit'])) {
         echo "<script>alert('Erreur lors du paiement');</script>";
     }
 }
+
+// Récupérer les noms de produits pour le datalist
+$productNamesQuery = mysqli_query($con, "SELECT DISTINCT ProductName FROM tblproducts ORDER BY ProductName ASC");
+$productNames = array();
+if ($productNamesQuery) {
+    while ($row = mysqli_fetch_assoc($productNamesQuery)) {
+        $productNames[] = $row['ProductName'];
+    }
+}
 ?>
 
 
@@ -274,30 +308,35 @@ if (!empty($_GET['searchTerm'])) {
             c.CategoryName
         FROM tblproducts p
         LEFT JOIN tblcategory c 
-            ON p.ID = c.ID
+            ON p.CategoryId = c.ID
         WHERE 
-            p.ProductName LIKE '%$searchTerm%'
-            OR p.ModelNumber  LIKE '%$searchTerm%'
+            p.ProductName LIKE ?
+            OR p.ModelNumber LIKE ?
     ";
 
-    $res = mysqli_query($con, $sql);
+    // Utiliser les requêtes préparées pour prévenir les injections SQL
+    $stmt = mysqli_prepare($con, $sql);
+    if (!$stmt) {
+        die("MySQL prepare error: " . mysqli_error($con));
+    }
+    
+    $searchParam = "%$searchTerm%";
+    mysqli_stmt_bind_param($stmt, "ss", $searchParam, $searchParam);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    
     if (!$res) {
         die("MySQL error: " . mysqli_error($con));
     }
 
     $count = mysqli_num_rows($res);
-
-    // …handle results…
 }
 ?>
 
-
-   
-
     <div class="row-fluid">
         <div class="span12">
-            <?php if (!empty($searchTerm)): ?>
-            <h4>Résultats de recherche pour "<em><?= htmlspecialchars($searchTerm) ?></em>"</h4>
+            <?php if (!empty($_GET['searchTerm'])): ?>
+            <h4>Résultats de recherche pour "<em><?= htmlspecialchars($_GET['searchTerm']) ?></em>"</h4>
 
             <?php if ($count > 0): ?>
                 <table class="table table-bordered table-striped">
@@ -368,7 +407,7 @@ if (!empty($_GET['searchTerm'])) {
     </div>
 <?php endif; ?>
 
-<!-- ========== PANIER + REMISE + PAIEMENT ========== -->        <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
+<!-- ========== PANIER + REMISE + PAIEMENT ========== -->
         <div class="row-fluid">
             <div class="span12">
                 <form method="post" class="form-inline" style="text-align:right;">
