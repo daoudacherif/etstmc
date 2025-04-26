@@ -271,13 +271,10 @@ if (!empty($_GET['searchTerm'])) {
             p.ModelNumber,
             p.Price,
             p.Stock,
-            c.CategoryName,
-            sc.SubCategoryName,
-            b.BrandName
+            c.CategoryName
         FROM tblproducts p
-        LEFT JOIN tblcategories c ON p.CategoryID = c.ID
-        LEFT JOIN tblsubcategory sc ON p.SubCategoryID = sc.ID
-        LEFT JOIN tblbrands b ON p.BrandID = b.ID
+        LEFT JOIN tblcategories c 
+            ON p.CategoryID = c.ID
         WHERE 
             p.ProductName LIKE '%$searchTerm%'
             OR p.ModelNumber LIKE '%$searchTerm%'
@@ -285,7 +282,12 @@ if (!empty($_GET['searchTerm'])) {
 
     $res   = mysqli_query($con, $sql);
     $count = mysqli_num_rows($res);
-    ?>
+
+    // ... your result‐handling code here ...
+}
+?>
+
+   
 
     <div class="row-fluid">
         <div class="span12">
