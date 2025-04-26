@@ -274,7 +274,7 @@ if (!empty($_GET['searchTerm'])) {
             c.CategoryName
         FROM tblproducts p
         LEFT JOIN tblcategory c 
-            ON p.CategoryID = c.ID
+            ON p.ID = c.ID
         WHERE 
             p.ProductName LIKE '%$searchTerm%'
             OR p.ModelNumber  LIKE '%$searchTerm%'
