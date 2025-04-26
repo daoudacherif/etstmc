@@ -273,19 +273,24 @@ if (!empty($_GET['searchTerm'])) {
             p.Stock,
             c.CategoryName
         FROM tblproducts p
-        LEFT JOIN tblcategories c 
+        LEFT JOIN tblcategory c 
             ON p.CategoryID = c.ID
         WHERE 
             p.ProductName LIKE '%$searchTerm%'
-            OR p.ModelNumber LIKE '%$searchTerm%'
+            OR p.ModelNumber  LIKE '%$searchTerm%'
     ";
 
-    $res   = mysqli_query($con, $sql);
+    $res = mysqli_query($con, $sql);
+    if (!$res) {
+        die("MySQL error: " . mysqli_error($con));
+    }
+
     $count = mysqli_num_rows($res);
 
-    // ... your result‐handling code here ...
+    // …handle results…
 }
 ?>
+
 
    
 
