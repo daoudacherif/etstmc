@@ -306,8 +306,7 @@ if (!empty($_GET['searchTerm'])) {
                             <th>#</th>
                             <th>Nom du produit</th>
                             <th>Catégorie</th>
-                            <th>Sous-catégorie</th>
-                            <th>Marque</th>
+                            
                             <th>Modèle</th>
                             <th>Prix par défaut</th>
                             <th>Stock disponible</th>
