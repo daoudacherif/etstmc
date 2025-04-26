@@ -131,7 +131,7 @@ if (isset($_POST['addtocart'])) {
     $row   = mysqli_fetch_assoc($stockRes);
     $stock = intval($row['Stock']);
 
-    // 2) Interdire si stock épuisé
+    // 2) Interdire si stock épuisé ou négatif
     if ($stock <= 0) {
         echo "<script>
                 alert('Désolé, ce produit est en rupture de stock.');
@@ -159,6 +159,16 @@ if (isset($_POST['addtocart'])) {
     if (mysqli_num_rows($checkCart) > 0) {
         $c      = mysqli_fetch_assoc($checkCart);
         $newQty = $c['ProductQty'] + $quantity;
+        
+        // Vérifier à nouveau que le nouveau total ne dépasse pas le stock disponible
+        if ($newQty > $stock) {
+            echo "<script>
+                    alert('Vous avez déjà ' + {$c['ProductQty']} + ' exemplaire(s) dans votre panier. Ajouter ' + $quantity + ' de plus dépasserait le stock disponible.');
+                    window.location.href='cart.php';
+                  </script>";
+            exit;
+        }
+        
         mysqli_query($con, "
             UPDATE tblcart 
             SET ProductQty='$newQty', Price='$price' 
@@ -195,6 +205,35 @@ if (isset($_POST['submit'])) {
         $grand += $r['ProductQty'] * $r['Price'];
     }
     $netTotal = max(0, $grand - $discount);
+
+    // Vérifier à nouveau les stocks avant validation
+    $stockCheck = mysqli_query($con, "
+        SELECT c.ProductId, c.ProductQty, p.Stock, p.ProductName
+        FROM tblcart c
+        JOIN tblproducts p ON p.ID = c.ProductId
+        WHERE c.IsCheckOut = 0
+    ");
+    
+    $stockError = false;
+    $errorMessages = [];
+    
+    while ($item = mysqli_fetch_assoc($stockCheck)) {
+        if ($item['ProductQty'] > $item['Stock']) {
+            $stockError = true;
+            $errorMessages[] = "Produit '{$item['ProductName']}': Quantité demandée ({$item['ProductQty']}) supérieure au stock disponible ({$item['Stock']})";
+        }
+        
+        if ($item['Stock'] <= 0) {
+            $stockError = true;
+            $errorMessages[] = "Produit '{$item['ProductName']}' est en rupture de stock";
+        }
+    }
+    
+    if ($stockError) {
+        $errorMsg = "Problèmes de stock identifiés:\\n" . implode("\\n", $errorMessages);
+        echo "<script>alert('$errorMsg');</script>";
+        exit;
+    }
 
     // Générer un numéro de facture unique
     $billingnum = mt_rand(100000000, 999999999);
@@ -308,7 +347,7 @@ if (!empty($_GET['searchTerm'])) {
             c.CategoryName
         FROM tblproducts p
         LEFT JOIN tblcategory c 
-            ON p.ID = c.ID
+            ON p.CategoryId = c.ID
         WHERE 
             p.ProductName LIKE ?
             OR p.ModelNumber LIKE ?
@@ -477,7 +516,8 @@ if (!empty($_GET['searchTerm'])) {
                                     tblcart.ID as cid,
                                     tblcart.ProductQty,
                                     tblcart.Price as cartPrice,
-                                    tblproducts.ProductName
+                                    tblproducts.ProductName,
+                                    tblproducts.Stock
                                   FROM tblcart
                                   LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
                                   WHERE tblcart.IsCheckOut = 0
@@ -486,16 +526,29 @@ if (!empty($_GET['searchTerm'])) {
                                 $cnt = 1;
                                 $grandTotal = 0;
                                 $num = mysqli_num_rows($ret);
+                                $stockWarning = false;
+                                
                                 if ($num > 0) {
                                     while ($row = mysqli_fetch_array($ret)) {
                                         $pq = $row['ProductQty'];
                                         $ppu = $row['cartPrice'];
                                         $lineTotal = $pq * $ppu;
                                         $grandTotal += $lineTotal;
+                                        
+                                        // Vérifier si le stock actuel est suffisant
+                                        $stockSuffisant = $row['Stock'] >= $pq;
+                                        if (!$stockSuffisant) {
+                                            $stockWarning = true;
+                                        }
                                         ?>
-                                        <tr class="gradeX">
+                                        <tr class="gradeX <?php echo !$stockSuffisant ? 'error' : ''; ?>">
                                             <td><?php echo $cnt; ?></td>
-                                            <td><?php echo $row['ProductName']; ?></td>
+                                            <td>
+                                                <?php echo $row['ProductName']; ?>
+                                                <?php if (!$stockSuffisant): ?>
+                                                    <br><span class="label label-important">Stock insuffisant!</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo $pq; ?></td>
                                             <td><?php echo number_format($ppu, 2); ?></td>
                                             <td><?php echo number_format($lineTotal, 2); ?></td>
@@ -526,6 +579,22 @@ if (!empty($_GET['searchTerm'])) {
                                         <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total net</th>
                                         <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                     </tr>
+                                    <?php
+                                    // Ajouter un message d'avertissement si des produits ont un stock insuffisant
+                                    if ($stockWarning): ?>
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: red; font-weight: bold;">
+                                            Attention! Certains produits n'ont pas un stock suffisant. Veuillez ajuster votre panier.
+                                        </td>
+                                    </tr>
+                                    <script>
+                                        // Désactiver le bouton de paiement si stock insuffisant
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                            document.querySelector('button[name="submit"]').disabled = true;
+                                            document.querySelector('button[name="submit"]').title = "Impossible de finaliser: stock insuffisant";
+                                        });
+                                    </script>
+                                    <?php endif; ?>
                                     <?php
                                 } else {
                                     ?>
