@@ -306,7 +306,8 @@ if (!empty($_GET['searchTerm'])) {
                             <th>#</th>
                             <th>Nom du produit</th>
                             <th>Catégorie</th>
-                            
+                          
+                           
                             <th>Modèle</th>
                             <th>Prix par défaut</th>
                             <th>Stock disponible</th>
@@ -323,8 +324,7 @@ if (!empty($_GET['searchTerm'])) {
                             <td><?= $i++; ?></td>
                             <td><?= htmlspecialchars($row['ProductName']); ?></td>
                             <td><?= htmlspecialchars($row['CategoryName']); ?></td>
-                            <td><?= htmlspecialchars($row['SubCategoryName']); ?></td>
-                            <td><?= htmlspecialchars($row['BrandName']); ?></td>
+                            
                             <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
                             <td><?= number_format($row['Price'], 2, ',', ' '); ?> €</td>
                             <td><?= $stock; ?></td>
