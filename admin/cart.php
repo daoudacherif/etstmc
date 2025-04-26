@@ -8,77 +8,118 @@ error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
 /**
- * Récupère un token d'accès OAuth2 depuis NimbaSMS
+ * Function to obtain the OAuth2 access token from Nimba using cURL.
  */
 function getAccessToken() {
-    $url = "https://api.nimbasms.com/v1/oauth/token";
-    $client_id     = "1608e90e20415c7edf0226bf86e7effd";
+    $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
+    
+    // Replace with your real credentials
+    $client_id     = "1608e90e20415c7edf0226bf86e7effd";      
     $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
-    $credentials   = base64_encode("$client_id:$client_secret");
-
-    $headers = [
-        "Authorization: Basic $credentials",
+    
+    // Encode the credentials in Base64 ("client_id:client_secret")
+    $credentials = base64_encode($client_id . ":" . $client_secret);
+    
+    $headers = array(
+        "Authorization: Basic " . $credentials,
         "Content-Type: application/x-www-form-urlencoded"
-    ];
-    $postData = http_build_query([ "grant_type" => "client_credentials" ]);
-
+    );
+    
+    $postData = http_build_query(array(
+        "grant_type" => "client_credentials"
+    ));
+    
+    // Use cURL for the POST request
     $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL            => $url,
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_POSTFIELDS     => $postData,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // For development only!
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode != 200) {
-        error_log("Erreur token HTTP $httpCode : $response");
+    
+    if ($response === FALSE) {
+        $error = curl_error($ch);
+        error_log("cURL error while obtaining token: " . $error);
+        curl_close($ch);
         return false;
     }
-
+    curl_close($ch);
+    
+    if ($httpCode != 200) {
+        error_log("Error obtaining access token. HTTP Code: $httpCode. Response: $response");
+        return false;
+    }
+    
     $decoded = json_decode($response, true);
-    return $decoded['access_token'] ?? false;
+    if (!isset($decoded['access_token'])) {
+        error_log("API error (token): " . print_r($decoded, true));
+        return false;
+    }
+    return $decoded['access_token'];
 }
 
 /**
- * Envoie un SMS via NimbaSMS
+ * Function to send an SMS via the Nimba API.
+ * The message content is passed via the $message parameter.
+ * The payload sent is logged so you can verify the SMS content.
  */
 function sendSmsNotification($to, $message) {
-    $token = getAccessToken();
-    if (!$token) {
+    // Nimba API endpoint for sending SMS
+    $url = "https://api.nimbasms.com/v1/messages";
+    
+    // Replace with your actual service credentials (as provided by Nimba)
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";    
+    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
+    
+    // Build the Basic Auth string (Base64 of "service_id:secret_token")
+    $authString = base64_encode($service_id . ":" . $secret_token);
+    
+    // Prepare the JSON payload with recipient, message and sender_name
+    $payload = array(
+        "to"          => array($to),
+        "message"     => $message,
+        "sender_name" => "SMS 9080"   // Replace with your approved sender name with Nimba
+    );
+    $postData = json_encode($payload);
+    
+    // Log the payload for debugging (check your server error logs)
+    error_log("Nimba SMS Payload: " . $postData);
+    
+    $headers = array(
+        "Authorization: Basic " . $authString,
+        "Content-Type: application/json"
+    );
+    
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => $postData,
+            "ignore_errors" => true
+        )
+    );
+    
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
+    
+    // Log complete API response for debugging
+    error_log("Nimba API SMS Response: " . $response);
+    
+    // Retrieve HTTP status code from response headers
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    if ($status_code != 201) {
+        error_log("SMS send failed. HTTP Code: $status_code. Details: " . print_r(json_decode($response, true), true));
         return false;
     }
-
-    $url = "https://api.nimbasms.com/v1/messages";
-    $postData = json_encode([
-        "to"          => [$to],
-        "message"     => $message,
-        "sender_name" => "SMS 9080"
-    ]);
-    $headers = [
-        "Authorization: Bearer $token",
-        "Content-Type: application/json"
-    ];
-
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL            => $url,
-        CURLOPT_POST           => true,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_POSTFIELDS     => $postData,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-    $response = curl_exec($ch);
-    $status  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    return ($status === 201);
+    
+    return true;
 }
 
 // Initialiser la variable de remise
