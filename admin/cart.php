@@ -261,110 +261,99 @@ if (isset($_POST['submit'])) {
         </div>
         <hr>
 
-        <!-- ========== AFFICHAGE DES RÉSULTATS DE RECHERCHE ========== -->
         <?php
-       if (!empty($_GET['searchTerm'])) {
-        $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
-        $sql = "
-            SELECT 
-                p.ID, 
-                p.ProductName, 
-                p.ModelNumber, 
-                p.Price, 
-                p.Stock,
-                c.CategoryName
-            FROM tblproducts p
-            LEFT JOIN tblcategories c 
-                ON p.CategoryID = c.ID
-            WHERE 
-                p.ProductName LIKE '%$searchTerm%'
-                OR p.ModelNumber LIKE '%$searchTerm%'
-        ";
-        $res = mysqli_query($con, $sql);
-        $count = mysqli_num_rows($res);
-        // …
-    }
-    
-            ?>
-            <div class="row-fluid">
-                <div class="span12">
-                    <h4>Résultats de recherche pour "<em><?php echo htmlentities($searchTerm); ?></em>"</h4>
-                    <?php if ($count > 0) { ?>
-                        <table class="table table-bordered table-striped">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Nom du produit</th>
-                                    <th>Catégorie</th>
-                                   
-                                    <th>Modèle</th>
-                                    <th>Prix par défaut</th>
-                                    <th>Stock disponible</th>
-                                    <th>Prix personnalisé</th>
-                                    <th>Quantité</th>
-                                    <th>Ajouter</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php
-    $i = 1;
-    while ($row = mysqli_fetch_assoc($res)) {
-        $stock = intval($row['Stock']);
-        ?>
-        <tr>
-            <td><?= $i++; ?></td>
-            <td><?= htmlspecialchars($row['ProductName']); ?></td>
-            <td><?= htmlspecialchars($row['CategoryName']); ?></td>
-            <td><?= htmlspecialchars($row['SubCategoryName']); ?></td>
-            <td><?= htmlspecialchars($row['BrandName']); ?></td>
-            <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
-            <td><?= number_format($row['Price'], 2, ',', ' '); ?> €</td>
-            <td><?= $stock; ?></td>
+if (!empty($_GET['searchTerm'])) {
+    $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
+    $sql = "
+        SELECT 
+            p.ID,
+            p.ProductName,
+            p.ModelNumber,
+            p.Price,
+            p.Stock,
+            c.CategoryName
+        FROM tblproducts p
+        LEFT JOIN tblcategories c ON p.CategoryID = c.ID
+        WHERE 
+            p.ProductName LIKE '%$searchTerm%'
+            OR p.ModelNumber LIKE '%$searchTerm%'
+    ";
 
-            <td colspan="3">
-            <?php if ($stock > 0): ?>
-                <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px;">
-                    <!-- On n'expose plus price en input number -->
-                    <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
-                    <input type="hidden" name="price"     value="<?= $row['Price']; ?>">
+    $res   = mysqli_query($con, $sql);
+    $count = mysqli_num_rows($res);
+    ?>
 
-                    <!-- Quantité (max = stock) -->
-                    <input
-                        type="number"
-                        name="quantity"
-                        value="1"
-                        min="1"
-                        max="<?= $stock; ?>"
-                        style="width:60px;"
-                        required
-                    >
+    <div class="row-fluid">
+        <div class="span12">
+            <h4>Résultats de recherche pour "<em><?= htmlspecialchars($searchTerm) ?></em>"</h4>
 
-                    <!-- Bouton Ajouter -->
-                    <button
-                        type="submit"
-                        name="addtocart"
-                        class="btn btn-success btn-sm"
-                    >
-                        <i class="icon-plus"></i> Ajouter
-                    </button>
-                </form>
+            <?php if ($count > 0): ?>
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nom du produit</th>
+                            <th>Catégorie</th>
+                            <th>Modèle</th>
+                            <th>Prix par défaut</th>
+                            <th>Stock disponible</th>
+                            <th>Quantité &amp; Ajouter</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php
+                    $i = 1;
+                    while ($row = mysqli_fetch_assoc($res)) {
+                        $stock = (int) $row['Stock'];
+                        ?>
+                        <tr>
+                            <td><?= $i++; ?></td>
+                            <td><?= htmlspecialchars($row['ProductName']); ?></td>
+                            <td><?= htmlspecialchars($row['CategoryName']); ?></td>
+                            <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
+                            <td><?= number_format($row['Price'], 2, ',', ' '); ?> €</td>
+                            <td><?= $stock; ?></td>
+
+                            <td>
+                                <?php if ($stock > 0): ?>
+                                    <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px; margin:0;">
+                                        <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
+                                        <input type="hidden" name="price"     value="<?= $row['Price']; ?>">
+
+                                        <input
+                                            type="number"
+                                            name="quantity"
+                                            value="1"
+                                            min="1"
+                                            max="<?= $stock; ?>"
+                                            style="width:60px;"
+                                            required
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            name="addtocart"
+                                            class="btn btn-success btn-sm"
+                                        >
+                                            <i class="icon-plus"></i> Ajouter
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="text-danger fw-bold">Rupture de stock</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php } ?>
+                    </tbody>
+                </table>
             <?php else: ?>
-                <span class="text-danger fw-bold">Rupture de stock</span>
+                <p style="color:red;">Aucun produit correspondant trouvé.</p>
             <?php endif; ?>
-            </td>
-        </tr>
-        <?php
-    }
-?>
-
-                            </tbody>
-                        </table>
-                <?php } else { ?>
-                    <p style="color:red;">Aucun produit correspondant trouvé.</p>
-                <?php } ?>
-            </div>
         </div>
-        <hr>
+    </div>
+    <hr>
+<?php } ?>
+                
 
         <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
         <div class="row-fluid">
