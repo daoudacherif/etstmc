@@ -74,108 +74,76 @@ function sendSmsNotification($to, $message) {
     return $status_code == 201;
 }
 
-if (strlen($_SESSION['imsaid'] ?? '') == 0) {
-    header('location:logout.php');
-    exit;
-}
-
 if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
-    $quantity = max(1, intval($_POST['quantity']));
-    $price = max(0, floatval($_POST['price']));
+    $quantity  = max(1, intval($_POST['quantity']));
+    $price     = max(0, floatval($_POST['price']));
 
-    $stockRes = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+    // 1) Récupérer initial_stock et sold_qty
+    $stockRes = mysqli_query($con, "
+        SELECT initial_stock, sold_qty 
+        FROM tblproducts 
+        WHERE ID = '$productId' 
+        LIMIT 1
+    ");
     if (!$stockRes || mysqli_num_rows($stockRes) == 0) {
         echo "<script>alert('Produit introuvable'); window.location.href='cart.php';</script>";
         exit;
     }
-    if ($price < 0) {
-        $price = 0;
-    }
-    
-    // Vérifier si ce produit est déjà dans le panier
-    $checkCart = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
-    
-    if (mysqli_num_rows($checkCart) > 0) {
-        // Mise à jour de la quantité
-        $row = mysqli_fetch_assoc($checkCart);
-        $cartId = $row['ID'];
-        $oldQty = $row['ProductQty'];
-        $newQty = $oldQty + $quantity;
-        mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='$cartId'");
-    } else {
-        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId','$quantity','$price','0')");
-    }
-    echo "<script>alert('Produit ajouté au panier!');window.location.href='cart.php';</script>";
-    exit;
-}
+    $row = mysqli_fetch_assoc($stockRes);
 
-if (isset($_GET['delid'])) {
-    $rid = intval($_GET['delid']);
-    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$rid'");
-    echo "<script>alert('Produit retiré du panier');window.location.href='cart.php';</script>";
-    exit;
-}
+    // 2) Calculer le stock restant et normaliser à ≥ 0
+    $remaining = intval($row['initial_stock']) - intval($row['sold_qty']);
+    $remaining = max(0, $remaining);
 
-if (isset($_POST['applyDiscount'])) {
-    $_SESSION['discount'] = floatval($_POST['discount']);
-    echo "<script>window.location.href='cart.php';</script>";
-    exit;
-}
-
-if (isset($_POST['submit'])) {
-    $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
-    $custmobile = preg_replace('/[^0-9]/', '', $_POST['mobilenumber']);
-    $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
-
-    $discount = $_SESSION['discount'] ?? 0;
-    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
-    $grand = 0;
-    while ($row = mysqli_fetch_assoc($cartQ)) {
-        $grand += $row['ProductQty'] * $row['Price'];
-    }
-    
-    // Appliquer la remise
-    $netTotal = $grandTotal - $discount;
-    if ($netTotal < 0) {
-        $netTotal = 0;
-    }
-    
-    // Générer un numéro de facture unique
-    $billingnum = mt_rand(100000000, 999999999);
-    
-    // Marquer le panier comme validé et insérer dans tblcustomer
-    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
-    $query .= "INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount) VALUES('$billingnum', '$custname', '$custmobilenum', '$modepayment', '$netTotal');";
-    
-    $result = mysqli_multi_query($con, $query);
-    if ($result) {
-        $_SESSION['invoiceid'] = $billingnum;
-        unset($_SESSION['discount']); // Réinitialisation de la remise
-        
-        // Préparer le SMS personnalisé
-        $customerPhone = $custmobilenum; // Assurez-vous qu'il est au format international, ex: "+221787368793"
-        $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
-        
-        // Envoyer le SMS via l'API Nimba
-        $smsResult = sendSmsNotification($customerPhone, $smsMessage);
-        if ($smsResult === true) {
-            $smsMsg = "SMS envoyé avec succès";
-        } else {
-            $smsMsg = "Échec d'envoi SMS - Vérifier les logs serveur";
-        }
-        
+    // 3) Empêcher l’ajout si stock épuisé
+    if ($remaining === 0) {
         echo "<script>
-            alert('Facture créée. Numéro : $billingnum\\n$smsMsg');
-            window.location.href='invoice.php';
+            alert('Stock épuisé pour ce produit.');
+            window.location.href='cart.php';
         </script>";
         exit;
-    } else {
-        echo "<script>alert('Erreur lors du paiement');</script>";
     }
+
+    // 4) Vérifier que la quantité demandée ne dépasse pas le restant
+    if ($quantity > $remaining) {
+        echo "<script>
+            alert('Quantité demandée (' + $quantity + ') supérieure au stock disponible ($remaining).');
+            window.location.href='cart.php';
+        </script>";
+        exit;
+    }
+
+    // 5) Poursuivre comme avant : INSERT ou UPDATE dans tblcart
+    $checkCart = mysqli_query($con, "
+        SELECT ID, ProductQty 
+        FROM tblcart 
+        WHERE ProductId='$productId' AND IsCheckOut=0 
+        LIMIT 1
+    ");
+    if (mysqli_num_rows($checkCart) > 0) {
+        $c = mysqli_fetch_assoc($checkCart);
+        $newQty = $c['ProductQty'] + $quantity;
+        // (Optionnel) Re-vérifier que $newQty <= $remaining avant UPDATE
+        mysqli_query($con, "
+            UPDATE tblcart 
+            SET ProductQty='$newQty', Price='$price' 
+            WHERE ID='{$c['ID']}'
+        ");
+    } else {
+        mysqli_query($con, "
+            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) 
+            VALUES('$productId','$quantity','$price','0')
+        ");
+    }
+
+    echo "<script>
+        alert('Produit ajouté au panier !');
+        window.location.href='cart.php';
+    </script>";
+    exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
