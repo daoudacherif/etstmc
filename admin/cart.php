@@ -263,19 +263,28 @@ if (isset($_POST['submit'])) {
 
         <!-- ========== AFFICHAGE DES RÉSULTATS DE RECHERCHE ========== -->
         <?php
-        if (!empty($_GET['searchTerm'])) {
-            $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
-            $sql = "
-                SELECT p.ID, p.ProductName, p.ModelNumber, p.Price, p.Stock,
-                       c.CategoryName
-                FROM tblproducts p
-                LEFT JOIN tblcategories c ON p.CategoryID = c.ID
-                JOIN tblcategories c ON p.CategoryID = c.ID
-                WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
-                WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
-            ";
-            $res = mysqli_query($con, $sql);
-            $count = mysqli_num_rows($res);
+       if (!empty($_GET['searchTerm'])) {
+        $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
+        $sql = "
+            SELECT 
+                p.ID, 
+                p.ProductName, 
+                p.ModelNumber, 
+                p.Price, 
+                p.Stock,
+                c.CategoryName
+            FROM tblproducts p
+            LEFT JOIN tblcategories c 
+                ON p.CategoryID = c.ID
+            WHERE 
+                p.ProductName LIKE '%$searchTerm%'
+                OR p.ModelNumber LIKE '%$searchTerm%'
+        ";
+        $res = mysqli_query($con, $sql);
+        $count = mysqli_num_rows($res);
+        // …
+    }
+    
             ?>
             <div class="row-fluid">
                 <div class="span12">
@@ -350,13 +359,12 @@ if (isset($_POST['submit'])) {
 
                             </tbody>
                         </table>
-                    <?php } else { ?>
-                        <p style="color:red;">Aucun produit correspondant trouvé.</p>
-                    <?php } ?>
-                </div>
+                <?php } else { ?>
+                    <p style="color:red;">Aucun produit correspondant trouvé.</p>
+                <?php } ?>
             </div>
-            <hr>
-        <?php } ?>
+        </div>
+        <hr>
 
         <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
         <div class="row-fluid">
