@@ -291,6 +291,7 @@ if (!empty($_GET['searchTerm'])) {
 
     <div class="row-fluid">
         <div class="span12">
+            <?php if (!empty($searchTerm)): ?>
             <h4>Résultats de recherche pour "<em><?= htmlspecialchars($searchTerm) ?></em>"</h4>
 
             <?php if ($count > 0): ?>
@@ -361,10 +362,9 @@ if (!empty($_GET['searchTerm'])) {
             <?php endif; ?>
         </div>
     </div>
-    <hr>
-<?php } ?>
+<?php endif; ?>
 
-        <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
+<!-- ========== PANIER + REMISE + PAIEMENT ========== -->        <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
         <div class="row-fluid">
             <div class="span12">
                 <form method="post" class="form-inline" style="text-align:right;">
