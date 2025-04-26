@@ -266,11 +266,12 @@ if (isset($_POST['submit'])) {
         if (!empty($_GET['searchTerm'])) {
             $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
             $sql = "
-                SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price, p.Stock,
-                       c.CategoryName, s.SubCategoryName
+                SELECT p.ID, p.ProductName, p.ModelNumber, p.Price, p.Stock,
+                       c.CategoryName
                 FROM tblproducts p
-                LEFT JOIN tblcategory c ON c.ID = p.CatID
-                LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
+                LEFT JOIN tblcategories c ON p.CategoryID = c.ID
+                JOIN tblcategories c ON p.CategoryID = c.ID
+                WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
                 WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
             ";
             $res = mysqli_query($con, $sql);
@@ -286,8 +287,7 @@ if (isset($_POST['submit'])) {
                                     <th>#</th>
                                     <th>Nom du produit</th>
                                     <th>Catégorie</th>
-                                    <th>Sous-catégorie</th>
-                                    <th>Marque</th>
+                                   
                                     <th>Modèle</th>
                                     <th>Prix par défaut</th>
                                     <th>Stock disponible</th>
