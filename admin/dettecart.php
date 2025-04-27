@@ -101,10 +101,17 @@ if (isset($_POST['addtocart'])) {
     $price     = max(0, floatval($_POST['price']));
 
     // Vérifier le stock disponible
-    $stockCheck = mysqli_query($con, "SELECT Stock FROM tblproducts WHERE ID='$productId'");
+    $stockCheck = mysqli_query($con, "SELECT Stock, ProductName FROM tblproducts WHERE ID='$productId'");
     if ($row = mysqli_fetch_assoc($stockCheck)) {
+        // Vérification que le stock est strictement supérieur à 0
+        if ($row['Stock'] <= 0) {
+            echo "<script>alert('Produit \"" . htmlspecialchars($row['ProductName']) . "\" en rupture de stock.'); window.location='dettecart.php';</script>";
+            exit;
+        }
+        
+        // Vérification que la quantité demandée est disponible
         if ($row['Stock'] < $quantity) {
-            echo "<script>alert('Stock insuffisant pour ce produit.'); window.location='dettecart.php';</script>";
+            echo "<script>alert('Stock insuffisant pour \"" . htmlspecialchars($row['ProductName']) . "\". Stock disponible: " . $row['Stock'] . "'); window.location='dettecart.php';</script>";
             exit;
         }
     } else {
@@ -116,8 +123,9 @@ if (isset($_POST['addtocart'])) {
     if (mysqli_num_rows($existCheck) > 0) {
         $c = mysqli_fetch_assoc($existCheck);
         $newQty = $c['ProductQty'] + $quantity;
+        // Vérification que la nouvelle quantité totale ne dépasse pas le stock disponible
         if ($newQty > $row['Stock']) {
-            echo "<script>alert('Quantité demandée supérieure au stock disponible.'); window.location='dettecart.php';</script>";
+            echo "<script>alert('Quantité totale demandée (" . $newQty . ") supérieure au stock disponible (" . $row['Stock'] . ") pour \"" . htmlspecialchars($row['ProductName']) . "\".'); window.location='dettecart.php';</script>";
             exit;
         }
         mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
@@ -145,6 +153,17 @@ if (isset($_POST['applyDiscount'])) {
 }
 $discount = $_SESSION['discount'] ?? 0;
 
+// Vérifier les stocks pour l'affichage
+$hasStockIssue = false;
+$stockIssueProducts = [];
+
+// Récupérer la liste des noms de produits pour la datalist
+$productNames = [];
+$productQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName");
+while ($row = mysqli_fetch_assoc($productQuery)) {
+    $productNames[] = $row['ProductName'];
+}
+
 // Checkout + Facturation
 if (isset($_POST['submit'])) {
     $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
@@ -169,11 +188,22 @@ if (isset($_POST['submit'])) {
         JOIN tblproducts p ON p.ID = c.ProductId
         WHERE c.IsCheckOut=0
     ");
+    
+    $stockErrors = [];
     while ($row = mysqli_fetch_assoc($stockCheck)) {
-        if ($row['Stock'] < $row['ProductQty']) {
-            echo "<script>alert('Stock insuffisant pour {$row['ProductName']}'); window.location='dettecart.php';</script>";
-            exit;
+        // Vérification du stock suffisant
+        if ($row['Stock'] <= 0) {
+            $stockErrors[] = "{$row['ProductName']} est en rupture de stock";
         }
+        else if ($row['Stock'] < $row['ProductQty']) {
+            $stockErrors[] = "Stock insuffisant pour {$row['ProductName']} (demandé: {$row['ProductQty']}, disponible: {$row['Stock']})";
+        }
+    }
+    
+    if (!empty($stockErrors)) {
+        $errorMsg = "Impossible de finaliser la commande:\n- " . implode("\n- ", $stockErrors);
+        echo "<script>alert(" . json_encode($errorMsg) . "); window.location='dettecart.php';</script>";
+        exit;
     }
 
     $billingnum = mt_rand(100000000, 999999999);
@@ -212,6 +242,21 @@ if (isset($_POST['submit'])) {
         die('Erreur SQL : ' . mysqli_error($con));
     }
 }
+
+// Vérifier à nouveau les stocks pour l'affichage du panier
+$cartProducts = mysqli_query($con, "
+    SELECT c.ID, c.ProductId, c.ProductQty, p.Stock, p.ProductName 
+    FROM tblcart c
+    JOIN tblproducts p ON p.ID = c.ProductId
+    WHERE c.IsCheckOut=0
+");
+
+while ($product = mysqli_fetch_assoc($cartProducts)) {
+    if ($product['Stock'] <= 0 || $product['Stock'] < $product['ProductQty']) {
+        $hasStockIssue = true;
+        $stockIssueProducts[] = $product['ProductName'];
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -220,6 +265,52 @@ if (isset($_POST['submit'])) {
     <title>Système de Gestion d'Inventaire | Panier</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
+    
+    <!-- Style pour les problèmes de stock -->
+    <style>
+        .stock-warning {
+            color: #d9534f;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        tr.stock-error {
+            background-color: #f2dede !important;
+        }
+        
+        .global-warning {
+            background-color: #f2dede;
+            border: 1px solid #ebccd1;
+            color: #a94442;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        
+        .stock-status {
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .stock-ok {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        
+        .stock-warning {
+            background-color: #fcf8e3;
+            color: #8a6d3b;
+        }
+        
+        .stock-danger {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
     <!-- Header + Sidebar -->
     <?php include_once('includes/header.php'); ?>
     <?php include_once('includes/sidebar.php'); ?>
@@ -237,6 +328,34 @@ if (isset($_POST['submit'])) {
   
         <div class="container-fluid">
             <hr>
+            
+            <!-- Message d'alerte si problème de stock -->
+            <?php if ($hasStockIssue): ?>
+            <div class="global-warning">
+                <strong><i class="icon-warning-sign"></i> Attention !</strong> Certains produits dans votre panier ont des problèmes de stock :
+                <ul>
+                    <?php foreach($stockIssueProducts as $product): ?>
+                    <li><?php echo htmlspecialchars($product); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+                Veuillez ajuster les quantités ou supprimer ces produits avant de finaliser la commande.
+            </div>
+            
+            <!-- Script pour désactiver le bouton de paiement en cas de problème de stock -->
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Désactiver le bouton de validation
+                    var submitBtn = document.querySelector('button[name="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.title = "Veuillez d'abord résoudre les problèmes de stock";
+                        submitBtn.style.opacity = "0.5";
+                        submitBtn.style.cursor = "not-allowed";
+                    }
+                });
+            </script>
+            <?php endif; ?>
+            
             <!-- ====================== FORMULAIRE DE RECHERCHE (avec datalist) ====================== -->
             <div class="row-fluid">
                 <div class="span12">
@@ -262,7 +381,7 @@ if (isset($_POST['submit'])) {
             if (!empty($_GET['searchTerm'])) {
                 $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
                 $sql = "
-                    SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price,
+                    SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price, p.Stock,
                            c.CategoryName, s.SubCategoryName
                     FROM tblproducts p
                     LEFT JOIN tblcategory c ON c.ID = p.CatID
@@ -286,6 +405,7 @@ if (isset($_POST['submit'])) {
                                         <th>Marque</th>
                                         <th>Modèle</th>
                                         <th>Prix par Défaut</th>
+                                        <th>Stock</th>
                                         <th>Prix Personnalisé</th>
                                         <th>Quantité</th>
                                         <th>Ajouter</th>
@@ -295,8 +415,19 @@ if (isset($_POST['submit'])) {
                                 <?php
                                 $i = 1;
                                 while ($row = mysqli_fetch_assoc($res)) {
+                                    $disableAdd = ($row['Stock'] <= 0);
+                                    $rowClass = $disableAdd ? 'class="stock-error"' : '';
+                                    $stockStatus = '';
+                                    
+                                    if ($row['Stock'] <= 0) {
+                                        $stockStatus = '<span class="stock-status stock-danger">Rupture</span>';
+                                    } elseif ($row['Stock'] < 5) {
+                                        $stockStatus = '<span class="stock-status stock-warning">Faible</span>';
+                                    } else {
+                                        $stockStatus = '<span class="stock-status stock-ok">Disponible</span>';
+                                    }
                                     ?>
-                                    <tr>
+                                    <tr <?php echo $rowClass; ?>>
                                         <td><?php echo $i++; ?></td>
                                         <td><?php echo $row['ProductName']; ?></td>
                                         <td><?php echo $row['CategoryName']; ?></td>
@@ -304,6 +435,7 @@ if (isset($_POST['submit'])) {
                                         <td><?php echo $row['BrandName']; ?></td>
                                         <td><?php echo $row['ModelNumber']; ?></td>
                                         <td><?php echo $row['Price']; ?></td>
+                                        <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                         <td>
                                             <form method="post" action="dettecart.php" style="margin:0;">
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
@@ -311,10 +443,10 @@ if (isset($_POST['submit'])) {
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
                                         </td>
                                         <td>
-                                            <input type="number" name="quantity" value="1" min="1" style="width:60px;" />
+                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $row['Stock']; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> />
                                         </td>
                                         <td>
-                                            <button type="submit" name="addtocart" class="btn btn-success btn-small">
+                                            <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php echo $disableAdd ? 'disabled' : ''; ?>>
                                                 <i class="icon-plus"></i> Ajouter
                                             </button>
                                             </form>
@@ -382,7 +514,7 @@ if (isset($_POST['submit'])) {
                         </div>
   
                         <div class="form-actions" style="text-align:center;">
-                            <button class="btn btn-primary" type="submit" name="submit">
+                            <button class="btn btn-primary" type="submit" name="submit" <?php echo $hasStockIssue ? 'disabled' : ''; ?>>
                                 Valider & Créer la Facture
                             </button>
                         </div>
@@ -401,6 +533,7 @@ if (isset($_POST['submit'])) {
                                         <th>#</th>
                                         <th>Nom du Produit</th>
                                         <th>Quantité</th>
+                                        <th>Stock</th>
                                         <th>Prix (unité)</th>
                                         <th>Total</th>
                                         <th>Action</th>
@@ -413,7 +546,8 @@ if (isset($_POST['submit'])) {
                                         tblcart.ID as cid,
                                         tblcart.ProductQty,
                                         tblcart.Price as cartPrice,
-                                        tblproducts.ProductName
+                                        tblproducts.ProductName,
+                                        tblproducts.Stock
                                       FROM tblcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
                                       WHERE tblcart.IsCheckOut = 0
@@ -426,13 +560,29 @@ if (isset($_POST['submit'])) {
                                         while ($row = mysqli_fetch_array($ret)) {
                                             $pq    = $row['ProductQty'];
                                             $ppu   = $row['cartPrice'];
+                                            $stock = $row['Stock'];
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
+                                            
+                                            // Vérification du stock pour cette ligne
+                                            $stockIssue = ($stock <= 0 || $stock < $pq);
+                                            $rowClass = $stockIssue ? 'class="stock-error"' : '';
+                                            $stockStatus = '';
+                                            
+                                            if ($stock <= 0) {
+                                                $stockStatus = '<span class="stock-warning">RUPTURE</span>';
+                                            } elseif ($stock < $pq) {
+                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';
+                                            }
                                             ?>
-                                            <tr class="gradeX">
+                                            <tr <?php echo $rowClass; ?>>
                                                 <td><?php echo $cnt; ?></td>
                                                 <td><?php echo $row['ProductName']; ?></td>
                                                 <td><?php echo $pq; ?></td>
+                                                <td>
+                                                    <?php echo $stock; ?>
+                                                    <?php echo $stockStatus; ?>
+                                                </td>
                                                 <td><?php echo number_format($ppu, 2); ?></td>
                                                 <td><?php echo number_format($lineTotal, 2); ?></td>
                                                 <td>
@@ -451,22 +601,22 @@ if (isset($_POST['submit'])) {
                                         }
                                         ?>
                                         <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold;">Total Général</th>
+                                            <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
                                             <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
                                         </tr>
                                         <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold;">Remise</th>
+                                            <th colspan="5" style="text-align: right; font-weight: bold;">Remise</th>
                                             <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
                                         </tr>
                                         <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                            <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
                                             <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                         </tr>
                                         <?php
                                     } else {
                                         ?>
                                         <tr>
-                                            <td colspan="6" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
+                                            <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
                                         </tr>
                                         <?php
                                     }
