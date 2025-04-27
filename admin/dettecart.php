@@ -213,243 +213,283 @@ if (isset($_POST['submit'])) {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Système de Gestion | Panier Vente à Crédit</title>
+    <title>Système de Gestion d'Inventaire | Panier</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
-</head>
-
-<body>
-<?php include_once('includes/header.php'); ?>
-<?php include_once('includes/sidebar.php'); ?>
-
-<div id="content">
-    <div id="content-header">
-        <div id="breadcrumb">
-            <a href="dashboard.php" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
-            <a href="dettecart.php" class="current">Panier Dette</a>
-        </div>
-        <h1>Panier de Produits (Vente à Terme)</h1>
-    </div>
-
-    <div class="container-fluid">
-        <hr>
-
-        <!-- Recherche Produit -->
-        <div class="row-fluid">
-            <div class="span12">
-                <form method="get" action="dettecart.php" class="form-inline">
-                    <label>Rechercher Produit :</label>
-                    <input type="text" name="searchTerm" class="span3" list="productsList" placeholder="Nom ou Modèle..." />
-                    <datalist id="productsList">
-                        <?php
-                        foreach ($productNames as $pname) {
-                            echo '<option value="' . htmlspecialchars($pname) . '"></option>';
-                        }
-                        ?>
-                    </datalist>
-                    <button type="submit" class="btn btn-primary">Rechercher</button>
-                </form>
+    <!-- Header + Sidebar -->
+    <?php include_once('includes/header.php'); ?>
+    <?php include_once('includes/sidebar.php'); ?>
+  
+    <div id="content">
+        <div id="content-header">
+            <div id="breadcrumb">
+                <a href="dashboard.php" class="tip-bottom">
+                    <i class="icon-home"></i> Accueil
+                </a>
+                <a href="dettecart.php" class="current">Panier de Produits</a>
             </div>
+            <h1>Panier de Produits (Vente à terme possible)</h1>
         </div>
-
-        <hr>
-
-        <!-- Résultats de Recherche -->
-        <?php
-        if (!empty($_GET['searchTerm'])) {
-            $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
-            $res = mysqli_query($con, "
-                SELECT p.ID, p.ProductName, p.ModelNumber, p.Price, p.Stock
-                FROM tblproducts p
-                WHERE p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%'
-            ");
-            if (mysqli_num_rows($res) > 0) {
-                ?>
-                <table class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Produit</th>
-                            <th>Modèle</th>
-                            <th>Prix</th>
-                            <th>Stock</th>
-                            <th>Quantité</th>
-                            <th>Prix Perso</th>
-                            <th>Ajouter</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $i = 1;
-                        while ($row = mysqli_fetch_assoc($res)) {
-                            ?>
-                            <tr>
-                                <td><?= $i++; ?></td>
-                                <td><?= htmlspecialchars($row['ProductName']); ?></td>
-                                <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
-                                <td><?= number_format($row['Price'], 2, ',', ' '); ?> GNF</td>
-                                <td><?= $row['Stock']; ?></td>
-                                <td>
-                                    <form method="post" action="dettecart.php" style="margin:0;">
-                                        <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
-                                        <input type="number" name="quantity" value="1" min="1" max="<?= $row['Stock']; ?>" style="width: 60px;" required>
-                                </td>
-                                <td>
-                                    <input type="number" name="price" value="<?= $row['Price']; ?>" step="any" style="width: 80px;" required>
-                                </td>
-                                <td>
-                                    <button type="submit" name="addtocart" class="btn btn-success btn-small">
-                                        <i class="icon-plus"></i> Ajouter
-                                    </button>
-                                    </form>
-                                </td>
-                            </tr>
+  
+        <div class="container-fluid">
+            <hr>
+            <!-- ====================== FORMULAIRE DE RECHERCHE (avec datalist) ====================== -->
+            <div class="row-fluid">
+                <div class="span12">
+                    <form method="get" action="dettecart.php" class="form-inline">
+                        <label>Rechercher des Produits :</label>
+                        <input type="text" name="searchTerm" class="span3"
+                               placeholder="Nom du produit ou modèle..." list="productsList" />
+                        <datalist id="productsList">
                             <?php
-                        }
-                        ?>
-                    </tbody>
-                </table>
-                <?php
-            } else {
-                echo "<p style='color:red;'>Aucun produit trouvé.</p>";
-            }
-        }
-        ?>
-
-        <hr>
-
-        <!-- Formulaire Remise + Paiement -->
-        <div class="row-fluid">
-            <div class="span12">
-                <form method="post" class="form-inline" style="text-align:right;">
-                    <label>Remise :</label>
-                    <input type="number" name="discount" value="<?= $discount; ?>" step="any" style="width:80px;">
-                    <button type="submit" name="applyDiscount" class="btn btn-info">Appliquer</button>
-                </form>
-
-                <hr>
-
-                <form method="post" class="form-horizontal" name="submit">
-                    <div class="control-group">
-                        <label class="control-label">Nom Client :</label>
-                        <div class="controls">
-                            <input type="text" name="customername" class="span11" required>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Téléphone (+224...):</label>
-                        <div class="controls">
-                            <input type="tel" name="mobilenumber" class="span11" required
-                                   pattern="^\+224[0-9]{9}$" placeholder="+2246XXXXXXXX" title="Format: +224 suivi de 9 chiffres">
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Mode de Paiement :</label>
-                        <div class="controls">
-                            <label><input type="radio" name="modepayment" value="cash" checked> Espèces</label>
-                            <label><input type="radio" name="modepayment" value="card"> Carte</label>
-                            <label><input type="radio" name="modepayment" value="credit"> Crédit</label>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <label class="control-label">Montant Payé Maintenant :</label>
-                        <div class="controls">
-                            <input type="number" name="paid" class="span11" step="any" value="0">
-                        </div>
-                    </div>
-
-                    <div class="text-center">
-                        <button type="submit" name="submit" class="btn btn-primary">Valider et Facturer</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <hr>
-
-        <!-- Tableau Panier -->
-        <div class="widget-box">
-            <div class="widget-title"><h5>Produits dans le Panier</h5></div>
-            <div class="widget-content nopadding">
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Produit</th>
-                            <th>Quantité</th>
-                            <th>Prix unitaire</th>
-                            <th>Total</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $cartRes = mysqli_query($con, "
-                            SELECT tblcart.ID as cid, tblproducts.ProductName, tblcart.ProductQty, tblcart.Price
-                            FROM tblcart
-                            JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
-                            WHERE tblcart.IsCheckOut=0
-                        ");
-                        $cnt = 1;
-                        $grandTotal = 0;
-                        if (mysqli_num_rows($cartRes) > 0) {
-                            while ($row = mysqli_fetch_assoc($cartRes)) {
-                                $lineTotal = $row['ProductQty'] * $row['Price'];
-                                $grandTotal += $lineTotal;
-                                ?>
-                                <tr>
-                                    <td><?= $cnt++; ?></td>
-                                    <td><?= htmlspecialchars($row['ProductName']); ?></td>
-                                    <td><?= $row['ProductQty']; ?></td>
-                                    <td><?= number_format($row['Price'], 2); ?></td>
-                                    <td><?= number_format($lineTotal, 2); ?></td>
-                                    <td>
-                                        <a href="dettecart.php?delid=<?= $row['cid']; ?>"
-                                           onclick="return confirm('Confirmer la suppression ?');">
-                                           <i class="icon-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php
+                            foreach ($productNames as $pname) {
+                                echo '<option value="' . htmlspecialchars($pname) . '"></option>';
                             }
-                            $netTotal = max(0, $grandTotal - $discount);
                             ?>
-                            <tr>
-                                <th colspan="4" style="text-align:right;">Total général</th>
-                                <th colspan="2"><?= number_format($grandTotal, 2); ?></th>
-                            </tr>
-                            <tr>
-                                <th colspan="4" style="text-align:right;">Remise</th>
-                                <th colspan="2"><?= number_format($discount, 2); ?></th>
-                            </tr>
-                            <tr>
-                                <th colspan="4" style="text-align:right; color:green;">Total net</th>
-                                <th colspan="2" style="color:green;"><?= number_format($netTotal, 2); ?></th>
-                            </tr>
-                            <?php
-                        } else {
-                            echo "<tr><td colspan='6' style='text-align:center;color:red;'>Panier vide</td></tr>";
-                        }
-                        ?>
-                    </tbody>
-                </table>
+                        </datalist>
+                        <button type="submit" class="btn btn-primary">Rechercher</button>
+                    </form>
+                </div>
             </div>
-        </div>
-
-    </div> <!-- container-fluid -->
-</div> <!-- content -->
-
-<?php include_once('includes/footer.php'); ?>
-
-<!-- Scripts -->
-<script src="js/jquery.min.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.dataTables.min.js"></script>
-<script src="js/matrix.js"></script>
-<script src="js/matrix.tables.js"></script>
+            <hr>
+  
+            <!-- ====================== RÉSULTATS DE RECHERCHE ====================== -->
+            <?php
+            if (!empty($_GET['searchTerm'])) {
+                $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
+                $sql = "
+                    SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price,
+                           c.CategoryName, s.SubCategoryName
+                    FROM tblproducts p
+                    LEFT JOIN tblcategory c ON c.ID = p.CatID
+                    LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
+                    WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
+                ";
+                $res = mysqli_query($con, $sql);
+                $count = mysqli_num_rows($res);
+                ?>
+                <div class="row-fluid">
+                    <div class="span12">
+                        <h4>Résultats de recherche pour "<em><?php echo htmlentities($searchTerm); ?></em>"</h4>
+                        <?php if ($count > 0) { ?>
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nom du Produit</th>
+                                        <th>Catégorie</th>
+                                        <th>Sous-Catégorie</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Prix par Défaut</th>
+                                        <th>Prix Personnalisé</th>
+                                        <th>Quantité</th>
+                                        <th>Ajouter</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php
+                                $i = 1;
+                                while ($row = mysqli_fetch_assoc($res)) {
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $i++; ?></td>
+                                        <td><?php echo $row['ProductName']; ?></td>
+                                        <td><?php echo $row['CategoryName']; ?></td>
+                                        <td><?php echo $row['SubCategoryName']; ?></td>
+                                        <td><?php echo $row['BrandName']; ?></td>
+                                        <td><?php echo $row['ModelNumber']; ?></td>
+                                        <td><?php echo $row['Price']; ?></td>
+                                        <td>
+                                            <form method="post" action="dettecart.php" style="margin:0;">
+                                                <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
+                                                <input type="number" name="price" step="any" 
+                                                       value="<?php echo $row['Price']; ?>" style="width:80px;" />
+                                        </td>
+                                        <td>
+                                            <input type="number" name="quantity" value="1" min="1" style="width:60px;" />
+                                        </td>
+                                        <td>
+                                            <button type="submit" name="addtocart" class="btn btn-success btn-small">
+                                                <i class="icon-plus"></i> Ajouter
+                                            </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <?php
+                                }
+                                ?>
+                                </tbody>
+                            </table>
+                        <?php } else { ?>
+                            <p style="color:red;">Aucun produit correspondant trouvé.</p>
+                        <?php } ?>
+                    </div>
+                </div>
+                <hr>
+            <?php } ?>
+  
+            <!-- ====================== AFFICHAGE DU PANIER + REMISE + CHECKOUT ====================== -->
+            <div class="row-fluid">
+                <div class="span12">
+                    <!-- FORMULAIRE DE REMISE -->
+                    <form method="post" class="form-inline" style="text-align:right;">
+                        <label>Remise :</label>
+                        <input type="number" name="discount" step="any" value="<?php echo $discount; ?>" style="width:80px;" />
+                        <button class="btn btn-info" type="submit" name="applyDiscount">Appliquer</button>
+                    </form>
+                    <hr>
+  
+                    <!-- FORMULAIRE DE CHECKOUT (informations client + montant payé) -->
+                    <form method="post" class="form-horizontal" name="submit">
+                        <div class="control-group">
+                            <label class="control-label">Nom du Client :</label>
+                            <div class="controls">
+                                <input type="text" class="span11" name="customername" required />
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label">Numéro de Mobile :</label>
+                            <div class="controls">
+                                <!-- Validation pour le format sénégalais : +221 suivi de 9 chiffres -->
+                                <input type="tel"
+                                       class="span11"
+                                       name="mobilenumber"
+                                       required
+                                       pattern="^\+221[0-9]{9}$"
+                                       placeholder="+221787368793"
+                                       title="Format: +221 suivi de 9 chiffres">
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label">Mode de Paiement :</label>
+                            <div class="controls">
+                                <label><input type="radio" name="modepayment" value="cash" checked> Espèces</label>
+                                <label><input type="radio" name="modepayment" value="card"> Carte</label>
+                                <label><input type="radio" name="modepayment" value="credit"> Crédit (Terme)</label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label">Montant Payé Maintenant :</label>
+                            <div class="controls">
+                                <input type="number" name="paid" step="any" value="0" class="span11" />
+                                <p style="font-size: 12px; color: #666;">(Laissez 0 si rien n'est payé maintenant)</p>
+                            </div>
+                        </div>
+  
+                        <div class="form-actions" style="text-align:center;">
+                            <button class="btn btn-primary" type="submit" name="submit">
+                                Valider & Créer la Facture
+                            </button>
+                        </div>
+                    </form>
+  
+                    <!-- Tableau du panier -->
+                    <div class="widget-box">
+                        <div class="widget-title">
+                            <span class="icon"><i class="icon-th"></i></span>
+                            <h5>Produits dans le Panier</h5>
+                        </div>
+                        <div class="widget-content nopadding">
+                            <table class="table table-bordered" style="font-size: 15px">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nom du Produit</th>
+                                        <th>Quantité</th>
+                                        <th>Prix (unité)</th>
+                                        <th>Total</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $ret = mysqli_query($con, "
+                                      SELECT 
+                                        tblcart.ID as cid,
+                                        tblcart.ProductQty,
+                                        tblcart.Price as cartPrice,
+                                        tblproducts.ProductName
+                                      FROM tblcart
+                                      LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
+                                      WHERE tblcart.IsCheckOut = 0
+                                      ORDER BY tblcart.ID ASC
+                                    ");
+                                    $cnt = 1;
+                                    $grandTotal = 0;
+                                    $num = mysqli_num_rows($ret);
+                                    if ($num > 0) {
+                                        while ($row = mysqli_fetch_array($ret)) {
+                                            $pq    = $row['ProductQty'];
+                                            $ppu   = $row['cartPrice'];
+                                            $lineTotal = $pq * $ppu;
+                                            $grandTotal += $lineTotal;
+                                            ?>
+                                            <tr class="gradeX">
+                                                <td><?php echo $cnt; ?></td>
+                                                <td><?php echo $row['ProductName']; ?></td>
+                                                <td><?php echo $pq; ?></td>
+                                                <td><?php echo number_format($ppu, 2); ?></td>
+                                                <td><?php echo number_format($lineTotal, 2); ?></td>
+                                                <td>
+                                                    <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
+                                                       onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
+                                                        <i class="icon-trash"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <?php
+                                            $cnt++;
+                                        }
+                                        $netTotal = $grandTotal - $discount;
+                                        if ($netTotal < 0) {
+                                            $netTotal = 0;
+                                        }
+                                        ?>
+                                        <tr>
+                                            <th colspan="4" style="text-align: right; font-weight: bold;">Total Général</th>
+                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                        </tr>
+                                        <tr>
+                                            <th colspan="4" style="text-align: right; font-weight: bold;">Remise</th>
+                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                        </tr>
+                                        <tr>
+                                            <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                            <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
+                                        </tr>
+                                        <?php
+                                    } else {
+                                        ?>
+                                        <tr>
+                                            <td colspan="6" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
+                                        </tr>
+                                        <?php
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
+                        </div><!-- widget-content -->
+                    </div><!-- widget-box -->
+                </div>
+            </div><!-- row-fluid -->
+        </div><!-- container-fluid -->
+    </div><!-- content -->
+  
+    <!-- Footer -->
+    <?php include_once('includes/footer.php'); ?>
+    <!-- SCRIPTS -->
+    <script src="js/jquery.min.js"></script>
+    <script src="js/jquery.ui.custom.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery.uniform.js"></script>
+    <script src="js/select2.min.js"></script>
+    <script src="js/jquery.dataTables.min.js"></script>
+    <script src="js/matrix.js"></script>
+    <script src="js/matrix.tables.js"></script>
 </body>
 </html>
