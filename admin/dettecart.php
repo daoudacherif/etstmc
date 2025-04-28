@@ -105,7 +105,7 @@ if (isset($_POST['addtocart'])) {
     if ($row = mysqli_fetch_assoc($stockCheck)) {
         // Vérification que le stock est strictement supérieur à 0
         if ($row['Stock'] <= 0) {
-            echo "<script>alert('Produit \"" . htmlspecialchars($row['ProductName']) . "\" en rupture de stock.'); window.location='dettecart.php';</script>";
+            echo "<script>alert('Article \"" . htmlspecialchars($row['ProductName']) . "\" en rupture de stock.'); window.location='dettecart.php';</script>";
             exit;
         }
         
@@ -115,7 +115,7 @@ if (isset($_POST['addtocart'])) {
             exit;
         }
     } else {
-        echo "<script>alert('Produit introuvable.'); window.location='dettecart.php';</script>";
+        echo "<script>alert('Article introuvable.'); window.location='dettecart.php';</script>";
         exit;
     }
 
@@ -137,7 +137,7 @@ if (isset($_POST['addtocart'])) {
     exit;
 }
 
-// Supprimer un produit
+// Supprimer un Article
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
     mysqli_query($con, "DELETE FROM tblcart WHERE ID='$delid'") or die(mysqli_error($con));
@@ -157,7 +157,7 @@ $discount = $_SESSION['discount'] ?? 0;
 $hasStockIssue = false;
 $stockIssueProducts = [];
 
-// Récupérer la liste des noms de produits pour la datalist
+// Récupérer la liste des noms de Articles pour la datalist
 $productNames = [];
 $productQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName");
 while ($row = mysqli_fetch_assoc($productQuery)) {
@@ -321,9 +321,9 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                 <a href="dashboard.php" class="tip-bottom">
                     <i class="icon-home"></i> Accueil
                 </a>
-                <a href="dettecart.php" class="current">Panier de Produits</a>
+                <a href="dettecart.php" class="current">Panier de Articles</a>
             </div>
-            <h1>Panier de Produits (Vente à terme possible)</h1>
+            <h1>Panier de Articles (Vente à terme possible)</h1>
         </div>
   
         <div class="container-fluid">
@@ -332,13 +332,13 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
             <!-- Message d'alerte si problème de stock -->
             <?php if ($hasStockIssue): ?>
             <div class="global-warning">
-                <strong><i class="icon-warning-sign"></i> Attention !</strong> Certains produits dans votre panier ont des problèmes de stock :
+                <strong><i class="icon-warning-sign"></i> Attention !</strong> Certains Articles dans votre panier ont des problèmes de stock :
                 <ul>
                     <?php foreach($stockIssueProducts as $product): ?>
                     <li><?php echo htmlspecialchars($product); ?></li>
                     <?php endforeach; ?>
                 </ul>
-                Veuillez ajuster les quantités ou supprimer ces produits avant de finaliser la commande.
+                Veuillez ajuster les quantités ou supprimer ces Articles avant de finaliser la commande.
             </div>
             
             <!-- Script pour désactiver le bouton de paiement en cas de problème de stock -->
@@ -360,9 +360,9 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
             <div class="row-fluid">
                 <div class="span12">
                     <form method="get" action="dettecart.php" class="form-inline">
-                        <label>Rechercher des Produits :</label>
+                        <label>Rechercher des Articles :</label>
                         <input type="text" name="searchTerm" class="span3"
-                               placeholder="Nom du produit ou modèle..." list="productsList" />
+                               placeholder="Nom du Article ou modèle..." list="productsList" />
                         <datalist id="productsList">
                             <?php
                             foreach ($productNames as $pname) {
@@ -399,7 +399,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Nom du Produit</th>
+                                        <th>Nom du Article</th>
                                         <th>Catégorie</th>
                                         <th>Sous-Catégorie</th>
                                         <th>Marque</th>
@@ -458,7 +458,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                 </tbody>
                             </table>
                         <?php } else { ?>
-                            <p style="color:red;">Aucun produit correspondant trouvé.</p>
+                            <p style="color:red;">Aucun Article correspondant trouvé.</p>
                         <?php } ?>
                     </div>
                 </div>
@@ -524,14 +524,14 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                     <div class="widget-box">
                         <div class="widget-title">
                             <span class="icon"><i class="icon-th"></i></span>
-                            <h5>Produits dans le Panier</h5>
+                            <h5>Articles dans le Panier</h5>
                         </div>
                         <div class="widget-content nopadding">
                             <table class="table table-bordered" style="font-size: 15px">
                                 <thead>
                                     <tr>
                                         <th>#</th>
-                                        <th>Nom du Produit</th>
+                                        <th>Nom du Article</th>
                                         <th>Quantité</th>
                                         <th>Stock</th>
                                         <th>Prix (unité)</th>

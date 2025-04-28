@@ -13,7 +13,7 @@ if (empty($_SESSION['imsaid'])) {
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Inventaire des Produits</title>
+  <title>Inventaire des Articles</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
 </head>
@@ -27,9 +27,9 @@ if (empty($_SESSION['imsaid'])) {
       <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
       </a>
-      <strong>Voir l'Inventaire des Produits</strong>
+      <strong>Voir l'Inventaire des Articles</strong>
     </div>
-    <h1>Inventaire des Produits</h1>
+    <h1>Inventaire des Articles</h1>
   </div>
   <div class="container-fluid">
     <hr>
@@ -38,14 +38,14 @@ if (empty($_SESSION['imsaid'])) {
         <div class="widget-box">
           <div class="widget-title">
             <span class="icon"><i class="icon-th"></i></span>
-            <h5>Inventaire des Produits</h5>
+            <h5>Inventaire des Articles</h5>
           </div>
           <div class="widget-content nopadding">
             <table class="table table-bordered data-table">
               <thead>
                 <tr>
                   <th>N°</th>
-                  <th>Nom du Produit</th>
+                  <th>Nom du Article</th>
                   <th>Catégorie</th>
                   <th>Marque</th>
                   <th>Modèle</th>
@@ -104,7 +104,7 @@ if (empty($_SESSION['imsaid'])) {
                     $cnt++;
                   }
                 } else {
-                  echo '<tr><td colspan="9" class="text-center">Aucun produit trouvé</td></tr>';
+                  echo '<tr><td colspan="9" class="text-center">Aucun Article trouvé</td></tr>';
                 }
                 ?>
               </tbody>

@@ -164,7 +164,7 @@ if (isset($_POST['addtocart'])) {
     ");
     if (!$stockRes || mysqli_num_rows($stockRes) === 0) {
         echo "<script>
-                alert('Produit introuvable');
+                alert('Article introuvable');
                 window.location.href='cart.php';
               </script>";
         exit;
@@ -175,7 +175,7 @@ if (isset($_POST['addtocart'])) {
     // 2) Interdire si stock épuisé ou négatif
     if ($stock <= 0) {
         echo "<script>
-                alert('Désolé, ce produit est en rupture de stock.');
+                alert('Désolé, ce Article est en rupture de stock.');
                 window.location.href='cart.php';
               </script>";
         exit;
@@ -223,7 +223,7 @@ if (isset($_POST['addtocart'])) {
     }
 
     echo "<script>
-            alert('Produit ajouté au panier !');
+            alert('Article ajouté au panier !');
             window.location.href='cart.php';
           </script>";
     exit;
@@ -261,12 +261,12 @@ if (isset($_POST['submit'])) {
     while ($item = mysqli_fetch_assoc($stockCheck)) {
         if ($item['ProductQty'] > $item['Stock']) {
             $stockError = true;
-            $errorMessages[] = "Produit '{$item['ProductName']}': Quantité demandée ({$item['ProductQty']}) supérieure au stock disponible ({$item['Stock']})";
+            $errorMessages[] = "Article '{$item['ProductName']}': Quantité demandée ({$item['ProductQty']}) supérieure au stock disponible ({$item['Stock']})";
         }
         
         if ($item['Stock'] <= 0) {
             $stockError = true;
-            $errorMessages[] = "Produit '{$item['ProductName']}' est en rupture de stock";
+            $errorMessages[] = "Article '{$item['ProductName']}' est en rupture de stock";
         }
     }
     
@@ -321,7 +321,7 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// Récupérer les noms de produits pour le datalist
+// Récupérer les noms de Articles pour le datalist
 $productNamesQuery = mysqli_query($con, "SELECT DISTINCT ProductName FROM tblproducts ORDER BY ProductName ASC");
 $productNames = array();
 if ($productNamesQuery) {
@@ -349,9 +349,9 @@ if ($productNamesQuery) {
             <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
                 <i class="icon-home"></i> Accueil
             </a>
-            <a href="cart.php" class="current">Panier de produits</a>
+            <a href="cart.php" class="current">Panier de Articles</a>
         </div>
-        <h1>Panier de produits</h1>
+        <h1>Panier de Articles</h1>
     </div>
 
     <div class="container-fluid">
@@ -360,8 +360,8 @@ if ($productNamesQuery) {
         <div class="row-fluid">
             <div class="span12">
                 <form method="get" action="cart.php" class="form-inline">
-                    <label>Rechercher des produits :</label>
-                    <input type="text" name="searchTerm" class="span3" placeholder="Nom du produit..." list="productsList" />
+                    <label>Rechercher des Articles :</label>
+                    <input type="text" name="searchTerm" class="span3" placeholder="Nom du Article..." list="productsList" />
                     <datalist id="productsList">
                         <?php
                         foreach ($productNames as $pname) {
@@ -423,7 +423,7 @@ if (!empty($_GET['searchTerm'])) {
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Nom du produit</th>
+                            <th>Nom du Article</th>
                             <th>Catégorie</th>
                           
                            
@@ -481,7 +481,7 @@ if (!empty($_GET['searchTerm'])) {
                     </tbody>
                 </table>
             <?php else: ?>
-                <p style="color:red;">Aucun produit correspondant trouvé.</p>
+                <p style="color:red;">Aucun Article correspondant trouvé.</p>
             <?php endif; ?>
         </div>
     </div>
@@ -536,14 +536,14 @@ if (!empty($_GET['searchTerm'])) {
                 <div class="widget-box">
                     <div class="widget-title">
                         <span class="icon"><i class="icon-th"></i></span>
-                        <h5>Produits dans le panier</h5>
+                        <h5>Articles dans le panier</h5>
                     </div>
                     <div class="widget-content nopadding">
                         <table class="table table-bordered" style="font-size: 15px">
                             <thead>
                                 <tr>
                                     <th>N°</th>
-                                    <th>Nom du produit</th>
+                                    <th>Nom du Article</th>
                                     <th>Quantité</th>
                                     <th>Prix (par unité)</th>
                                     <th>Total</th>
@@ -621,11 +621,11 @@ if (!empty($_GET['searchTerm'])) {
                                         <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                     </tr>
                                     <?php
-                                    // Ajouter un message d'avertissement si des produits ont un stock insuffisant
+                                    // Ajouter un message d'avertissement si des Articles ont un stock insuffisant
                                     if ($stockWarning): ?>
                                     <tr>
                                         <td colspan="6" style="text-align: center; color: red; font-weight: bold;">
-                                            Attention! Certains produits n'ont pas un stock suffisant. Veuillez ajuster votre panier.
+                                            Attention! Certains Articles n'ont pas un stock suffisant. Veuillez ajuster votre panier.
                                         </td>
                                     </tr>
                                     <script>

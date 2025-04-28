@@ -78,14 +78,14 @@ while ($row=mysqli_fetch_array($ret)) {
         
         <div class="widget-box">
           <div class="widget-title"> <span class="icon"><i class="icon-th"></i></span>
-            <h5>Inventaire des produits</h5>
+            <h5>Inventaire des Articles</h5>
           </div>
           <div class="widget-content nopadding" width="100%" border="1">
             <table class="table table-bordered data-table" style="font-size: 15px">
               <thead>
                 <tr>
                   <th style="font-size: 12px">N°</th>
-                  <th style="font-size: 12px">Nom du produit</th>
+                  <th style="font-size: 12px">Nom du Article</th>
                   <th style="font-size: 12px">Numéro de modèle</th>
                   <th style="font-size: 12px">Quantité</th>
                   <th style="font-size: 12px">Prix (par unité)</th>

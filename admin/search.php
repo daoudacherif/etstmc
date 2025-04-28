@@ -17,7 +17,7 @@ $remainqty=$_SESSION['rqty'];
 if($pqty<=$remainqty)
 {
 $query=mysqli_query($con,"insert into tblcart(ProductId,ProductQty,IsCheckOut) value('$pid','$pqty','$ischecout')");
- echo "<script>alert('Le produit a été ajouté au panier');</script>"; 
+ echo "<script>alert('Le Article a été ajouté au panier');</script>"; 
   echo "<script>window.location.href = 'search.php'</script>";     
 } else{
 $msg="Vous ne pouvez pas ajouter une quantité supérieure à la quantité restante";
@@ -29,7 +29,7 @@ $msg="Vous ne pouvez pas ajouter une quantité supérieure à la quantité resta
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>Système de gestion des stocks || Ajouter des produits</title>
+<title>Système de gestion des stocks || Ajouter des Articles</title>
 <?php include_once('includes/cs.php');?>
 <?php include_once('includes/responsive.php'); ?>
 
@@ -39,8 +39,8 @@ $msg="Vous ne pouvez pas ajouter une quantité supérieure à la quantité resta
 
 <div id="content">
   <div id="content-header">
-    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="search.php" class="current">Rechercher des produits</a> </div>
-    <h1>Rechercher des produits</h1>
+    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="search.php" class="current">Rechercher des Articles</a> </div>
+    <h1>Rechercher des Articles</h1>
   </div>
   <div class="container-fluid">
     <hr>
@@ -51,7 +51,7 @@ $msg="Vous ne pouvez pas ajouter une quantité supérieure à la quantité resta
           <form method="post" class="form-horizontal">
            
             <div class="control-group">
-              <label class="control-label">Rechercher un produit :</label>
+              <label class="control-label">Rechercher un Article :</label>
               <div class="controls">
                 <input type="text" class="span11" name="pname" id="pname" value="" required='true' />
               </div>
@@ -73,7 +73,7 @@ $sdata=$_POST['pname'];
         
         <div class="widget-box">
           <div class="widget-title"> <span class="icon"><i class="icon-th"></i></span>
-            <h5>Rechercher des produits</h5>
+            <h5>Rechercher des Articles</h5>
           </div>
           <div class="widget-content nopadding">
              
@@ -81,7 +81,7 @@ $sdata=$_POST['pname'];
               <thead>
                 <tr>
                   <th>N°</th>
-                  <th>Nom du produit</th>
+                  <th>Nom du Article</th>
                   <th>Nom de la catégorie</th>
                    <th>Nom de la sous-catégorie</th>
                   <th>Nom de la marque</th>

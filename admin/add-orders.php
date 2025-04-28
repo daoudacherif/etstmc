@@ -64,7 +64,7 @@ if (isset($_POST['submit'])) {
     // -- Obtenir le nouvel OrderID
     $orderID = mysqli_insert_id($con);
 
-    // 5) Insérer chaque ligne de produit dans tblorderdetails
+    // 5) Insérer chaque ligne de  dans tblorderdetails
     $productArray = $_POST['product']; // tableau des IDs des produits
     $priceArray   = $_POST['price'];   // tableau des prix
     $qtyArray     = $_POST['qty'];     // tableau des quantités

@@ -15,12 +15,12 @@
       </ul>
     </li>
 
-    <!-- Produits -->
+    <!-- Articles -->
     <li class="submenu">
-      <a href="#"><i class="icon icon-info-sign"></i> <span>Produits</span></a>
+      <a href="#"><i class="icon icon-info-sign"></i> <span>Articles</span></a>
       <ul>
-        <li><a href="add-product.php">Ajouter un produit</a></li>
-        <li><a href="manage-product.php">Gérer les produits</a></li>
+        <li><a href="add-product.php">Ajouter un Article</a></li>
+        <li><a href="manage-product.php">Gérer les Articles</a></li>
         <li><a href="inventory.php">Inventaire</a></li>
       </ul>
     </li>

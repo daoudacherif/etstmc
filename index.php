@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-    <title>Gescometstmc - Aluminium & Matériaux de Construction</title>
+    <title>Gescometstmc - Commerce general</title>
     <meta name="description"
           content="Gescometstmc est une entreprise spécialisée dans l'importation et la vente de matériaux de construction en aluminium en République de Guinée." />
 
@@ -135,8 +135,8 @@
 
 <!-- Hero Section -->
 <section class="hero">
-    <h1>Matériaux en Aluminium pour la Guinée</h1>
-    <p>Gescometstmc est votre partenaire idéal pour l'importation et la vente de matériaux de construction en aluminium.</p>
+    <h1>Votre Partenaire en Commerce Général</h1>
+    <p>GESCOMETSTMC, leader dans l'importation et la distribution de produits de qualité. Nous vous offrons une large gamme d'article et équipements professionnels avec un service client exceptionnel.</p>
     <button class="btn btn-hero">Découvrir nos offres</button>
 </section>
 

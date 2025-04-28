@@ -64,7 +64,7 @@ if (isset($_POST['submit'])) {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <title>Gestion des stocks | Retours de produits</title>
+  <title>Gestion des stocks | Retours de Article</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
 <!-- Header + Sidebar -->
@@ -77,9 +77,9 @@ if (isset($_POST['submit'])) {
     <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
       <i class="icon-home"></i> Accueil
     </a>
-    <a href="return.php" class="current">Retours de produits</a>
+    <a href="return.php" class="current">Retours de Article</a>
     </div>
-    <h1>Gérer les retours de produits</h1>
+    <h1>Gérer les retours de Article</h1>
   </div>
 
   <div class="container-fluid">

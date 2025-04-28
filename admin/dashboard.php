@@ -81,7 +81,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               <li class="bg_ls">
                 <a href="manage-product.php">
                   <i class="icon-list-alt"></i>
-                  <span class="label label-success" style="margin-top:7%"><?php echo $productcount; ?></span> Produits
+                  <span class="label label-success" style="margin-top:7%"><?php echo $productcount; ?></span> Articles
                 </a>
               </li>
               <?php 
