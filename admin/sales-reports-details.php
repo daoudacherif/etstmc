@@ -144,6 +144,12 @@ $cnt=$cnt+1;
 <th style="text-align: center;color: red;font-size: 15px"><?php echo $gtotal;?></th>  
 </tr>
 </tbody></table>
+<div style="text-align: right; margin-bottom: 20px;">
+  <a href="sale-repport-print.php?fdate=<?php echo $fdate;?>&tdate=<?php echo $tdate;?>&rtype=<?php echo $rtype;?>" target="_blank" class="btn btn-primary">
+    <i class="icon-print"></i> Imprimer le rapport
+  </a>
+</div>
+
 <?php } }?>
 
               </tbody>
