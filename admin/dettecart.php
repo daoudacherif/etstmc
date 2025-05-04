@@ -56,10 +56,15 @@ function getAccessToken() {
 
 /**
  * Envoyer un SMS via Nimba avec Bearer Token
+ * Version améliorée avec meilleure journalisation des erreurs
  */
 function sendSmsNotification($to, $message) {
+    // Obtenir un token d'accès
     $accessToken = getAccessToken();
-    if (!$accessToken) return false;
+    if (!$accessToken) {
+        error_log("Erreur: Impossible d'obtenir un token d'accès pour l'API SMS");
+        return false;
+    }
 
     $url = "https://api.nimbasms.com/v1/messages";
     $payload = [
@@ -84,11 +89,23 @@ function sendSmsNotification($to, $message) {
     ]);
 
     $response = curl_exec($ch);
+    
+    // Gestion d'erreur cURL plus détaillée
+    if (!$response) {
+        $curlError = curl_error($ch);
+        error_log("Erreur cURL lors de l'envoi du SMS: " . $curlError);
+        curl_close($ch);
+        return false;
+    }
+    
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    error_log("SMS envoyé, réponse: $response");
+    // Journalisation détaillée
+    $logMsg = "Tentative d'envoi SMS à $to - Code HTTP: $httpCode - Réponse: $response";
+    error_log($logMsg);
 
+    // Le code 201 indique un succès pour Nimba SMS API
     return $httpCode == 201;
 }
 
@@ -225,18 +242,36 @@ if (isset($_POST['submit'])) {
             WHERE c.BillingId='$billingnum'
         ") or die(mysqli_error($con));
 
-        // SMS personnalisé
+        // SMS personnalisé avec vérification du statut d'envoi
         if ($dues > 0) {
             $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
         } else {
             $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
         }
-        sendSmsNotification($custmobile, $smsMessage);
+        
+        // Envoyer le SMS et stocker le résultat (true/false)
+        $smsResult = sendSmsNotification($custmobile, $smsMessage);
+        
+        // Journal de l'envoi SMS (optionnel mais recommandé)
+        // Vérifier d'abord si la table existe
+        $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
+        if (mysqli_num_rows($tableExists) > 0) {
+            $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
+                           VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
+                           ($smsResult ? '1' : '0') . ", NOW())";
+            mysqli_query($con, $smsLogQuery);
+        }
 
         unset($_SESSION['discount']);
         $_SESSION['invoiceid'] = $billingnum;
 
-        echo "<script>alert('Facture créée: $billingnum'); window.location='invoice_dettecard.php?print=auto';</script>";        exit;
+        // Afficher le statut de l'envoi SMS dans le message d'alerte
+        if ($smsResult) {
+            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
+        } else {
+            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
+        }
+        exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
     }
@@ -486,14 +521,14 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                         <div class="control-group">
                             <label class="control-label">Numéro de Mobile :</label>
                             <div class="controls">
-                                <!-- Validation pour le format sénégalais : +221 suivi de 9 chiffres -->
+                                <!-- Validation pour le format guinéen : +224 suivi de 9 chiffres -->
                                 <input type="tel"
                                        class="span11"
                                        name="mobilenumber"
                                        required
                                        pattern="^\+224[0-9]{9}$"
                                        placeholder="+224-XXXXXXXXX"
-                                       title="Format: +221 suivi de 9 chiffres">
+                                       title="Format: +224 suivi de 9 chiffres">
                             </div>
                         </div>
                         <div class="control-group">
@@ -605,7 +640,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                         </tr>
                                         <tr>
                                             <th colspan="5" style="text-align: right; font-weight: bold;">Remise</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echonumber_format($discount, 2); ?></th>
                                         </tr>
                                         <tr>
                                             <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
