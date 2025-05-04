@@ -252,8 +252,7 @@ if (isset($_POST['submit'])) {
         // Envoyer le SMS et stocker le résultat (true/false)
         $smsResult = sendSmsNotification($custmobile, $smsMessage);
         
-        // Journal de l'envoi SMS (optionnel mais recommandé)
-        // Vérifier d'abord si la table existe
+        // Journal de l'envoi SMS (si la table existe)
         $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
         if (mysqli_num_rows($tableExists) > 0) {
             $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
@@ -606,74 +605,73 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                             if ($stock <= 0) {
                                                 $stockStatus = '<span class="stock-warning">RUPTURE</span>';
                                             } elseif ($stock < $pq) {
-                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';
+                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';}
+                                                ?>
+                                                <tr <?php echo $rowClass; ?>>
+                                                    <td><?php echo $cnt; ?></td>
+                                                    <td><?php echo $row['ProductName']; ?></td>
+                                                    <td><?php echo $pq; ?></td>
+                                                    <td>
+                                                        <?php echo $stock; ?>
+                                                        <?php echo $stockStatus; ?>
+                                                    </td>
+                                                    <td><?php echo number_format($ppu, 2); ?></td>
+                                                    <td><?php echo number_format($lineTotal, 2); ?></td>
+                                                    <td>
+                                                        <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
+                                                           onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
+                                                            <i class="icon-trash"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                <?php
+                                                $cnt++;
+                                            }
+                                            $netTotal = $grandTotal - $discount;
+                                            if ($netTotal < 0) {
+                                                $netTotal = 0;
                                             }
                                             ?>
-                                            <tr <?php echo $rowClass; ?>>
-                                                <td><?php echo $cnt; ?></td>
-                                                <td><?php echo $row['ProductName']; ?></td>
-                                                <td><?php echo $pq; ?></td>
-                                                <td>
-                                                    <?php echo $stock; ?>
-                                                    <?php echo $stockStatus; ?>
-                                                </td>
-                                                <td><?php echo number_format($ppu, 2); ?></td>
-                                                <td><?php echo number_format($lineTotal, 2); ?></td>
-                                                <td>
-                                                    <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
-                                                       onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
-                                                        <i class="icon-trash"></i>
-                                                    </a>
-                                                </td>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">Remise</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                             </tr>
                                             <?php
-                                            $cnt++;
-                                        }
-                                        $netTotal = $grandTotal - $discount;
-                                        if ($netTotal < 0) {
-                                            $netTotal = 0;
+                                        } else {
+                                            ?>
+                                            <tr>
+                                                <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
+                                            </tr>
+                                            <?php
                                         }
                                         ?>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">Remise</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echonumber_format($discount, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-                                        </tr>
-                                        <?php
-                                    } else {
-                                        ?>
-                                        <tr>
-                                            <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
-                                        </tr>
-                                        <?php
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div><!-- widget-content -->
-                    </div><!-- widget-box -->
-                </div>
-            </div><!-- row-fluid -->
-        </div><!-- container-fluid -->
-    </div><!-- content -->
-  
-    <!-- Footer -->
-    <?php include_once('includes/footer.php'); ?>
-    <!-- SCRIPTS -->
-    <script src="js/jquery.min.js"></script>
-    <script src="js/jquery.ui.custom.js"></script>
-    <script src="js/bootstrap.min.js"></script>
-    <script src="js/jquery.uniform.js"></script>
-    <script src="js/select2.min.js"></script>
-    <script src="js/jquery.dataTables.min.js"></script>
-    <script src="js/matrix.js"></script>
-    <script src="js/matrix.tables.js"></script>
-</body>
-</html>
+                                    </tbody>
+                                </table>
+                            </div><!-- widget-content -->
+                        </div><!-- widget-box -->
+                    </div>
+                </div><!-- row-fluid -->
+            </div><!-- container-fluid -->
+        </div><!-- content -->
+      
+        <!-- Footer -->
+        <?php include_once('includes/footer.php'); ?>
+        <!-- SCRIPTS -->
+        <script src="js/jquery.min.js"></script>
+        <script src="js/jquery.ui.custom.js"></script>
+        <script src="js/bootstrap.min.js"></script>
+        <script src="js/jquery.uniform.js"></script>
+        <script src="js/select2.min.js"></script>
+        <script src="js/jquery.dataTables.min.js"></script>
+        <script src="js/matrix.js"></script>
+        <script src="js/matrix.tables.js"></script>
+    </body>
+    </html>
