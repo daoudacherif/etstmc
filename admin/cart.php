@@ -452,15 +452,15 @@ if ($productNamesQuery) {
                     <?php if ($count > 0): ?>
                         <table class="table table-bordered table-striped">
                             <thead>
-                            <tr>
-            <th>N°</th>
-            <th>Nom du Article</th>
-            <th>Quantité</th>
-            <th>Prix de base</th>
-            <th>Prix appliqué</th>
-            <th>Total</th>
-            <th>Action</th>
-        </tr>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nom du Article</th>
+                                    <th>Catégorie</th>
+                                    <th>Modèle</th>
+                                    <th>Prix</th>
+                                    <th>Stock</th>
+                                    <th>Action</th>
+                                </tr>
                             </thead>
                             <tbody>
                             <?php
@@ -595,7 +595,8 @@ if ($productNamesQuery) {
                                         <th>N°</th>
                                         <th>Nom du Article</th>
                                         <th>Quantité</th>
-                                        <th>Prix (par unité)</th>
+                                        <th>Prix de base</th>
+                                        <th>Prix appliqué</th>
                                         <th>Total</th>
                                         <th>Action</th>
                                     </tr>
@@ -608,7 +609,8 @@ if ($productNamesQuery) {
                                         tblcart.ProductQty,
                                         tblcart.Price as cartPrice,
                                         tblproducts.ProductName,
-                                        tblproducts.Stock
+                                        tblproducts.Stock,
+                                        tblproducts.Price as basePrice
                                       FROM tblcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
                                       WHERE tblcart.IsCheckOut = 0
@@ -623,14 +625,19 @@ if ($productNamesQuery) {
                                         while ($row = mysqli_fetch_array($ret)) {
                                             $pq = $row['ProductQty'];
                                             $ppu = $row['cartPrice'];
+                                            $basePrice = $row['basePrice'];
+                                            $stock = $row['Stock'];
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
                                             
                                             // Vérifier si le stock actuel est suffisant
-                                            $stockSuffisant = $row['Stock'] >= $pq;
+                                            $stockSuffisant = $stock >= $pq;
                                             if (!$stockSuffisant) {
                                                 $stockWarning = true;
                                             }
+                                            
+                                            // Déterminer si le prix a été modifié par rapport au prix de base
+                                            $prixModifie = ($ppu != $basePrice);
                                             ?>
                                             <tr class="gradeX <?php echo !$stockSuffisant ? 'error' : ''; ?>">
                                                 <td><?php echo $cnt; ?></td>
@@ -641,8 +648,20 @@ if ($productNamesQuery) {
                                                     <?php endif; ?>
                                                 </td>
                                                 <td><?php echo $pq; ?></td>
-                                                <td><?php echo number_format($ppu, 2); ?></td>
-                                                <td><?php echo number_format($lineTotal, 2); ?></td>
+                                                <td>
+                                                    <?php echo number_format($basePrice, 2); ?> GNF
+                                                </td>
+                                                <td <?php echo $prixModifie ? 'style="color: #f89406; font-weight: bold;"' : ''; ?>>
+                                                    <?php echo number_format($ppu, 2); ?> GNF
+                                                    <?php if ($prixModifie): ?>
+                                                        <?php 
+                                                        $variation = (($ppu / $basePrice) - 1) * 100;
+                                                        $symbole = $variation >= 0 ? '+' : '';
+                                                        echo '<br><small class="text-muted">(' . $symbole . number_format($variation, 1) . '%)</small>'; 
+                                                        ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><?php echo number_format($lineTotal, 2); ?> GNF</td>
                                                 <td>
                                                     <a href="cart.php?delid=<?php echo $row['cid']; ?>"
                                                        onclick="return confirm('Voulez-vous vraiment retirer cet article?');">
@@ -657,70 +676,68 @@ if ($productNamesQuery) {
                                         if ($netTotal < 0) {
                                             $netTotal = 0;
                                         }
-                                        ?>
-                                        <!-- Affichage de la remise dans le tableau des totaux -->
-                                        <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold;">Total Général</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold;">
-                                                Remise
-                                                <?php if ($discountType == 'percentage'): ?>
-                                                    (<?php echo $discountValue; ?>%)
-                                                <?php endif; ?>
-                                            </th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-                                        </tr>
-                                        <?php
-                                        // Ajouter un message d'avertissement si des Articles ont un stock insuffisant
-                                        if ($stockWarning): ?>
-                                        <tr>
-                                            <td colspan="6" style="text-align: center; color: red; font-weight: bold;">
-                                                Attention! Certains Articles n'ont pas un stock suffisant. Veuillez ajuster votre panier.
-                                            </td>
-                                        </tr>
-                                        <script>
-                                            // Désactiver le bouton de paiement si stock insuffisant
-                                            document.addEventListener('DOMContentLoaded', function() {
-                                                document.querySelector('button[name="submit"]').disabled = true;
-                                                document.querySelector('button[name="submit"]').title = "Impossible de finaliser: stock insuffisant";
-                                            });
-                                        </script>
-                                        <?php endif; ?>
-                                        <?php
-                                    } else {
-                                        ?>
-                                        <tr>
-                                            <td colspan="6" style="color:red; text-align:center">Aucun article trouvé dans le panier</td>
-                                        </tr>
-                                        <?php
-                                    }
+                                        ?><tr>
+                                        <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?> GNF</th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="5" style="text-align: right; font-weight: bold;">
+                                            Remise
+                                            <?php if ($discountType == 'percentage'): ?>
+                                                (<?php echo $discountValue; ?>%)
+                                            <?php endif; ?>
+                                        </th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?> GNF</th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                        <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?> GNF</th>
+                                    </tr>
+                                    <?php
+                                    // Ajouter un message d'avertissement si des Articles ont un stock insuffisant
+                                    if ($stockWarning): ?>
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; color: red; font-weight: bold;">
+                                            Attention! Certains Articles n'ont pas un stock suffisant. Veuillez ajuster votre panier.
+                                        </td>
+                                    </tr>
+                                    <script>
+                                        // Désactiver le bouton de paiement si stock insuffisant
+                                        document.addEventListener('DOMContentLoaded', function() {
+                                            document.querySelector('button[name="submit"]').disabled = true;
+                                            document.querySelector('button[name="submit"]').title = "Impossible de finaliser: stock insuffisant";
+                                        });
+                                    </script>
+                                    <?php endif; ?>
+                                    <?php
+                                } else {
                                     ?>
-                                </tbody>
-                            </table>
-                        </div><!-- widget-content -->
-                    </div><!-- widget-box -->
-                </div>
-            </div><!-- row-fluid -->
-        </div><!-- container-fluid -->
-    </div><!-- content -->
+                                    <tr>
+                                        <td colspan="7" style="color:red; text-align:center">Aucun article trouvé dans le panier</td>
+                                    </tr>
+                                    <?php
+                                }
+                                ?>
+                            </tbody>
+                        </table>
+                    </div><!-- widget-content -->
+                </div><!-- widget-box -->
+            </div>
+        </div><!-- row-fluid -->
+    </div><!-- container-fluid -->
+</div><!-- content -->
 
-    <!-- Footer -->
-    <?php include_once('includes/footer.php'); ?>
+<!-- Footer -->
+<?php include_once('includes/footer.php'); ?>
 
-    <!-- SCRIPTS -->
-    <script src="js/jquery.min.js"></script>
-    <script src="js/jquery.ui.custom.js"></script>
-    <script src="js/bootstrap.min.js"></script>
-    <script src="js/jquery.uniform.js"></script>
-    <script src="js/select2.min.js"></script>
-    <script src="js/jquery.dataTables.min.js"></script>
-    <script src="js/matrix.js"></script>
-    <script src="js/matrix.tables.js"></script>
+<!-- SCRIPTS -->
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
+<script src="js/matrix.tables.js"></script>
 </body>
 </html>
