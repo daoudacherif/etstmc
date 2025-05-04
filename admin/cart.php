@@ -450,85 +450,84 @@ if ($productNamesQuery) {
                     <h4>Résultats de recherche pour "<em><?= htmlspecialchars($_GET['searchTerm']) ?></em>"</h4>
 
                     <?php if ($count > 0): ?>
-                        <table class="table table-bordered table-striped">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Nom du Article</th>
-                                    <th>Catégorie</th>
-                                    <th>Modèle</th>
-                                    <th>Prix</th>
-                                    <th>Stock</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php
-                            $i = 1;
-                            while ($row = mysqli_fetch_assoc($res)) {
-                                $stock = (int) $row['Stock'];
-                                ?>
-                                <tr>
-                                    <td><?= $i++; ?></td>
-                                    <td><?= htmlspecialchars($row['ProductName']); ?></td>
-                                    <td><?= htmlspecialchars($row['CategoryName']); ?></td>
-                                    <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
-                                    <td><?= number_format($row['Price'], 2, ',', ' '); ?> GNF</td>
-                                    <td><?= $stock; ?></td>
-                                    <td>
-                                        <?php if ($stock > 0): ?>
-                                            <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px; margin:0;">
-                                                <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
-                                                
-                                                <!-- Champ pour le prix personnalisé -->
-                                                <div style="margin-bottom: 5px;">
-                                                    <label>Prix:</label>
-                                                    <input 
-                                                        type="number" 
-                                                        name="price" 
-                                                        step="any" 
-                                                        value="<?= $row['Price']; ?>" 
-                                                        style="width:80px;"
-                                                    />
-                                                </div>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Nom du Article</th>
+                <th>Catégorie</th>
+                <th>Modèle</th>
+                <th>Prix de base</th>
+                <th>Stock</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php
+        $i = 1;
+        while ($row = mysqli_fetch_assoc($res)) {
+            $stock = (int) $row['Stock'];
+            ?>
+            <tr>
+                <td><?= $i++; ?></td>
+                <td><?= htmlspecialchars($row['ProductName']); ?></td>
+                <td><?= htmlspecialchars($row['CategoryName']); ?></td>
+                <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
+                <td><?= number_format($row['Price'], 2, ',', ' '); ?> GNF</td>
+                <td><?= $stock; ?></td>
+                <td>
+                    <?php if ($stock > 0): ?>
+                        <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px; margin:0;">
+                            <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
+                            
+                            <!-- Champ pour le prix personnalisé -->
+                            <div style="margin-bottom: 5px;">
+                                <label>Prix personnalisé:</label>
+                                <input 
+                                    type="number" 
+                                    name="price" 
+                                    step="any" 
+                                    value="<?= $row['Price']; ?>" 
+                                    style="width:80px;"
+                                />
+                            </div>
 
-                                                <div>
-                                                    <label>Quantité:</label>
-                                                    <input
-                                                        type="number"
-                                                        name="quantity"
-                                                        value="1"
-                                                        min="1"
-                                                        max="<?= $stock; ?>"
-                                                        style="width:60px;"
-                                                        required
-                                                    />
-                                                </div>
+                            <div>
+                                <label>Quantité:</label>
+                                <input
+                                    type="number"
+                                    name="quantity"
+                                    value="1"
+                                    min="1"
+                                    max="<?= $stock; ?>"
+                                    style="width:60px;"
+                                    required
+                                />
+                            </div>
 
-                                                <button
-                                                    type="submit"
-                                                    name="addtocart"
-                                                    class="btn btn-success btn-sm"
-                                                >
-                                                    <i class="icon-plus"></i> Ajouter
-                                                </button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span class="text-danger fw-bold">Rupture de stock</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php } ?>
-                            </tbody>
-                        </table>
+                            <button
+                                type="submit"
+                                name="addtocart"
+                                class="btn btn-success btn-sm"
+                            >
+                                <i class="icon-plus"></i> Ajouter
+                            </button>
+                        </form>
                     <?php else: ?>
-                        <p style="color:red;">Aucun Article correspondant trouvé.</p>
+                        <span class="text-danger fw-bold">Rupture de stock</span>
                     <?php endif; ?>
-                </div>
-            </div>
-            <hr>
-            <?php } ?>
-
+                </td>
+            </tr>
+        <?php } ?>
+        </tbody>
+    </table>
+<?php else: ?>
+    <p style="color:red;">Aucun Article correspondant trouvé.</p>
+<?php endif; ?>
+</div>
+</div>
+<hr>
+<?php } ?>
             <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
             <div class="row-fluid">
                 <div class="span12">
