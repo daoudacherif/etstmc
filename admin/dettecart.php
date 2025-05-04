@@ -491,8 +491,8 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                        class="span11"
                                        name="mobilenumber"
                                        required
-                                       pattern="^\+221[0-9]{9}$"
-                                       placeholder="+221787368793"
+                                       pattern="^\+224[0-9]{9}$"
+                                       placeholder="+224-XXXXXXXXX"
                                        title="Format: +221 suivi de 9 chiffres">
                             </div>
                         </div>
