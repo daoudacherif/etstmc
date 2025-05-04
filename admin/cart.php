@@ -456,8 +456,7 @@ if ($productNamesQuery) {
                                         <th>#</th>
                                         <th>Nom du Article</th>
                                         <th>Catégorie</th>
-                                        <th>Sous-Catégorie</th>
-                                        <th>Marque</th>
+                                       
                                         <th>Modèle</th>
                                         <th>Prix par Défaut</th>
                                         <th>Stock</th>
@@ -486,8 +485,7 @@ if ($productNamesQuery) {
                                         <td><?php echo $i++; ?></td>
                                         <td><?php echo $row['ProductName']; ?></td>
                                         <td><?php echo $row['CategoryName']; ?></td>
-                                        <td><?php echo $row['SubCategoryName']; ?></td>
-                                        <td><?php echo $row['BrandName']; ?></td>
+                                       
                                         <td><?php echo $row['ModelNumber']; ?></td>
                                         <td><?php echo $row['Price']; ?></td>
                                         <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
