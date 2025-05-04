@@ -236,8 +236,7 @@ if (isset($_POST['submit'])) {
         unset($_SESSION['discount']);
         $_SESSION['invoiceid'] = $billingnum;
 
-        echo "<script>alert('Facture créée: $billingnum'); window.location='dettecart.php';</script>";
-        exit;
+        echo "<script>alert('Facture créée: $billingnum'); window.location='invoice_dettecard.php?print=auto';</script>";        exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
     }
