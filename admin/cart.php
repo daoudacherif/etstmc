@@ -132,14 +132,43 @@ function sendSmsNotification($to, $message) {
 // Initialiser la variable de remise
 $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 
-// Traitement de l'application de remise
+// Appliquer une remise (en valeur absolue ou en pourcentage)
 if (isset($_POST['applyDiscount'])) {
-    $discount = max(0, floatval($_POST['discount']));
-    $_SESSION['discount'] = $discount;
-    // Redirection pour éviter re-soumission du formulaire
-    header("Location: cart.php");
+    $discountValue = max(0, floatval($_POST['discount']));
+    
+    // Calculer le grand total avant d'appliquer la remise
+    $grandTotal = 0;
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    while ($row = mysqli_fetch_assoc($cartQuery)) {
+        $grandTotal += $row['ProductQty'] * $row['Price'];
+    }
+    
+    // Déterminer si c'est un pourcentage ou une valeur absolue
+    $isPercentage = isset($_POST['discountType']) && $_POST['discountType'] === 'percentage';
+    
+    if ($isPercentage) {
+        // Limiter le pourcentage à 100% maximum
+        $discountValue = min(100, $discountValue);
+        // Calculer la remise en valeur absolue basée sur le pourcentage
+        $actualDiscount = ($discountValue / 100) * $grandTotal;
+    } else {
+        // Remise en valeur absolue (limiter à la valeur du panier)
+        $actualDiscount = min($grandTotal, $discountValue);
+    }
+    
+    // Stocker les informations de remise dans la session
+    $_SESSION['discount'] = $actualDiscount;
+    $_SESSION['discountType'] = $isPercentage ? 'percentage' : 'absolute';
+    $_SESSION['discountValue'] = $discountValue;
+    
+    header("Location: dettecart.php");
     exit;
 }
+
+// Récupérer les informations de remise de la session
+$discount = $_SESSION['discount'] ?? 0;
+$discountType = $_SESSION['discountType'] ?? 'absolute';
+$discountValue = $_SESSION['discountValue'] ?? 0;
 
 // Traitement de la suppression d'un élément du panier
 if (isset($_GET['delid'])) {
@@ -497,12 +526,20 @@ if (!empty($_GET['searchTerm'])) {
 <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
         <div class="row-fluid">
             <div class="span12">
-                <form method="post" class="form-inline" style="text-align:right;">
-                    <label>Remise :</label>
-                    <input type="number" name="discount" step="any" value="<?php echo $discount; ?>" style="width:80px;" />
-                    <button class="btn btn-info" type="submit" name="applyDiscount">Appliquer</button>
-                </form>
-                <hr>
+             <!-- FORMULAIRE DE REMISE avec option pour pourcentage -->
+<form method="post" class="form-inline" style="text-align:right;">
+    <label>Remise :</label>
+    <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
+    
+    <select name="discountType" style="width:120px; margin-left:5px;">
+        <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
+        <option value="percentage" <?php echo ($discountType == 'percentage') ? 'selected' : ''; ?>>Pourcentage (%)</option>
+    </select>
+    
+    <button class="btn btn-info" type="submit" name="applyDiscount" style="margin-left:5px;">Appliquer</button>
+</form>
+<hr>
+
 
                 <!-- Formulaire checkout (informations client) -->
                 <form method="post" class="form-horizontal" name="submit">
@@ -615,18 +652,25 @@ if (!empty($_GET['searchTerm'])) {
                                         $netTotal = 0;
                                     }
                                     ?>
-                                    <tr>
-                                        <th colspan="4" style="text-align: right; font-weight: bold;">Total général</th>
-                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-                                    </tr>
-                                    <tr>
-                                        <th colspan="4" style="text-align: right; font-weight: bold;">Remise</th>
-                                        <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
-                                    </tr>
-                                    <tr>
-                                        <th colspan="4" style="text-align: right; font-weight: bold; color: green;">Total net</th>
-                                        <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-                                    </tr>
+                                    
+<!-- Affichage de la remise dans le tableau des totaux -->
+<tr>
+    <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+    <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+</tr>
+<tr>
+    <th colspan="5" style="text-align: right; font-weight: bold;">
+        Remise
+        <?php if ($discountType == 'percentage'): ?>
+            (<?php echo $discountValue; ?>%)
+        <?php endif; ?>
+    </th>
+    <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+</tr>
+<tr>
+    <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+    <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
+</tr>
                                     <?php
                                     // Ajouter un message d'avertissement si des Articles ont un stock insuffisant
                                     if ($stockWarning): ?>
