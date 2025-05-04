@@ -10,6 +10,9 @@ include('includes/dbconnection.php');
 /**
  * Function to obtain the OAuth2 access token from Nimba using cURL.
  */
+/**
+ * Function to obtain the OAuth2 access token from Nimba using cURL.
+ */
 function getAccessToken() {
     $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
     
@@ -110,6 +113,11 @@ function sendSmsNotification($to, $message) {
     
     // Retrieve HTTP status code from response headers
     $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    if (empty($http_response_header)) {
+        error_log("No HTTP response headers - SMS send failed");
+        return false;
+    }
+    
     $status_line = $http_response_header[0];
     preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
     $status_code = isset($match[1]) ? $match[1] : 0;
@@ -121,7 +129,6 @@ function sendSmsNotification($to, $message) {
     
     return true;
 }
-
 // Initialiser la variable de remise
 $discount = isset($_SESSION['discount']) ? $_SESSION['discount'] : 0;
 

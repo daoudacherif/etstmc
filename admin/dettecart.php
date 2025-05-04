@@ -242,35 +242,38 @@ if (isset($_POST['submit'])) {
             WHERE c.BillingId='$billingnum'
         ") or die(mysqli_error($con));
 
-        // SMS personnalisé avec vérification du statut d'envoi
-        if ($dues > 0) {
-            $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
-        } else {
-            $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
-        }
-        
-        // Envoyer le SMS et stocker le résultat (true/false)
-        $smsResult = sendSmsNotification($custmobile, $smsMessage);
-        
-        // Journal de l'envoi SMS (si la table existe)
-        $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
-        if (mysqli_num_rows($tableExists) > 0) {
-            $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
-                           VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
-                           ($smsResult ? '1' : '0') . ", NOW())";
-            mysqli_query($con, $smsLogQuery);
-        }
+       // Partie à remplacer dans dettecart.php
+// Dans la section "Checkout + Facturation", remplacez le code d'envoi de SMS par celui-ci:
 
-        unset($_SESSION['discount']);
-        $_SESSION['invoiceid'] = $billingnum;
+// SMS personnalisé avec vérification du statut d'envoi
+if ($dues > 0) {
+    $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+} else {
+    $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
+}
 
-        // Afficher le statut de l'envoi SMS dans le message d'alerte
-        if ($smsResult) {
-            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
-        } else {
-            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
-        }
-        exit;
+// Envoyer le SMS et stocker le résultat (true/false)
+$smsResult = sendSmsNotification($custmobile, $smsMessage);
+
+// Journal de l'envoi SMS (si la table existe)
+$tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
+if (mysqli_num_rows($tableExists) > 0) {
+    $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
+                   VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
+                   ($smsResult ? '1' : '0') . ", NOW())";
+    mysqli_query($con, $smsLogQuery);
+}
+
+unset($_SESSION['discount']);
+$_SESSION['invoiceid'] = $billingnum;
+
+// Afficher le statut de l'envoi SMS dans le message d'alerte
+if ($smsResult) {
+    echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
+} else {
+    echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
+}
+exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
     }
