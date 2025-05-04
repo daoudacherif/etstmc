@@ -449,85 +449,77 @@ if ($productNamesQuery) {
                 <div class="span12">
                     <h4>Résultats de recherche pour "<em><?= htmlspecialchars($_GET['searchTerm']) ?></em>"</h4>
 
-                    <?php if ($count > 0): ?>
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Nom du Article</th>
-                <th>Catégorie</th>
-                <th>Modèle</th>
-                <th>Prix de base</th>
-                <th>Stock</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php
-        $i = 1;
-        while ($row = mysqli_fetch_assoc($res)) {
-            $stock = (int) $row['Stock'];
-            ?>
-            <tr>
-                <td><?= $i++; ?></td>
-                <td><?= htmlspecialchars($row['ProductName']); ?></td>
-                <td><?= htmlspecialchars($row['CategoryName']); ?></td>
-                <td><?= htmlspecialchars($row['ModelNumber']); ?></td>
-                <td><?= number_format($row['Price'], 2, ',', ' '); ?> GNF</td>
-                <td><?= $stock; ?></td>
-                <td>
-                    <?php if ($stock > 0): ?>
-                        <form method="post" action="cart.php" class="d-flex align-items-center" style="gap:8px; margin:0;">
-                            <input type="hidden" name="productid" value="<?= $row['ID']; ?>">
-                            
-                            <!-- Champ pour le prix personnalisé -->
-                            <div style="margin-bottom: 5px;">
-                                <label>Prix personnalisé:</label>
-                                <input 
-                                    type="number" 
-                                    name="price" 
-                                    step="any" 
-                                    value="<?= $row['Price']; ?>" 
-                                    style="width:80px;"
-                                />
-                            </div>
+                    <?php if ($count > 0) { ?>
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nom du Article</th>
+                                        <th>Catégorie</th>
+                                        <th>Sous-Catégorie</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Prix par Défaut</th>
+                                        <th>Stock</th>
+                                        <th>Prix Personnalisé</th>
+                                        <th>Quantité</th>
+                                        <th>Ajouter</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php
+                                $i = 1;
+                                while ($row = mysqli_fetch_assoc($res)) {
+                                    $disableAdd = ($row['Stock'] <= 0);
+                                    $rowClass = $disableAdd ? 'class="stock-error"' : '';
+                                    $stockStatus = '';
+                                    
+                                    if ($row['Stock'] <= 0) {
+                                        $stockStatus = '<span class="stock-status stock-danger">Rupture</span>';
+                                    } elseif ($row['Stock'] < 5) {
+                                        $stockStatus = '<span class="stock-status stock-warning">Faible</span>';
+                                    } else {
+                                        $stockStatus = '<span class="stock-status stock-ok">Disponible</span>';
+                                    }
+                                    ?>
+                                    <tr <?php echo $rowClass; ?>>
+                                        <td><?php echo $i++; ?></td>
+                                        <td><?php echo $row['ProductName']; ?></td>
+                                        <td><?php echo $row['CategoryName']; ?></td>
+                                        <td><?php echo $row['SubCategoryName']; ?></td>
+                                        <td><?php echo $row['BrandName']; ?></td>
+                                        <td><?php echo $row['ModelNumber']; ?></td>
+                                        <td><?php echo $row['Price']; ?></td>
+                                        <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
+                                        <td>
+                                            <form method="post" action="dettecart.php" style="margin:0;">
+                                                <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
+                                                <input type="number" name="price" step="any" 
+                                                       value="<?php echo $row['Price']; ?>" style="width:80px;" />
+                                        </td>
+                                        <td>
+                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $row['Stock']; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> />
+                                        </td>
+                                        <td>
+                                            <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php echo $disableAdd ? 'disabled' : ''; ?>>
+                                                <i class="icon-plus"></i> Ajouter
+                                            </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    <?php
+                                }
+                                ?>
+                                </tbody>
+                            </table>
+                        <?php } else { ?>
+                            <p style="color:red;">Aucun Article correspondant trouvé.</p>
+                        <?php } ?>
+                    </div>
+                </div>
+                <hr>
+            <?php } ?>
 
-                            <div>
-                                <label>Quantité:</label>
-                                <input
-                                    type="number"
-                                    name="quantity"
-                                    value="1"
-                                    min="1"
-                                    max="<?= $stock; ?>"
-                                    style="width:60px;"
-                                    required
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                name="addtocart"
-                                class="btn btn-success btn-sm"
-                            >
-                                <i class="icon-plus"></i> Ajouter
-                            </button>
-                        </form>
-                    <?php else: ?>
-                        <span class="text-danger fw-bold">Rupture de stock</span>
-                    <?php endif; ?>
-                </td>
-            </tr>
-        <?php } ?>
-        </tbody>
-    </table>
-<?php else: ?>
-    <p style="color:red;">Aucun Article correspondant trouvé.</p>
-<?php endif; ?>
-</div>
-</div>
-<hr>
-<?php } ?>
             <!-- ========== PANIER + REMISE + PAIEMENT ========== -->
             <div class="row-fluid">
                 <div class="span12">
