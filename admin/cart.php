@@ -452,15 +452,15 @@ if ($productNamesQuery) {
                     <?php if ($count > 0): ?>
                         <table class="table table-bordered table-striped">
                             <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Nom du Article</th>
-                                    <th>Catégorie</th>
-                                    <th>Modèle</th>
-                                    <th>Prix par défaut</th>
-                                    <th>Stock disponible</th>
-                                    <th>Action</th>
-                                </tr>
+                            <tr>
+            <th>N°</th>
+            <th>Nom du Article</th>
+            <th>Quantité</th>
+            <th>Prix de base</th>
+            <th>Prix appliqué</th>
+            <th>Total</th>
+            <th>Action</th>
+        </tr>
                             </thead>
                             <tbody>
                             <?php
