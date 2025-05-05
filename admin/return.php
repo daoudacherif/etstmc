@@ -130,13 +130,13 @@ if (isset($_POST['submit'])) {
   if ($amount <= 0) {
     $transactionError = 'Montant invalide. Doit être > 0';
   } 
-  // Block OUT transactions when current balance is zero
-  else if ($transtype == 'OUT' && $currentBalance <= 0) {
-    $transactionError = 'Impossible d\'effectuer un retrait: le solde actuel est nul';
+  // Block OUT only when current balance is exactly zero
+  else if ($transtype == 'OUT' && $currentBalance == 0) {
+    $transactionError = 'Impossible d\'effectuer un retrait : le solde actuel est nul';
   }
-  // Check if OUT transaction would make the balance negative
-  else if ($transtype == 'OUT' && $amount >= $currentBalance) {
-    $transactionError = 'Impossible d\'effectuer un retrait: le solde ne peut pas être réduit à zéro ou négatif';
+  // Block if amount would exceed the balance
+  else if ($transtype == 'OUT' && $amount > $currentBalance) {
+    $transactionError = 'Impossible d\'effectuer un retrait : montant supérieur au solde actuel';
   }
   else {
     // Find last transaction's balance
@@ -155,9 +155,9 @@ if (isset($_POST['submit'])) {
     } else {
       // 'OUT'
       $newBal = $oldBal - $amount;
-      // Never allow balance to be zero or negative
-      if ($newBal <= 0) {
-        $transactionError = 'Impossible d\'effectuer un retrait: le solde ne peut pas être réduit à zéro ou négatif';
+      // Never allow balance to go negative (zero is fine)
+      if ($newBal < 0) {
+        $transactionError = 'Impossible d\'effectuer un retrait : fonds insuffisants';
       } else {
         // Insert new row
         $sqlInsert = "
@@ -213,8 +213,8 @@ if (mysqli_num_rows($resBal) > 0) {
   $oldBalance = 0;
 }
 
-// Determine the maximum amount that can be withdrawn (must leave at least 0.01 in balance)
-$maxWithdrawal = $currentBalance > 0 ? $currentBalance - 0.01 : 0;
+// Determine the maximum amount that can be withdrawn (allow down to zero)
+$maxWithdrawal = $currentBalance > 0 ? $currentBalance : 0;
 
 // Determine if OUT transactions should be completely disabled
 $outDisabled = ($currentBalance <= 0);
