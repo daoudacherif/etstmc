@@ -580,8 +580,6 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
   </div>
 </div>
 
-
-
 <!-- Footer -->
 <?php include_once('includes/footer.php'); ?>
 
@@ -594,7 +592,6 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
 <script src="js/jquery.dataTables.min.js"></script>
 <script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
-
 <script>
 // Auto-calc cost client-side for single product form
 function updateCost() {
