@@ -130,11 +130,11 @@ if (isset($_POST['submit'])) {
   if ($amount <= 0) {
     $transactionError = 'Montant invalide. Doit être > 0';
   } 
-  // Check if OUT transaction is allowed based on daily balance
-  else if ($transtype == 'OUT' && $dailyBalance <= 0) {
-    $transactionError = 'Impossible d\'effectuer un retrait: le solde journalier est nul ou négatif';
+  // Block OUT transactions when current balance is zero
+  else if ($transtype == 'OUT' && $currentBalance <= 0) {
+    $transactionError = 'Impossible d\'effectuer un retrait: le solde actuel est nul';
   }
-  // Check if OUT transaction would make the balance negative or zero
+  // Check if OUT transaction would make the balance negative
   else if ($transtype == 'OUT' && $amount >= $currentBalance) {
     $transactionError = 'Impossible d\'effectuer un retrait: le solde ne peut pas être réduit à zéro ou négatif';
   }
@@ -215,6 +215,9 @@ if (mysqli_num_rows($resBal) > 0) {
 
 // Determine the maximum amount that can be withdrawn (must leave at least 0.01 in balance)
 $maxWithdrawal = $currentBalance > 0 ? $currentBalance - 0.01 : 0;
+
+// Determine if OUT transactions should be completely disabled
+$outDisabled = ($currentBalance <= 0);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -259,7 +262,11 @@ $maxWithdrawal = $currentBalance > 0 ? $currentBalance - 0.01 : 0;
         <span style="color: red;">(Attention: Retraits bloqués car solde journalier ≤ 0)</span>
       <?php endif; ?>
       </p>
-      <p>Montant max. retirable: <strong><?php echo number_format($maxWithdrawal, 2); ?></strong></p>
+      <?php if ($currentBalance <= 0): ?>
+        <p style="color: red; font-weight: bold;">SOLDE NUL OU NÉGATIF: RETRAITS DÉSACTIVÉS</p>
+      <?php else: ?>
+        <p>Montant max. retirable: <strong><?php echo number_format($maxWithdrawal, 2); ?></strong></p>
+      <?php endif; ?>
     </div>
     </div>
   </div>
@@ -280,12 +287,12 @@ $maxWithdrawal = $currentBalance > 0 ? $currentBalance - 0.01 : 0;
         <div class="controls">
           <select name="transtype" id="transtype" required>
           <option value="IN">Dépôt (IN)</option>
-          <option value="OUT" <?php echo ($dailyBalance <= 0 || $currentBalance <= 0) ? 'disabled' : ''; ?>>Retrait (OUT)</option>
+          <?php if (!$outDisabled): ?>
+          <option value="OUT">Retrait (OUT)</option>
+          <?php endif; ?>
           </select>
-          <?php if ($dailyBalance <= 0): ?>
-            <span class="help-inline" style="color: red;">Retraits désactivés (solde journalier insuffisant)</span>
-          <?php elseif ($currentBalance <= 0): ?>
-            <span class="help-inline" style="color: red;">Retraits désactivés (solde actuel nul)</span>
+          <?php if ($outDisabled): ?>
+            <span class="help-inline" style="color: red;">Retraits désactivés (solde actuel nul ou négatif)</span>
           <?php endif; ?>
         </div>
         </div>
@@ -406,4 +413,4 @@ $(document).ready(function() {
 });
 </script>
 </body>
-</html>
+</html>X
