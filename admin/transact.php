@@ -132,44 +132,47 @@ $todayOut = floatval($rowToday['sumOut']);
 $todayNet = $todayIn - $todayOut;
 
 // ---------------------------------------------------------------------
-// D) Calculate netBalance using method from report.php
+// D) Calculate today's returns
 // ---------------------------------------------------------------------
-// 1. Get all-time sales
-$sqlSales = "
-  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
-  FROM tblcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut='1'
-";
-$resSales = mysqli_query($con, $sqlSales);
-$rowSales = mysqli_fetch_assoc($resSales);
-$totalSales = $rowSales['totalSales'];
-
-// 2. Get all-time deposits/withdrawals
-$sqlTransactions = "
-  SELECT
-    COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) AS totalDeposits,
-    COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS totalWithdrawals
-  FROM tblcashtransactions
-";
-$resTransactions = mysqli_query($con, $sqlTransactions);
-$rowTransactions = mysqli_fetch_assoc($resTransactions);
-$totalDeposits    = $rowTransactions['totalDeposits'];
-$totalWithdrawals = $rowTransactions['totalWithdrawals'];
-
-// 3. Get all-time returns (using ReturnPrice from tblreturns)
-$sqlReturns = "
-  SELECT COALESCE(SUM(ReturnPrice), 0) AS totalReturns
+$sqlTodayReturns = "
+  SELECT COALESCE(SUM(ReturnPrice), 0) AS todayReturns
   FROM tblreturns
+  WHERE DATE(ReturnDate) = CURDATE()
 ";
-$resReturns = mysqli_query($con, $sqlReturns);
-$rowReturns = mysqli_fetch_assoc($resReturns);
-$totalReturns = $rowReturns['totalReturns'];
+$resTodayReturns = mysqli_query($con, $sqlTodayReturns);
+$rowTodayReturns = mysqli_fetch_assoc($resTodayReturns);
+$todayReturns = floatval($rowTodayReturns['todayReturns']);
 
-// 4. Calculate net balance (like in report.php)
-$netBalance = ($totalSales + $totalDeposits) - ($totalWithdrawals + $totalReturns);
+// ---------------------------------------------------------------------
+// E) Calculate daily balance
+// ---------------------------------------------------------------------
+// Daily balance = today's sales + today's deposits - today's withdrawals - today's returns
+$dailyBalance = $todayNet - $todayReturns;
 
-// Keep the old balance calculation for comparison
+// ---------------------------------------------------------------------
+// F) Get the previous day's final balance
+// ---------------------------------------------------------------------
+$sqlPrevious = "
+  SELECT BalanceAfter 
+  FROM tblcashtransactions 
+  WHERE DATE(TransDate) < CURDATE() 
+  ORDER BY ID DESC 
+  LIMIT 1
+";
+$resPrevious = mysqli_query($con, $sqlPrevious);
+if (mysqli_num_rows($resPrevious) > 0) {
+  $rowPrevious = mysqli_fetch_assoc($resPrevious);
+  $previousBalance = floatval($rowPrevious['BalanceAfter']);
+} else {
+  $previousBalance = 0;
+}
+
+// ---------------------------------------------------------------------
+// G) Calculate current balance = previous day's final balance + daily balance
+// ---------------------------------------------------------------------
+$currentBalance = $previousBalance + $dailyBalance;
+
+// Keep the old calculation for reference
 $sqlBal = "SELECT BalanceAfter FROM tblcashtransactions ORDER BY ID DESC LIMIT 1";
 $resBal = mysqli_query($con, $sqlBal);
 if (mysqli_num_rows($resBal) > 0) {
@@ -178,9 +181,6 @@ if (mysqli_num_rows($resBal) > 0) {
 } else {
   $oldBalance = 0;
 }
-
-// Use netBalance as the current balance
-$currentBalance = $netBalance;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -219,6 +219,7 @@ $currentBalance = $netBalance;
          echo " (déjà ajouté à la caisse)";
        }
       ?></p>
+      <p>Retours du jour: <?php echo number_format($todayReturns, 2); ?></p>
     </div>
     </div>
   </div>
