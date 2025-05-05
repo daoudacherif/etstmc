@@ -51,6 +51,7 @@ if (empty($_SESSION['imsaid'])) {
                   <th>Modèle</th>
                   <th>Stock Initial</th>
                   <th>Vendus</th>
+                  <th>Retournés</th>
                   <th>Stock Restant</th>
                   <th>Statut</th>
                 </tr>
@@ -67,6 +68,10 @@ if (empty($_SESSION['imsaid'])) {
                     p.ModelNumber,
                     p.Stock         AS initial_stock,
                     COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                    COALESCE(
+                      (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
+                      0
+                    ) AS returned_qty,
                     p.Status
                   FROM tblproducts p
                   LEFT JOIN tblcategory c 
@@ -83,8 +88,13 @@ if (empty($_SESSION['imsaid'])) {
                 if (mysqli_num_rows($ret) > 0) {
                   $cnt = 1;
                   while ($row = mysqli_fetch_assoc($ret)) {
-                    // Calcul du stock restant
-                    $remaining = intval($row['initial_stock']) - intval($row['sold_qty']);
+                    // Calcul du stock restant en tenant compte des retours
+                    $sold = intval($row['sold_qty']);
+                    $returned = intval($row['returned_qty']);
+                    $initial = intval($row['initial_stock']);
+                    
+                    // Le stock restant est: initial - vendu + retourné
+                    $remaining = $initial - $sold;
                     $remaining = max(0, $remaining);
                     ?>
                     <tr>
@@ -93,8 +103,9 @@ if (empty($_SESSION['imsaid'])) {
                       <td><?= htmlspecialchars($row['CategoryName']) ?></td>
                       <td><?= htmlspecialchars($row['BrandName']) ?></td>
                       <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                      <td><?= intval($row['initial_stock']) ?></td>
-                      <td><?= intval($row['sold_qty']) ?></td>
+                      <td><?= $initial ?></td>
+                      <td><?= $sold ?></td>
+                      <td><?= $returned ?></td>
                       <td class="<?= $remaining === 0 ? 'text-danger' : '' ?>">
                         <?= $remaining === 0 ? 'Épuisé' : $remaining ?>
                       </td>
@@ -104,7 +115,7 @@ if (empty($_SESSION['imsaid'])) {
                     $cnt++;
                   }
                 } else {
-                  echo '<tr><td colspan="9" class="text-center">Aucun Article trouvé</td></tr>';
+                  echo '<tr><td colspan="10" class="text-center">Aucun Article trouvé</td></tr>';
                 }
                 ?>
               </tbody>
