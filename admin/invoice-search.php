@@ -12,13 +12,8 @@ if (strlen($_SESSION['imsaid']==0)) {
 <title>Système de Gestion d'Inventaire || Rechercher Facture</title>
 <?php include_once('includes/cs.php');?>
 <?php include_once('includes/responsive.php'); ?>
-
-</head>
-<body>
-
-<?php include_once('includes/header.php');?>
-<?php include_once('includes/sidebar.php');?>
 <style>
+  /* Styles pour l'interface normale */
   .invoice-box {
     background-color: #f9f9f9;
     border: 1px solid #ddd;
@@ -44,32 +39,118 @@ if (strlen($_SESSION['imsaid']==0)) {
   .customer-info td, .customer-info th {
     padding: 8px;
   }
+  .print-header {
+    display: none;
+  }
+  
+  /* Styles spécifiques pour l'impression */
   @media print {
-    .no-print {
+    /* Cacher tous les éléments de navigation et UI */
+    header, #header, .header, 
+    #sidebar, .sidebar, 
+    #user-nav, #search, .navbar, 
+    footer, #footer, .footer,
+    .no-print, #breadcrumb, 
+    #content-header, .widget-title {
       display: none !important;
     }
-    .container-fluid {
-      padding: 0;
+    
+    /* Afficher l'en-tête d'impression qui est normalement caché */
+    .print-header {
+      display: block;
+      text-align: center;
+      margin-bottom: 20px;
     }
+    
+    /* Ajuster la mise en page pour l'impression */
     body {
-      padding: 0;
-      margin: 0;
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
-    .invoice-box {
-      border: none;
-      background: none;
+    
+    #content {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      left: 0 !important;
+      position: relative !important;
+    }
+    
+    .container-fluid {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+    }
+    
+    .row-fluid .span12 {
+      width: 100% !important;
+      margin: 0 !important;
+      float: none !important;
+    }
+    
+    /* Retirer les bordures et couleurs de fond pour l'impression */
+    .widget-box, .invoice-box {
+      border: none !important;
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: none !important;
+    }
+    
+    /* Assurer que les tableaux s'impriment correctement */
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    
+    /* Supprimer les marges et espacements inutiles */
+    hr, br.print-hidden {
+      display: none !important;
+    }
+    
+    /* Forcer l'impression en noir et blanc par défaut */
+    * {
+      color: black !important;
+      text-shadow: none !important;
+      filter: none !important;
+      -ms-filter: none !important;
+    }
+    
+    /* Sauf pour certains éléments spécifiques */
+    .invoice-total {
+      color: #d9534f !important;
+    }
+    
+    /* Assurer que les liens sont visibles et sans URL */
+    a, a:visited {
+      text-decoration: underline;
+    }
+    a[href]:after {
+      content: "";
     }
   }
 </style>
+</head>
+<body>
+<!-- Éléments qui seront cachés à l'impression -->
+<div class="no-print">
+  <?php include_once('includes/header.php');?>
+  <?php include_once('includes/sidebar.php');?>
+</div>
+
 <div id="content">
+  <!-- En-tête de contenu - caché à l'impression -->
   <div id="content-header" class="no-print">
     <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="invoice-search.php" class="current">Rechercher Facture</a> </div>
     <h1>Rechercher Facture</h1>
   </div>
+  
   <div class="container-fluid">
     <hr class="no-print">
     <div class="row-fluid">
       <div class="span12">
+        <!-- Formulaire de recherche - caché à l'impression -->
         <div class="widget-box search-form no-print">
           <div class="widget-title">
             <span class="icon"><i class="icon-search"></i></span>
@@ -125,6 +206,12 @@ if (strlen($_SESSION['imsaid']==0)) {
           $formattedDate = date("d/m/Y", strtotime($customerRow['BillingDate']));
         ?>
         <div id="printArea">
+          <!-- En-tête qui n'apparaît qu'à l'impression -->
+          <div class="print-header">
+            <h2>Système de Gestion d'Inventaire</h2>
+            <p>Facture #<?php echo htmlspecialchars($invoiceid); ?></p>
+          </div>
+          
           <div class="invoice-box">
             <div class="invoice-header">
               <div class="row-fluid">
@@ -153,7 +240,7 @@ if (strlen($_SESSION['imsaid']==0)) {
             </table>
           
             <div class="widget-box">
-              <div class="widget-title"> 
+              <div class="widget-title no-print"> 
                 <span class="icon"><i class="icon-th"></i></span>
                 <h5>Détails des produits</h5>
               </div>
@@ -234,7 +321,16 @@ if (strlen($_SESSION['imsaid']==0)) {
               </div>
             </div>
             
-            <div class="row-fluid no-print">
+            <!-- Pied de page de facture -->
+            <div class="row-fluid">
+              <div class="span12">
+                <p style="margin-top: 20px;">Merci pour votre achat!</p>
+                <p><small>Cette facture a été générée automatiquement par le système.</small></p>
+              </div>
+            </div>
+            
+            <!-- Bouton d'impression - caché à l'impression -->
+            <div class="row-fluid no-print" style="margin-top: 20px;">
               <div class="span12 text-center">
                 <button class="btn btn-primary" onclick="window.print();">
                   <i class="icon-print"></i> Imprimer Facture
@@ -259,9 +355,12 @@ if (strlen($_SESSION['imsaid']==0)) {
   </div>
 </div>
 
-<!--Footer-part-->
-<?php include_once('includes/footer.php');?>
-<!--end-Footer-part-->
+<!-- Pied de page - caché à l'impression -->
+<div class="no-print">
+  <?php include_once('includes/footer.php');?>
+</div>
+
+<!-- Scripts JS - ne s'exécutent pas lors de l'impression -->
 <script src="js/jquery.min.js"></script> 
 <script src="js/jquery.ui.custom.js"></script> 
 <script src="js/bootstrap.min.js"></script> 
