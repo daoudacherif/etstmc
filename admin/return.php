@@ -134,9 +134,9 @@ if (isset($_POST['submit'])) {
   else if ($transtype == 'OUT' && $dailyBalance <= 0) {
     $transactionError = 'Impossible d\'effectuer un retrait: le solde journalier est nul ou négatif';
   }
-  // Check if OUT transaction would make the balance negative
-  else if ($transtype == 'OUT' && $amount > $currentBalance) {
-    $transactionError = 'Impossible d\'effectuer un retrait: le montant dépasse le solde actuel';
+  // Check if OUT transaction would make the balance negative or zero
+  else if ($transtype == 'OUT' && $amount >= $currentBalance) {
+    $transactionError = 'Impossible d\'effectuer un retrait: le solde ne peut pas être réduit à zéro ou négatif';
   }
   else {
     // Find last transaction's balance
@@ -155,23 +155,24 @@ if (isset($_POST['submit'])) {
     } else {
       // 'OUT'
       $newBal = $oldBal - $amount;
-      if ($newBal < 0) {
-        $newBal = 0; // or allow negative if you prefer
+      // Never allow balance to be zero or negative
+      if ($newBal <= 0) {
+        $transactionError = 'Impossible d\'effectuer un retrait: le solde ne peut pas être réduit à zéro ou négatif';
+      } else {
+        // Insert new row
+        $sqlInsert = "
+          INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
+          VALUES(NOW(), '$transtype', '$amount', '$newBal', '$comments')
+        ";
+        if (mysqli_query($con, $sqlInsert)) {
+          echo "<script>alert('Transaction enregistrée!');</script>";
+          // Refresh
+          echo "<script>window.location.href='transact.php'</script>";
+          exit;
+        } else {
+          $transactionError = 'Erreur lors de l\'insertion de la transaction';
+        }
       }
-    }
-
-    // Insert new row
-    $sqlInsert = "
-      INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
-      VALUES(NOW(), '$transtype', '$amount', '$newBal', '$comments')
-    ";
-    if (mysqli_query($con, $sqlInsert)) {
-      echo "<script>alert('Transaction enregistrée!');</script>";
-      // Refresh
-      echo "<script>window.location.href='transact.php'</script>";
-      exit;
-    } else {
-      $transactionError = 'Erreur lors de l\'insertion de la transaction';
     }
   }
   
@@ -211,6 +212,9 @@ if (mysqli_num_rows($resBal) > 0) {
 } else {
   $oldBalance = 0;
 }
+
+// Determine the maximum amount that can be withdrawn (must leave at least 0.01 in balance)
+$maxWithdrawal = $currentBalance > 0 ? $currentBalance - 0.01 : 0;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -255,6 +259,7 @@ if (mysqli_num_rows($resBal) > 0) {
         <span style="color: red;">(Attention: Retraits bloqués car solde journalier ≤ 0)</span>
       <?php endif; ?>
       </p>
+      <p>Montant max. retirable: <strong><?php echo number_format($maxWithdrawal, 2); ?></strong></p>
     </div>
     </div>
   </div>
@@ -273,12 +278,14 @@ if (mysqli_num_rows($resBal) > 0) {
         <div class="control-group">
         <label class="control-label">Type de transaction :</label>
         <div class="controls">
-          <select name="transtype" required>
+          <select name="transtype" id="transtype" required>
           <option value="IN">Dépôt (IN)</option>
-          <option value="OUT" <?php echo ($dailyBalance <= 0) ? 'disabled' : ''; ?>>Retrait (OUT)</option>
+          <option value="OUT" <?php echo ($dailyBalance <= 0 || $currentBalance <= 0) ? 'disabled' : ''; ?>>Retrait (OUT)</option>
           </select>
           <?php if ($dailyBalance <= 0): ?>
             <span class="help-inline" style="color: red;">Retraits désactivés (solde journalier insuffisant)</span>
+          <?php elseif ($currentBalance <= 0): ?>
+            <span class="help-inline" style="color: red;">Retraits désactivés (solde actuel nul)</span>
           <?php endif; ?>
         </div>
         </div>
@@ -286,7 +293,11 @@ if (mysqli_num_rows($resBal) > 0) {
         <div class="control-group">
         <label class="control-label">Montant :</label>
         <div class="controls">
-          <input type="number" name="amount" step="any" min="0.01" required />
+          <input type="number" name="amount" id="amount" step="0.01" min="0.01" 
+                 max="<?php echo ($currentBalance > 0) ? $maxWithdrawal : ''; ?>" required />
+          <span id="amount-warning" class="help-inline" style="color: red; display: none;">
+            Le montant doit être inférieur à <?php echo number_format($maxWithdrawal, 2); ?> pour garder un solde positif
+          </span>
         </div>
         </div>
 
@@ -376,5 +387,23 @@ if (mysqli_num_rows($resBal) > 0) {
 <script src="js/jquery.dataTables.min.js"></script>
 <script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
+
+<!-- Custom script for amount validation -->
+<script>
+$(document).ready(function() {
+  // Show/hide max amount warning based on transaction type
+  $('#transtype, #amount').on('change input', function() {
+    var transType = $('#transtype').val();
+    var amount = parseFloat($('#amount').val()) || 0;
+    var maxWithdrawal = <?php echo $maxWithdrawal; ?>;
+    
+    if (transType === 'OUT' && amount > maxWithdrawal) {
+      $('#amount-warning').show();
+    } else {
+      $('#amount-warning').hide();
+    }
+  });
+});
+</script>
 </body>
 </html>
