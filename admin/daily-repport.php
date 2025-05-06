@@ -2,17 +2,17 @@
 session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
+use Dompdf\Dompdf;
 
 // Vérifier si l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
     header('location:logout.php');
     exit;
 }
-
 // Inclure dompdf (si nécessaire)
 if (file_exists('dompdf/autoload.inc.php')) {
     require_once 'dompdf/autoload.inc.php';
-    use Dompdf\Dompdf;
+    $dompdf_available = true;
     $dompdf_available = true;
 } else {
     $dompdf_available = false;
