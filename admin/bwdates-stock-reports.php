@@ -23,74 +23,54 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
     <style>
-      /* Styles normaux pour l'interface */
-      .widget-content {
-          padding: 15px;
-      }
-      
-      /* Styles spécifiques pour l'impression - SEUL LE TABLEAU EST VISIBLE */
+      /* Style pour l'impression - version simplifiée */
       @media print {
-          /* Cacher absolument tout */
-          body * {
-              visibility: hidden;
-              display: none;
+          /* Cacher tous les éléments par défaut */
+          body > *,
+          #content > *,
+          .container-fluid > *,
+          .row-fluid > *,
+          .widget-box > * {
+              display: none !important;
           }
           
-          /* Afficher seulement le tableau et son contenu */
-          .data-table,
-          .data-table * {
-              visibility: visible;
-              display: table-row;
+          /* Réafficher uniquement les éléments parents nécessaires */
+          body, #content, .container-fluid, .row-fluid, .widget-box, .widget-content {
+              display: block !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              border: none !important;
+              background: white !important;
           }
           
+          /* Afficher uniquement la table */
           .data-table {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              display: table;
-              border-collapse: collapse;
-          }
-          
-          /* Styles pour que le tableau soit bien formaté */
-          .data-table th, 
-          .data-table td {
-              padding: 8px;
-              border: 1px solid #000;
-              text-align: left;
-          }
-          
-          .data-table th {
-              font-weight: bold;
-              background-color: #f5f5f5 !important;
+              display: table !important;
+              width: 100% !important;
+              border-collapse: collapse !important;
+              margin: 0 !important;
           }
           
           .data-table thead {
-              display: table-header-group;
+              display: table-header-group !important;
           }
           
           .data-table tbody {
-              display: table-row-group;
+              display: table-row-group !important;
           }
           
           .data-table tr {
-              page-break-inside: avoid;
-              display: table-row;
+              display: table-row !important;
+              page-break-inside: avoid !important;
           }
           
-          /* Exceptions pour certains éléments spécifiques */
-          .text-danger {
-              color: #d9534f !important;
-          }
-          
-          .label-success {
-              background-color: #dff0d8 !important;
-              border: 1px solid #3c763d !important;
-          }
-          
-          .label-important {
-              background-color: #f2dede !important;
-              border: 1px solid #a94442 !important;
+          .data-table th, 
+          .data-table td {
+              display: table-cell !important;
+              border: 1px solid #000 !important;
+              padding: 8px !important;
+              font-size: 12px !important;
           }
       }
     </style>
@@ -153,12 +133,12 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
                             </h5>
                             <div class="buttons">
-                                <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
+                                <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer Tableau</button>
                                 <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
                             </div>
                         </div>
                         <div class="widget-content">
-                            <!-- Tableau optimisé pour l'impression -->
+                            <!-- Ce tableau sera le seul élément visible à l'impression -->
                             <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
@@ -222,16 +202,8 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                             <td><?= $initial ?></td>
                                             <td><?= $sold ?></td>
                                             <td><?= $returned ?></td>
-                                            <td class="<?= $remain === 0 ? 'text-danger' : '' ?>">
-                                                <?= $remain === 0 ? 'Épuisé' : $remain ?>
-                                            </td>
-                                            <td>
-                                                <?php if($row['Status'] == '1'): ?>
-                                                    <span class="label label-success">Actif</span>
-                                                <?php else: ?>
-                                                    <span class="label label-important">Inactif</span>
-                                                <?php endif; ?>
-                                            </td>
+                                            <td><?= $remain === 0 ? 'Épuisé' : $remain ?></td>
+                                            <td><?= $row['Status'] == '1' ? 'Actif' : 'Inactif' ?></td>
                                         </tr>
                                         <?php
                                         $cnt++;
@@ -320,16 +292,8 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                                 <td><?= $initial ?></td>
                                                 <td><?= $sold ?></td>
                                                 <td><?= $returned ?></td>
-                                                <td class="<?= $remain === 0 ? 'text-danger' : '' ?>">
-                                                    <?= $remain === 0 ? 'Épuisé' : $remain ?>
-                                                </td>
-                                                <td>
-                                                    <?php if($row['Status'] == '1'): ?>
-                                                        <span class="label label-success">Actif</span>
-                                                    <?php else: ?>
-                                                        <span class="label label-important">Inactif</span>
-                                                    <?php endif; ?>
-                                                </td>
+                                                <td><?= $remain === 0 ? 'Épuisé' : $remain ?></td>
+                                                <td><?= $row['Status'] == '1' ? 'Actif' : 'Inactif' ?></td>
                                             </tr>
                                             <?php
                                             $cnt++;
