@@ -9,7 +9,7 @@ if (empty($_SESSION['imsaid'])) {
     exit;
 }
 
-// Récupération et nettoyage des dates
+// Initialiser les variables
 $fdate = filter_input(INPUT_POST, 'fromdate', FILTER_SANITIZE_STRING);
 $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
 
@@ -19,7 +19,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Système de Gestion des Inventaires | Rapport entre deux dates</title>
+    <title>Système de Gestion des Inventaires | Rapport de Stock</title>
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
 </head>
@@ -31,23 +31,58 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <div id="content-header">
         <div id="breadcrumb">
             <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
-            <a href="stock-report.php" class="current">Rapport entre deux dates</a>
+            <a href="stock-report.php" class="current">Rapport de Stock</a>
         </div>
-        <h1>Détails des Produits</h1>
+        <h1>Rapport de Stock</h1>
     </div>
     <div class="container-fluid">
         <hr />
+        
+        <!-- Formulaire de sélection des dates -->
+        <div class="row-fluid">
+            <div class="span12">
+                <div class="widget-box">
+                    <div class="widget-title">
+                        <span class="icon"><i class="icon-calendar"></i></span>
+                        <h5>Sélectionner la période du rapport</h5>
+                    </div>
+                    <div class="widget-content nopadding">
+                        <form method="post" class="form-horizontal" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+                            <div class="control-group">
+                                <label class="control-label">De Date :</label>
+                                <div class="controls">
+                                    <input type="date" class="span11" name="fromdate" id="fromdate" value="<?php echo $fdate; ?>" required='true' />
+                                </div>
+                            </div>
+                            <div class="control-group">
+                                <label class="control-label">À Date :</label>
+                                <div class="controls">
+                                    <input type="date" class="span11" name="todate" id="todate" value="<?php echo $tdate; ?>" required='true' />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-success" name="submit">Générer le Rapport</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <?php if ($fdate && $tdate): ?>
-
+            <!-- Tableau des résultats -->
             <div class="row-fluid">
                 <div class="span12">
                     <div class="widget-box">
                         <div class="widget-title">
                             <span class="icon"><i class="icon-th"></i></span>
-                            <h5 class="text-center text-blue">
+                            <h5>
                                 Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
                             </h5>
+                            <div class="buttons">
+                                <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
+                                <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
+                            </div>
                         </div>
                         <div class="widget-content nopadding">
                             <table class="table table-bordered data-table">
@@ -99,13 +134,19 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                             <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
                                             <td><?= $initial ?></td>
                                             <td><?= $remain ?></td>
-                                            <td><?= $row['Status'] === '1' ? 'Actif' : 'Inactif' ?></td>
+                                            <td>
+                                                <?php if($row['Status'] === '1'): ?>
+                                                    <span class="label label-success">Actif</span>
+                                                <?php else: ?>
+                                                    <span class="label label-important">Inactif</span>
+                                                <?php endif; ?>
+                                            </td>
                                         </tr>
                                         <?php
                                         $cnt++;
                                     }
                                 } else {
-                                    echo '<tr><td colspan="9" class="text-center text-red">Aucun enregistrement trouvé.</td></tr>';
+                                    echo '<tr><td colspan="9" class="text-center">Aucun enregistrement trouvé pour cette période.</td></tr>';
                                 }
                                 $stmt->close();
                                 ?>
@@ -115,9 +156,69 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                     </div>
                 </div>
             </div>
-
         <?php else: ?>
-            <p class="text-center text-red">Veuillez sélectionner les dates de début et de fin.</p>
+            <div class="row-fluid">
+                <div class="span12">
+                    <div class="alert alert-info">
+                        <button class="close" data-dismiss="alert">×</button>
+                        <strong>Info!</strong> Veuillez sélectionner les dates de début et de fin pour générer le rapport.
+                    </div>
+                    
+                    <!-- Aperçu des produits récents -->
+                    <div class="widget-box">
+                        <div class="widget-title">
+                            <span class="icon"><i class="icon-th"></i></span>
+                            <h5>Aperçu des Produits Récents</h5>
+                        </div>
+                        <div class="widget-content nopadding">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>N°</th>
+                                        <th>Produit</th>
+                                        <th>CatID</th>
+                                        <th>SubcatID</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Stock</th>
+                                        <th>Prix</th>
+                                        <th>Statut</th>
+                                        <th>Date Création</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $query = mysqli_query($con, "SELECT * FROM tblproducts ORDER BY CreationDate DESC LIMIT 10");
+                                    $cnt = 1;
+                                    while($row = mysqli_fetch_array($query)) {
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $cnt; ?></td>
+                                        <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['CatID']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['SubcatID']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['Stock']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['Price']); ?></td>
+                                        <td>
+                                            <?php if($row['Status'] == '1'): ?>
+                                                <span class="label label-success">Actif</span>
+                                            <?php else: ?>
+                                                <span class="label label-important">Inactif</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($row['CreationDate']); ?></td>
+                                    </tr>
+                                    <?php 
+                                    $cnt++;
+                                    } ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         <?php endif; ?>
     </div>
 </div>
