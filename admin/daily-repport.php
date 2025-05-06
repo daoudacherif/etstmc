@@ -536,17 +536,7 @@ if ($export === 'excel') {
                   <i class="icon-print"></i> Imprimer
                 </button>
                 
-                <!-- Boutons Export -->
-                <div class="pull-right">
-                  <?php if ($dompdf_available): ?>
-                  <a href="report.php?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=pdf" class="btn btn-danger">
-                    <i class="icon-file"></i> Exporter PDF
-                  </a>
-                  <?php endif; ?>
-                  <a href="report.php?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=excel" class="btn btn-primary">
-                    <i class="icon-table"></i> Exporter Excel
-                  </a>
-                </div>
+               
               </div>
             </form>
           </div>
