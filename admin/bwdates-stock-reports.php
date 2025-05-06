@@ -23,94 +23,73 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
     <style>
-      /* Styles normaux pour l'interface */
-      .print-header {
-          display: none;
-      }
-      
-      /* Style pour l'impression - version optimisée */
-      @media print {
-          /* Cacher tous les éléments par défaut */
-          body > *,
-          #content > *,
-          .container-fluid > *,
-          .row-fluid > *,
-          .widget-box > * {
-              display: none !important;
-          }
-          
-          /* Afficher l'en-tête d'impression qui est normalement caché */
-          .print-header {
-              display: block !important;
-              text-align: center !important;
-              margin-bottom: 20px !important;
-              padding: 10px !important;
-          }
-          
-          /* Réafficher uniquement les éléments parents nécessaires */
-          body, #content, .container-fluid, .row-fluid, .widget-box, .widget-content {
-              display: block !important;
-              width: 100% !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border: none !important;
-              background: white !important;
-          }
-          
-          /* Afficher uniquement la table avec formatage amélioré */
-          .data-table {
-              display: table !important;
-              width: 100% !important;
-              border-collapse: collapse !important;
-              margin: 0 !important;
-              font-size: 11px !important;
-          }
-          
-          .data-table caption {
-              display: table-caption !important;
-              font-size: 16px !important;
-              font-weight: bold !important;
-              margin-bottom: 10px !important;
-              text-align: center !important;
-          }
-          
-          .data-table thead {
-              display: table-header-group !important;
-          }
-          
-          .data-table tbody {
-              display: table-row-group !important;
-          }
-          
-          .data-table tr {
-              display: table-row !important;
-              page-break-inside: avoid !important;
-          }
-          
-          .data-table th, 
-          .data-table td {
-              display: table-cell !important;
-              border: 1px solid #000 !important;
-              padding: 5px !important;
-              font-size: 11px !important;
-              text-align: left !important;
-          }
-          
-          .data-table th {
-              background-color: #f0f0f0 !important;
-              font-weight: bold !important;
-          }
-          
-          /* Pied de page impression */
-          .print-footer {
-              display: block !important;
-              text-align: center !important;
-              font-size: 10px !important;
-              margin-top: 20px !important;
-              border-top: 1px solid #ccc !important;
-              padding-top: 5px !important;
-          }
-      }
+        /* Style pour l'impression - uniquement le tableau */
+        @media print {
+            /* Cacher tous les éléments */
+            body * {
+                display: none !important;
+            }
+            
+            /* Afficher uniquement le contenu principal et le tableau */
+            body, 
+            #content, 
+            .container-fluid, 
+            .row-fluid, 
+            .widget-box, 
+            .widget-content {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                background: white !important;
+            }
+            
+            /* Styles pour le tableau spécifiquement */
+            .data-table {
+                display: table !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                margin: 0 !important;
+                font-size: 12px !important;
+            }
+            
+            .data-table thead {
+                display: table-header-group !important;
+            }
+            
+            .data-table tbody {
+                display: table-row-group !important;
+            }
+            
+            .data-table tr {
+                display: table-row !important;
+                page-break-inside: avoid !important;
+            }
+            
+            .data-table th, 
+            .data-table td {
+                display: table-cell !important;
+                border: 1px solid #000 !important;
+                padding: 5px !important;
+                text-align: left !important;
+            }
+            
+            .data-table th {
+                background-color: #f0f0f0 !important;
+                font-weight: bold !important;
+            }
+            
+            /* Cacher tout le reste */
+            .no-print,
+            .print-header,
+            .print-footer,
+            #content-header,
+            .widget-title,
+            .buttons {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -180,17 +159,9 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                             </div>
                         </div>
                         
-                        <!-- En-tête visible uniquement à l'impression -->
-                        <div class="print-header">
-                            <h2>Système de Gestion des Inventaires</h2>
-                            <h3>Rapport de Stock</h3>
-                            <p>Période: <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></p>
-                        </div>
-                        
                         <div class="widget-content">
-                            <!-- Ce tableau sera le seul élément visible à l'impression -->
+                            <!-- Seul le tableau sera visible à l'impression -->
                             <table class="table table-bordered data-table">
-                                <caption class="no-print">Rapport de stock du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></caption>
                                 <thead>
                                     <tr>
                                         <th width="5%">N°</th>
@@ -266,11 +237,6 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 ?>
                                 </tbody>
                             </table>
-                            
-                            <!-- Pied de page visible uniquement à l'impression -->
-                            <div class="print-footer">
-                                <p>Rapport généré le <?= date('d/m/Y H:i') ?></p>
-                            </div>
                         </div>
                     </div>
                 </div>
