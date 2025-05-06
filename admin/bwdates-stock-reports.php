@@ -23,137 +23,84 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
     <style>
-      /* Styles pour l'interface normale */
-      .report-box {
-        background-color: #f9f9f9;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px;
-        margin-bottom: 20px;
-      }
-      .report-header {
-        border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
-        margin-bottom: 15px;
-      }
-      .report-total {
-        font-weight: bold;
-        color: #d9534f;
-      }
-      .print-header {
-        display: none;
+      /* Styles normaux pour l'interface */
+      .widget-content {
+          padding: 15px;
       }
       
-      /* Styles spécifiques pour l'impression */
+      /* Styles spécifiques pour l'impression - SEUL LE TABLEAU EST VISIBLE */
       @media print {
-        /* Cacher tous les éléments de navigation et UI */
-        header, #header, .header, 
-        #sidebar, .sidebar, 
-        #user-nav, #search, .navbar, 
-        footer, #footer, .footer,
-        .no-print, #breadcrumb, 
-        #content-header, .widget-title, .buttons,
-        .form-actions, .alert, .close {
-          display: none !important;
-        }
-        
-        /* Afficher l'en-tête d'impression qui est normalement caché */
-        .print-header {
-          display: block;
-          text-align: center;
-          margin-bottom: 20px;
-        }
-        
-        /* Ajuster la mise en page pour l'impression */
-        body {
-          background: white !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-        
-        #content {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100% !important;
-          left: 0 !important;
-          position: relative !important;
-        }
-        
-        .container-fluid {
-          padding: 0 !important;
-          margin: 0 !important;
-          width: 100% !important;
-        }
-        
-        .row-fluid .span12 {
-          width: 100% !important;
-          margin: 0 !important;
-          float: none !important;
-        }
-        
-        /* Retirer les bordures et couleurs de fond pour l'impression */
-        .widget-box, .invoice-box {
-          border: none !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: none !important;
-        }
-        
-        /* Assurer que les tableaux s'impriment correctement */
-        table { page-break-inside: auto; }
-        tr { page-break-inside: avoid; page-break-after: auto; }
-        thead { display: table-header-group; }
-        tfoot { display: table-footer-group; }
-        
-        /* Supprimer les marges et espacements inutiles */
-        hr, br.print-hidden {
-          display: none !important;
-        }
-        
-        /* Forcer l'impression en noir et blanc par défaut */
-        * {
-          color: black !important;
-          text-shadow: none !important;
-          filter: none !important;
-          -ms-filter: none !important;
-        }
-        
-        /* Exceptions pour certains éléments spécifiques */
-        .text-danger {
-          color: #d9534f !important;
-        }
-        
-        .label-success {
-          background-color: #dff0d8 !important;
-          border: 1px solid #3c763d !important;
-        }
-        
-        .label-important {
-          background-color: #f2dede !important;
-          border: 1px solid #a94442 !important;
-        }
-        
-        /* Assurer que les liens sont visibles et sans URL */
-        a, a:visited {
-          text-decoration: underline;
-        }
-        a[href]:after {
-          content: "";
-        }
+          /* Cacher absolument tout */
+          body * {
+              visibility: hidden;
+              display: none;
+          }
+          
+          /* Afficher seulement le tableau et son contenu */
+          .data-table,
+          .data-table * {
+              visibility: visible;
+              display: table-row;
+          }
+          
+          .data-table {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              display: table;
+              border-collapse: collapse;
+          }
+          
+          /* Styles pour que le tableau soit bien formaté */
+          .data-table th, 
+          .data-table td {
+              padding: 8px;
+              border: 1px solid #000;
+              text-align: left;
+          }
+          
+          .data-table th {
+              font-weight: bold;
+              background-color: #f5f5f5 !important;
+          }
+          
+          .data-table thead {
+              display: table-header-group;
+          }
+          
+          .data-table tbody {
+              display: table-row-group;
+          }
+          
+          .data-table tr {
+              page-break-inside: avoid;
+              display: table-row;
+          }
+          
+          /* Exceptions pour certains éléments spécifiques */
+          .text-danger {
+              color: #d9534f !important;
+          }
+          
+          .label-success {
+              background-color: #dff0d8 !important;
+              border: 1px solid #3c763d !important;
+          }
+          
+          .label-important {
+              background-color: #f2dede !important;
+              border: 1px solid #a94442 !important;
+          }
       }
     </style>
 </head>
 <body>
-<!-- Éléments qui seront cachés à l'impression -->
-<div class="no-print">
-    <?php include_once 'includes/header.php'; ?>
-    <?php include_once 'includes/sidebar.php'; ?>
-</div>
+<?php include_once 'includes/header.php'; ?>
+<?php include_once 'includes/sidebar.php'; ?>
 
 <div id="content">
-    <!-- En-tête de contenu - caché à l'impression -->
-    <div id="content-header" class="no-print">
+    <div id="content-header">
         <div id="breadcrumb">
             <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
             <a href="stock-report.php" class="current">Rapport de Stock</a>
@@ -162,10 +109,10 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     </div>
     
     <div class="container-fluid">
-        <hr class="no-print" />
+        <hr />
         
-        <!-- Formulaire de sélection des dates - caché à l'impression -->
-        <div class="row-fluid no-print">
+        <!-- Formulaire de sélection des dates -->
+        <div class="row-fluid">
             <div class="span12">
                 <div class="widget-box">
                     <div class="widget-title">
@@ -198,38 +145,33 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
         <?php if ($fdate && $tdate): ?>
             <!-- Tableau des résultats -->
             <div class="row-fluid">
-                <div class="span12" id="printArea">
-                    <!-- En-tête qui n'apparaît qu'à l'impression -->
-                    <div class="print-header">
-                        <h2>Système de Gestion des Inventaires</h2>
-                        <p>Rapport de Stock du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></p>
-                    </div>
-                    
-                    <div class="widget-box report-box">
+                <div class="span12">
+                    <div class="widget-box">
                         <div class="widget-title">
                             <span class="icon"><i class="icon-th"></i></span>
                             <h5>
                                 Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
                             </h5>
-                            <div class="buttons no-print">
+                            <div class="buttons">
                                 <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
-                              
+                                <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
                             </div>
                         </div>
-                        <div class="widget-content nopadding">
-                            <table class="table table-bordered ">
+                        <div class="widget-content">
+                            <!-- Tableau optimisé pour l'impression -->
+                            <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
-                                        <th width="5%">N°</th>
-                                        <th width="20%">Nom du Produit</th>
-                                        <th width="15%">Catégorie</th>
-                                        <th width="15%">Marque</th>
-                                        <th width="10%">Modèle</th>
-                                        <th width="8%">Stock Initial</th>
-                                        <th width="7%">Vendus</th>
-                                        <th width="7%">Retournés</th>
-                                        <th width="8%">Stock Restant</th>
-                                        <th width="5%">Statut</th>
+                                        <th>N°</th>
+                                        <th>Nom du Produit</th>
+                                        <th>Catégorie</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Stock Initial</th>
+                                        <th>Vendus</th>
+                                        <th>Retournés</th>
+                                        <th>Stock Restant</th>
+                                        <th>Statut</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -301,31 +243,12 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 ?>
                                 </tbody>
                             </table>
-                            
-                            <!-- Pied de page du rapport -->
-                            <div class="row-fluid">
-                                <div class="span12">
-                                    <p style="margin-top: 20px;"><small>Rapport généré le <?php echo date("d/m/Y H:i"); ?></small></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Bouton d'impression supplémentaire en bas de page - caché à l'impression -->
-                    <div class="row-fluid no-print" style="margin-top: 20px;">
-                        <div class="span12 text-center">
-                            <button class="btn btn-primary" onclick="window.print();">
-                                <i class="icon-print"></i> Imprimer Rapport
-                            </button>
-                            <a href="stock-report.php" class="btn">
-                                <i class="icon-refresh"></i> Nouvelle recherche
-                            </a>
                         </div>
                     </div>
                 </div>
             </div>
         <?php else: ?>
-            <div class="row-fluid no-print">
+            <div class="row-fluid">
                 <div class="span12">
                     <div class="alert alert-info">
                         <button class="close" data-dismiss="alert">×</button>
@@ -338,7 +261,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                             <span class="icon"><i class="icon-th"></i></span>
                             <h5>Aperçu des Produits Récents</h5>
                         </div>
-                        <div class="widget-content nopadding">
+                        <div class="widget-content">
                             <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
@@ -425,10 +348,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     </div>
 </div>
 
-<!-- Pied de page - caché à l'impression -->
-<div class="no-print">
-    <?php include_once 'includes/footer.php'; ?>
-</div>
+<?php include_once 'includes/footer.php'; ?>
 
 <!-- Scripts -->
 <script src="js/jquery.min.js"></script>
