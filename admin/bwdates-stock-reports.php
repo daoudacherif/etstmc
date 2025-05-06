@@ -23,7 +23,12 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
     <style>
-      /* Style pour l'impression - version simplifiée */
+      /* Styles normaux pour l'interface */
+      .print-header {
+          display: none;
+      }
+      
+      /* Style pour l'impression - version optimisée */
       @media print {
           /* Cacher tous les éléments par défaut */
           body > *,
@@ -32,6 +37,14 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
           .row-fluid > *,
           .widget-box > * {
               display: none !important;
+          }
+          
+          /* Afficher l'en-tête d'impression qui est normalement caché */
+          .print-header {
+              display: block !important;
+              text-align: center !important;
+              margin-bottom: 20px !important;
+              padding: 10px !important;
           }
           
           /* Réafficher uniquement les éléments parents nécessaires */
@@ -44,12 +57,21 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
               background: white !important;
           }
           
-          /* Afficher uniquement la table */
+          /* Afficher uniquement la table avec formatage amélioré */
           .data-table {
               display: table !important;
               width: 100% !important;
               border-collapse: collapse !important;
               margin: 0 !important;
+              font-size: 11px !important;
+          }
+          
+          .data-table caption {
+              display: table-caption !important;
+              font-size: 16px !important;
+              font-weight: bold !important;
+              margin-bottom: 10px !important;
+              text-align: center !important;
           }
           
           .data-table thead {
@@ -69,18 +91,38 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
           .data-table td {
               display: table-cell !important;
               border: 1px solid #000 !important;
-              padding: 8px !important;
-              font-size: 12px !important;
+              padding: 5px !important;
+              font-size: 11px !important;
+              text-align: left !important;
+          }
+          
+          .data-table th {
+              background-color: #f0f0f0 !important;
+              font-weight: bold !important;
+          }
+          
+          /* Pied de page impression */
+          .print-footer {
+              display: block !important;
+              text-align: center !important;
+              font-size: 10px !important;
+              margin-top: 20px !important;
+              border-top: 1px solid #ccc !important;
+              padding-top: 5px !important;
           }
       }
     </style>
 </head>
 <body>
-<?php include_once 'includes/header.php'; ?>
-<?php include_once 'includes/sidebar.php'; ?>
+<!-- Éléments qui seront cachés à l'impression -->
+<div class="no-print">
+    <?php include_once 'includes/header.php'; ?>
+    <?php include_once 'includes/sidebar.php'; ?>
+</div>
 
 <div id="content">
-    <div id="content-header">
+    <!-- En-tête de contenu - caché à l'impression -->
+    <div id="content-header" class="no-print">
         <div id="breadcrumb">
             <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
             <a href="stock-report.php" class="current">Rapport de Stock</a>
@@ -89,10 +131,10 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     </div>
     
     <div class="container-fluid">
-        <hr />
+        <hr class="no-print" />
         
-        <!-- Formulaire de sélection des dates -->
-        <div class="row-fluid">
+        <!-- Formulaire de sélection des dates - caché à l'impression -->
+        <div class="row-fluid no-print">
             <div class="span12">
                 <div class="widget-box">
                     <div class="widget-title">
@@ -127,31 +169,40 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
             <div class="row-fluid">
                 <div class="span12">
                     <div class="widget-box">
-                        <div class="widget-title">
+                        <div class="widget-title no-print">
                             <span class="icon"><i class="icon-th"></i></span>
                             <h5>
                                 Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
                             </h5>
-                            <div class="buttons">
+                            <div class="buttons no-print">
                                 <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer Tableau</button>
                                 <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
                             </div>
                         </div>
+                        
+                        <!-- En-tête visible uniquement à l'impression -->
+                        <div class="print-header">
+                            <h2>Système de Gestion des Inventaires</h2>
+                            <h3>Rapport de Stock</h3>
+                            <p>Période: <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></p>
+                        </div>
+                        
                         <div class="widget-content">
                             <!-- Ce tableau sera le seul élément visible à l'impression -->
                             <table class="table table-bordered data-table">
+                                <caption class="no-print">Rapport de stock du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></caption>
                                 <thead>
                                     <tr>
-                                        <th>N°</th>
-                                        <th>Nom du Produit</th>
-                                        <th>Catégorie</th>
-                                        <th>Marque</th>
-                                        <th>Modèle</th>
-                                        <th>Stock Initial</th>
-                                        <th>Vendus</th>
-                                        <th>Retournés</th>
-                                        <th>Stock Restant</th>
-                                        <th>Statut</th>
+                                        <th width="5%">N°</th>
+                                        <th width="20%">Nom du Produit</th>
+                                        <th width="15%">Catégorie</th>
+                                        <th width="15%">Marque</th>
+                                        <th width="10%">Modèle</th>
+                                        <th width="8%">Stock Initial</th>
+                                        <th width="7%">Vendus</th>
+                                        <th width="7%">Retournés</th>
+                                        <th width="8%">Stock Restant</th>
+                                        <th width="5%">Statut</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -215,12 +266,17 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 ?>
                                 </tbody>
                             </table>
+                            
+                            <!-- Pied de page visible uniquement à l'impression -->
+                            <div class="print-footer">
+                                <p>Rapport généré le <?= date('d/m/Y H:i') ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         <?php else: ?>
-            <div class="row-fluid">
+            <div class="row-fluid no-print">
                 <div class="span12">
                     <div class="alert alert-info">
                         <button class="close" data-dismiss="alert">×</button>
@@ -312,7 +368,10 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     </div>
 </div>
 
-<?php include_once 'includes/footer.php'; ?>
+<!-- Pied de page - caché à l'impression -->
+<div class="no-print">
+    <?php include_once 'includes/footer.php'; ?>
+</div>
 
 <!-- Scripts -->
 <script src="js/jquery.min.js"></script>
