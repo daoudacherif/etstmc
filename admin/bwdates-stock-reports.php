@@ -23,20 +23,35 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
     <style>
-        /* Style pour l'impression - uniquement le tableau */
+        /* Style pour l'impression - CORRIGÉ */
         @media print {
-            /* Cacher tous les éléments */
-            body * {
+            /* Cacher les éléments non nécessaires */
+            .no-print,
+            #content-header,
+            #breadcrumb,
+            .widget-title,
+            .buttons,
+            hr,
+            form,
+            .alert,
+            header,
+            footer,
+            .sidebar,
+            #header,
+            #footer,
+            #sidebar {
                 display: none !important;
             }
             
-            /* Afficher uniquement le contenu principal et le tableau */
+            /* S'assurer que le contenu est visible */
             body, 
+            html, 
             #content, 
             .container-fluid, 
             .row-fluid, 
             .widget-box, 
-            .widget-content {
+            .widget-content,
+            .span12 {
                 display: block !important;
                 width: 100% !important;
                 margin: 0 !important;
@@ -45,12 +60,13 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                 background: white !important;
             }
             
-            /* Styles pour le tableau spécifiquement */
+            /* S'assurer que le tableau est visible */
             .data-table {
                 display: table !important;
                 width: 100% !important;
                 border-collapse: collapse !important;
                 margin: 0 !important;
+                page-break-inside: auto !important;
                 font-size: 12px !important;
             }
             
@@ -78,16 +94,6 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
             .data-table th {
                 background-color: #f0f0f0 !important;
                 font-weight: bold !important;
-            }
-            
-            /* Cacher tout le reste */
-            .no-print,
-            .print-header,
-            .print-footer,
-            #content-header,
-            .widget-title,
-            .buttons {
-                display: none !important;
             }
         }
     </style>
@@ -160,7 +166,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                         </div>
                         
                         <div class="widget-content">
-                            <!-- Seul le tableau sera visible à l'impression -->
+                            <!-- Table qui sera visible à l'impression -->
                             <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
