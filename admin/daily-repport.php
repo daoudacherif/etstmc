@@ -325,13 +325,179 @@ if ($export === 'excel') {
   <title>Rapport Financier</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+  <style>
+    /* Styles pour impression */
+    @media print {
+      /* Cacher tous les éléments de navigation et UI */
+      header, #header, .header, 
+      #sidebar, .sidebar, 
+      #user-nav, #search, .navbar, 
+      footer, #footer, .footer,
+      .no-print, #breadcrumb, 
+      #content-header, .widget-title {
+        display: none !important;
+      }
+      
+      /* Afficher l'en-tête d'impression qui est normalement caché */
+      .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      
+      /* Ajuster la mise en page pour l'impression */
+      body {
+        background: white !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
+      #content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        left: 0 !important;
+        position: relative !important;
+      }
+      
+      .container-fluid {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      
+      .row-fluid .span12 {
+        width: 100% !important;
+        margin: 0 !important;
+        float: none !important;
+      }
+      
+      /* Retirer les bordures et couleurs de fond pour l'impression */
+      .widget-box {
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: none !important;
+      }
+      
+      /* Assurer que les tableaux s'impriment correctement */
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      
+      /* Supprimer les marges et espacements inutiles */
+      hr, br.print-hidden {
+        display: none !important;
+      }
+      
+      /* Styles pour les tableaux à l'impression */
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      
+      .data-table th,
+      .data-table td {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+        text-align: left;
+      }
+      
+      .data-table th {
+        font-weight: bold;
+        background-color: #f5f5f5 !important;
+      }
+      
+      /* Formatage des titres et sections */
+      h1, h2, h3, h4, h5 {
+        page-break-after: avoid;
+      }
+      
+      /* Forcer l'impression en noir et blanc par défaut */
+      * {
+        color: black !important;
+        text-shadow: none !important;
+        filter: none !important;
+        -ms-filter: none !important;
+      }
+      
+      /* Exceptions pour certains éléments spécifiques */
+      .text-danger {
+        color: #d9534f !important;
+      }
+      
+      .widget-content {
+        page-break-inside: avoid !important;
+      }
+      
+      /* Cacher les éléments de UI non nécessaires pour l'impression */
+      .btn, .form-actions, .buttons, .pagination {
+        display: none !important;
+      }
+      
+      /* Assurer que tout passe bien à l'impression */
+      .print-full-width {
+        width: 100% !important;
+        float: none !important;
+      }
+      
+      .print-visible {
+        display: block !important;
+        visibility: visible !important;
+      }
+      
+      /* Cacher le datatable search et pagination */
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_paginate,
+      .dataTables_wrapper .dataTables_info,
+      .dataTables_wrapper .dataTables_length {
+        display: none !important;
+      }
+    }
+    
+    /* Styles normaux (hors impression) */
+    .print-header {
+      display: none;
+    }
+    
+    .text-right {
+      text-align: right;
+    }
+    
+    .stat-boxes li {
+      margin-bottom: 10px;
+    }
+    
+    .table th {
+      font-weight: bold;
+    }
+    
+    .summary-box {
+      background-color: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .btn-print {
+      margin-left: 10px;
+    }
+  </style>
 </head>
 <body>
-<?php include_once('includes/header.php'); ?>
-<?php include_once('includes/sidebar.php'); ?>
+<!-- Éléments qui seront cachés à l'impression -->
+<div class="no-print">
+  <?php include_once('includes/header.php'); ?>
+  <?php include_once('includes/sidebar.php'); ?>
+</div>
 
 <div id="content">
-  <div id="content-header">
+  <!-- En-tête de contenu - caché à l'impression -->
+  <div id="content-header" class="no-print">
     <div id="breadcrumb">
       <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
       <a href="report.php" class="current">Rapport Financier</a>
@@ -340,10 +506,10 @@ if ($export === 'excel') {
   </div>
 
   <div class="container-fluid">
-    <hr>
+    <hr class="no-print">
 
-    <!-- Formulaire de filtre par dates -->
-    <div class="row-fluid">
+    <!-- Formulaire de filtre par dates - caché à l'impression -->
+    <div class="row-fluid no-print">
       <div class="span12">
         <div class="widget-box">
           <div class="widget-title">
@@ -366,6 +532,9 @@ if ($export === 'excel') {
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn btn-success"><i class="icon-search"></i> Afficher le Rapport</button>
+                <button type="button" class="btn btn-primary btn-print" onclick="window.print();">
+                  <i class="icon-print"></i> Imprimer
+                </button>
                 
                 <!-- Boutons Export -->
                 <div class="pull-right">
@@ -385,170 +554,175 @@ if ($export === 'excel') {
       </div>
     </div>
 
-    <!-- Tableau récapitulatif -->
-    <div class="row-fluid">
-      <div class="span12">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-signal"></i></span>
-            <h5>Résumé du <?php echo date('d/m/Y', strtotime($start)); ?> au <?php echo date('d/m/Y', strtotime($end)); ?></h5>
-            <span class="label label-info">Période: <?php echo round((strtotime($end) - strtotime($start)) / 86400); ?> jours</span>
-          </div>
-          <div class="widget-content">
-            <div class="row-fluid">
-              <div class="span12">
-                <ul class="stat-boxes">
-                  <li class="popover-visits">
-                    <div class="left peity_bar_good"><span>2,4,9,7,12,10,12</span>+10%</div>
-                    <div class="right">
-                      <strong><?php echo number_format($totalSales, 2); ?></strong>
-                      Ventes
-                    </div>
-                  </li>
-                  <li class="popover-users">
-                    <div class="left peity_line_neutral"><span>20,15,18,14,25,16,22</span>0%</div>
-                    <div class="right">
-                      <strong><?php echo number_format($totalDeposits, 2); ?></strong>
-                      Dépôts
-                    </div>
-                  </li>
-                  <li class="popover-orders">
-                    <div class="left peity_bar_bad"><span>3,5,9,7,12,20,10</span>-50%</div>
-                    <div class="right">
-                      <strong><?php echo number_format($totalWithdrawals, 2); ?></strong>
-                      Retraits
-                    </div>
-                  </li>
-                  <li class="popover-tickets">
-                    <div class="left peity_line_bad"><span>12,6,9,13,5,7,10</span>-25%</div>
-                    <div class="right">
-                      <strong><?php echo number_format($totalReturns, 2); ?></strong>
-                      Retours
-                    </div>
-                  </li>
-                  <li class="popover-tickets">
-                    <div class="left peity_line_good"><span>5,9,16,14,25,33,28</span>+20%</div>
-                    <div class="right">
-                      <strong><?php echo number_format($netBalance, 2); ?></strong>
-                      Solde Final
-                    </div>
-                  </li>
-                </ul>
+    <!-- Zone d'impression -->
+    <div id="printArea">
+      <!-- En-tête visible uniquement à l'impression -->
+      <div class="print-header">
+        <h2>Système de Gestion d'Inventaire</h2>
+        <h3>Rapport Financier du <?php echo date('d/m/Y', strtotime($start)); ?> au <?php echo date('d/m/Y', strtotime($end)); ?></h3>
+        <p>Période: <?php echo round((strtotime($end) - strtotime($start)) / 86400); ?> jours</p>
+      </div>
+
+      <!-- Tableau récapitulatif -->
+      <div class="row-fluid">
+        <div class="span12">
+          <div class="widget-box summary-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-signal"></i></span>
+              <h5>Résumé du <?php echo date('d/m/Y', strtotime($start)); ?> au <?php echo date('d/m/Y', strtotime($end)); ?></h5>
+              <span class="label label-info">Période: <?php echo round((strtotime($end) - strtotime($start)) / 86400); ?> jours</span>
+            </div>
+            <div class="widget-content">
+              <div class="row-fluid">
+                <div class="span12">
+                  <table class="table table-bordered">
+                    <tr>
+                      <th>Ventes</th>
+                      <td class="text-right"><?php echo number_format($totalSales, 2); ?></td>
+                    </tr>
+                    <tr>
+                      <th>Dépôts</th>
+                      <td class="text-right"><?php echo number_format($totalDeposits, 2); ?></td>
+                    </tr>
+                    <tr>
+                      <th>Retraits</th>
+                      <td class="text-right"><?php echo number_format($totalWithdrawals, 2); ?></td>
+                    </tr>
+                    <tr>
+                      <th>Retours</th>
+                      <td class="text-right"><?php echo number_format($totalReturns, 2); ?></td>
+                    </tr>
+                    <tr>
+                      <th>Solde Final</th>
+                      <td class="text-right"><strong><?php echo number_format($netBalance, 2); ?></strong></td>
+                    </tr>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Top Produits Vendus -->
-    <div class="row-fluid">
-      <div class="span12">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-star"></i></span>
-            <h5>Top Produits Vendus</h5>
-          </div>
-          <div class="widget-content nopadding">
-            <table class="table table-bordered table-striped">
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Produit</th>
-                  <th>Catégorie</th>
-                  <th>Quantité Vendue</th>
-                  <th>Retours</th>
-                  <th>Prix Unitaire</th>
-                  <th>Ventes Totales</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php
-                $resultProducts->data_seek(0);
-                $cnt = 1;
-                while($row = $resultProducts->fetch_assoc()) {
-                  $sold = (int)$row['sold_qty'];
-                  $returned = (int)$row['returned_qty'];
-                  $net_sold = $sold - $returned;
-                ?>
-                <tr>
-                  <td><?php echo $cnt; ?></td>
-                  <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                  <td><?php echo htmlspecialchars($row['CategoryName']); ?></td>
-                  <td><?php echo $sold; ?></td>
-                  <td><?php echo $returned; ?></td>
-                  <td class="text-right"><?php echo number_format($row['Price'], 2); ?></td>
-                  <td class="text-right"><?php echo number_format($row['total_sales'], 2); ?></td>
-                </tr>
-                <?php
-                  $cnt++;
-                }
-                ?>
-              </tbody>
-            </table>
+      <!-- Top Produits Vendus -->
+      <div class="row-fluid">
+        <div class="span12">
+          <div class="widget-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-star"></i></span>
+              <h5>Top Produits Vendus</h5>
+            </div>
+            <div class="widget-content">
+              <table class="table table-bordered table-striped data-table">
+                <thead>
+                  <tr>
+                    <th width="5%">N°</th>
+                    <th width="30%">Produit</th>
+                    <th width="15%">Catégorie</th>
+                    <th width="10%">Quantité Vendue</th>
+                    <th width="10%">Retours</th>
+                    <th width="15%">Prix Unitaire</th>
+                    <th width="15%">Ventes Totales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  $resultProducts->data_seek(0);
+                  $cnt = 1;
+                  while($row = $resultProducts->fetch_assoc()) {
+                    $sold = (int)$row['sold_qty'];
+                    $returned = (int)$row['returned_qty'];
+                    $net_sold = $sold - $returned;
+                  ?>
+                  <tr>
+                    <td><?php echo $cnt; ?></td>
+                    <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
+                    <td><?php echo htmlspecialchars($row['CategoryName']); ?></td>
+                    <td><?php echo $sold; ?></td>
+                    <td><?php echo $returned; ?></td>
+                    <td class="text-right"><?php echo number_format($row['Price'], 2); ?></td>
+                    <td class="text-right"><?php echo number_format($row['total_sales'], 2); ?></td>
+                  </tr>
+                  <?php
+                    $cnt++;
+                  }
+                  ?>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Transactions détaillées -->
-    <div class="row-fluid">
-      <div class="span12">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-th"></i></span>
-            <h5>Transactions détaillées</h5>
-          </div>
-          <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Type</th>
-                  <th>Montant</th>
-                  <th>Date</th>
-                  <th>Commentaire</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php
-                $resultList->data_seek(0);
-                $cnt = 1;
-                while($row = $resultList->fetch_assoc()) {
-                  // Définir la classe CSS pour le type de transaction
-                  $typeClass = '';
-                  switch($row['Type']) {
-                    case 'Vente': $typeClass = 'label-success'; break;
-                    case 'Dépôt': $typeClass = 'label-info'; break;
-                    case 'Retrait': $typeClass = 'label-warning'; break;
-                    case 'Retour': $typeClass = 'label-important'; break;
-                    default: $typeClass = '';
+      <!-- Transactions détaillées -->
+      <div class="row-fluid">
+        <div class="span12">
+          <div class="widget-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-th"></i></span>
+              <h5>Transactions détaillées</h5>
+            </div>
+            <div class="widget-content">
+              <table class="table table-bordered data-table">
+                <thead>
+                  <tr>
+                    <th width="5%">N°</th>
+                    <th width="15%">Type</th>
+                    <th width="15%">Montant</th>
+                    <th width="20%">Date</th>
+                    <th width="45%">Commentaire</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  $resultList->data_seek(0);
+                  $cnt = 1;
+                  while($row = $resultList->fetch_assoc()) {
+                    // Définir la classe CSS pour le type de transaction
+                    $typeClass = '';
+                    switch($row['Type']) {
+                      case 'Vente': $typeClass = 'label-success'; break;
+                      case 'Dépôt': $typeClass = 'label-info'; break;
+                      case 'Retrait': $typeClass = 'label-warning'; break;
+                      case 'Retour': $typeClass = 'label-important'; break;
+                      default: $typeClass = '';
+                    }
+                  ?>
+                  <tr>
+                    <td><?php echo $cnt; ?></td>
+                    <td><span class="label <?php echo $typeClass; ?>"><?php echo $row['Type']; ?></span></td>
+                    <td class="text-right"><?php echo number_format($row['Amount'], 2); ?></td>
+                    <td><?php echo date('d/m/Y H:i', strtotime($row['Date'])); ?></td>
+                    <td><?php echo htmlspecialchars($row['Comment']); ?></td>
+                  </tr>
+                  <?php
+                    $cnt++;
                   }
-                ?>
-                <tr>
-                  <td><?php echo $cnt; ?></td>
-                  <td><span class="label <?php echo $typeClass; ?>"><?php echo $row['Type']; ?></span></td>
-                  <td class="text-right"><?php echo number_format($row['Amount'], 2); ?></td>
-                  <td><?php echo date('d/m/Y H:i', strtotime($row['Date'])); ?></td>
-                  <td><?php echo htmlspecialchars($row['Comment']); ?></td>
-                </tr>
-                <?php
-                  $cnt++;
-                }
-                // Fermer les requêtes préparées
-                $stmtList->close();
-                $stmtProducts->close();
-                ?>
-              </tbody>
-            </table>
+                  // Fermer les requêtes préparées
+                  $stmtList->close();
+                  $stmtProducts->close();
+                  ?>
+                </tbody>
+              </table>
+            </div>
           </div>
+        </div>
+      </div>
+      
+      <!-- Pied de page du rapport (visible à l'impression) -->
+      <div class="row-fluid print-visible">
+        <div class="span12">
+          <p style="margin-top: 20px;"><small>Rapport généré le <?php echo date("d/m/Y H:i"); ?></small></p>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<?php include_once('includes/footer.php'); ?>
+<!-- Pied de page - caché à l'impression -->
+<div class="no-print">
+  <?php include_once('includes/footer.php'); ?>
+</div>
 
 <!-- Scripts -->
 <script src="js/jquery.min.js"></script>
