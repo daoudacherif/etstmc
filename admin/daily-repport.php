@@ -1,287 +1,253 @@
 <?php
 session_start();
-error_reporting(0);
-include('includes/dbconnection.php');
-
-// Inclure dompdf (ajuste le chemin selon ton organisation)
-// Par exemple si tu as un dossier "dompdf" dans le même répertoire :
-require_once 'dompdf/autoload.inc.php';
-
-use Dompdf\Dompdf;
+error_reporting(E_ALL);
+include_once 'includes/dbconnection.php';
 
 // Vérifier si l'admin est connecté
-if (strlen($_SESSION['imsaid'] == 0)) {
-  header('location:logout.php');
-  exit;
+if (empty($_SESSION['imsaid'])) {
+    header('Location: logout.php');
+    exit;
 }
 
-// --- 1) Récupérer dates de filtrage ---
-$start = isset($_GET['start']) ? $_GET['start'] : date('Y-m-d');
-$end   = isset($_GET['end'])   ? $_GET['end']   : date('Y-m-d');
+// Initialiser les variables
+$fdate = filter_input(INPUT_POST, 'fromdate', FILTER_SANITIZE_STRING);
+$tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
 
-// On formate pour un BETWEEN en SQL (inclusif sur la journée)
-$startDateTime = $start . " 00:00:00";
-$endDateTime   = $end   . " 23:59:59";
-
-// --- 2) Calculer les totaux (Ventes, Dépôts, Retraits, Retours) ---
-
-// Ventes
-$sqlSales = "
-  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
-  FROM tblcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN '$startDateTime' AND '$endDateTime'
-";
-$resSales = mysqli_query($con, $sqlSales);
-$rowSales = mysqli_fetch_assoc($resSales);
-$totalSales = $rowSales['totalSales'];
-
-// Dépôts/Retraits
-$sqlTransactions = "
-  SELECT
-    COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) AS totalDeposits,
-    COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS totalWithdrawals
-  FROM tblcashtransactions
-  WHERE TransDate BETWEEN '$startDateTime' AND '$endDateTime'
-";
-$resTransactions = mysqli_query($con, $sqlTransactions);
-$rowTransactions = mysqli_fetch_assoc($resTransactions);
-$totalDeposits    = $rowTransactions['totalDeposits'];
-$totalWithdrawals = $rowTransactions['totalWithdrawals'];
-
-// Retours
-$sqlReturns = "
-  SELECT COALESCE(SUM(r.Quantity * p.Price), 0) AS totalReturns
-  FROM tblreturns r
-  JOIN tblproducts p ON p.ID = r.ProductID
-  WHERE r.ReturnDate BETWEEN '$start' AND '$end'
-    /* ReturnDate est un champ DATE, donc BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD' suffit */
-";
-$resReturns = mysqli_query($con, $sqlReturns);
-$rowReturns = mysqli_fetch_assoc($resReturns);
-$totalReturns = $rowReturns['totalReturns'];
-
-// Solde final
-$netBalance = ($totalSales + $totalDeposits) - ($totalWithdrawals + $totalReturns);
-
-// --- 3) Récupérer la liste unifiée pour l'affichage / export ---
-$sqlList = "
-  SELECT 'Vente' AS Type, (c.ProductQty * p.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName AS Comment
-  FROM tblcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN '$startDateTime' AND '$endDateTime'
-  
-  UNION ALL
-  
-  SELECT TransType AS Type, Amount, TransDate AS Date, Comments AS Comment
-  FROM tblcashtransactions
-  WHERE TransDate BETWEEN '$startDateTime' AND '$endDateTime'
-  
-  UNION ALL
-  
-  SELECT 'Retour' AS Type, (r.Quantity * p.Price) AS Amount,
-       r.ReturnDate AS Date, r.Reason AS Comment
-  FROM tblreturns r
-  JOIN tblproducts p ON p.ID = r.ProductID
-  WHERE r.ReturnDate BETWEEN '$start' AND '$end'
-  
-  ORDER BY Date DESC
-";
-$resList = mysqli_query($con, $sqlList);
-
-// --- 4) Export PDF ou Excel ? ---
-$export = isset($_GET['export']) ? $_GET['export'] : '';
-
-// ========== A) Export PDF via dompdf ==========
-if ($export === 'pdf') {
-  // 1) Créer une instance Dompdf
-  $dompdf = new Dompdf();
-
-  // 2) Construire le HTML minimal à exporter
-  ob_start();
-  ?>
-  <h2>Rapport du <?php echo $start; ?> au <?php echo $end; ?></h2>
-  <p><strong>Ventes:</strong> <?php echo number_format($totalSales,2); ?><br>
-     <strong>Dépôts:</strong> <?php echo number_format($totalDeposits,2); ?><br>
-     <strong>Retraits:</strong> <?php echo number_format($totalWithdrawals,2); ?><br>
-     <strong>Retours:</strong> <?php echo number_format($totalReturns,2); ?><br>
-     <strong>Solde Final:</strong> <?php echo number_format($netBalance,2); ?></p>
-
-  <table border="1" cellspacing="0" cellpadding="5">
-    <tr>
-    <th>#</th>
-    <th>Type</th>
-    <th>Montant</th>
-    <th>Date</th>
-    <th>Commentaire</th>
-    </tr>
-    <?php
-    $cnt=1;
-    mysqli_data_seek($resList, 0); // reset pointer
-    while($row = mysqli_fetch_assoc($resList)) {
-    ?>
-    <tr>
-      <td><?php echo $cnt++; ?></td>
-      <td><?php echo $row['Type']; ?></td>
-      <td><?php echo number_format($row['Amount'],2); ?></td>
-      <td><?php echo $row['Date']; ?></td>
-      <td><?php echo $row['Comment']; ?></td>
-    </tr>
-    <?php
-    }
-    ?>
-  </table>
-  <?php
-  $html = ob_get_clean();
-
-  // 3) Passer le HTML à dompdf
-  $dompdf->loadHtml($html);
-  $dompdf->setPaper('A4', 'portrait');
-  $dompdf->render();
-
-  // 4) Output PDF
-  $dompdf->stream("rapport_".date('Ymd').".pdf", array("Attachment" => true));
-  exit;
-}
-
-// ========== B) Export Excel ==========
-if ($export === 'excel') {
-  // 1) Nom du fichier
-  $filename = "rapport_".date('Ymd').".xls";
-
-  // 2) Headers HTTP pour l'export Excel
-  header("Content-Type: application/vnd.ms-excel");
-  header("Content-Disposition: attachment; filename=\"$filename\"");
-  header("Cache-Control: max-age=0");
-
-  // 3) Construire un tableau HTML
-  echo "<h2>Rapport du $start au $end</h2>";
-  echo "<p><strong>Ventes:</strong> ".number_format($totalSales,2)."<br>";
-  echo "<strong>Dépôts:</strong> ".number_format($totalDeposits,2)."<br>";
-  echo "<strong>Retraits:</strong> ".number_format($totalWithdrawals,2)."<br>";
-  echo "<strong>Retours:</strong> ".number_format($totalReturns,2)."<br>";
-  echo "<strong>Solde Final:</strong> ".number_format($netBalance,2)."</p>";
-
-  echo "<table border='1'>";
-  echo "<tr><th>#</th><th>Type</th><th>Montant</th><th>Date</th><th>Commentaire</th></tr>";
-  $cnt=1;
-  mysqli_data_seek($resList, 0); // reset pointer
-  while($row = mysqli_fetch_assoc($resList)) {
-    echo "<tr>";
-    echo "<td>".$cnt++."</td>";
-    echo "<td>".$row['Type']."</td>";
-    echo "<td>".number_format($row['Amount'],2)."</td>";
-    echo "<td>".$row['Date']."</td>";
-    echo "<td>".$row['Comment']."</td>";
-    echo "</tr>";
-  }
-  echo "</table>";
-  exit;
-}
-
-// --- 5) Sinon, on affiche la page HTML classique ---
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <title>Rapport global</title>
-  <?php include_once('includes/cs.php'); ?>
-  <?php include_once('includes/responsive.php'); ?>
-<?php include_once('includes/header.php'); ?>
-<?php include_once('includes/sidebar.php'); ?>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Système de Gestion des Inventaires | Rapport de Stock</title>
+    <?php include_once 'includes/cs.php'; ?>
+    <?php include_once 'includes/responsive.php'; ?>
+</head>
+<body>
+<?php include_once 'includes/header.php'; ?>
+<?php include_once 'includes/sidebar.php'; ?>
 
 <div id="content">
-  <div id="content-header">
-  <h1>Rapport Global</h1>
-  </div>
-
-  <div class="container-fluid">
-  <hr>
-
-  <!-- Formulaire de filtre par dates -->
-  <form method="get" class="form-inline" action="report.php">
-    <label>Du :</label>
-    <input type="date" name="start" value="<?php echo $start; ?>">
-    <label>Au :</label>
-    <input type="date" name="end" value="<?php echo $end; ?>">
-    <button type="submit" class="btn btn-primary">Filtrer</button>
-
-    <!-- Boutons Export -->
-    <a href="report.php?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=pdf" class="btn btn-info" target="_blank">Exporter PDF</a>
-    <a href="report.php?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=excel" class="btn btn-success">Exporter Excel</a>
-  </form>
-  <hr>
-
-  <!-- Tableau récap -->
-  <div class="row-fluid">
-    <div class="span12">
-    <h3>Résumé du <?php echo $start; ?> au <?php echo $end; ?></h3>
-    <table class="table table-bordered">
-      <tr><th>Ventes</th><td><?php echo number_format($totalSales,2); ?></td></tr>
-      <tr><th>Dépôts</th><td><?php echo number_format($totalDeposits,2); ?></td></tr>
-      <tr><th>Retraits</th><td><?php echo number_format($totalWithdrawals,2); ?></td></tr>
-      <tr><th>Retours</th><td><?php echo number_format($totalReturns,2); ?></td></tr>
-      <tr>
-      <th>Solde Final</th>
-      <td><strong><?php echo number_format($netBalance,2); ?></strong></td>
-      </tr>
-    </table>
+    <div id="content-header">
+        <div id="breadcrumb">
+            <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
+            <a href="stock-report.php" class="current">Rapport de Stock</a>
+        </div>
+        <h1>Rapport de Stock</h1>
     </div>
-  </div>
+    <div class="container-fluid">
+        <hr />
+        
+        <!-- Formulaire de sélection des dates -->
+        <div class="row-fluid">
+            <div class="span12">
+                <div class="widget-box">
+                    <div class="widget-title">
+                        <span class="icon"><i class="icon-calendar"></i></span>
+                        <h5>Sélectionner la période du rapport</h5>
+                    </div>
+                    <div class="widget-content nopadding">
+                        <form method="post" class="form-horizontal" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
+                            <div class="control-group">
+                                <label class="control-label">De Date :</label>
+                                <div class="controls">
+                                    <input type="date" class="span11" name="fromdate" id="fromdate" value="<?php echo $fdate; ?>" required='true' />
+                                </div>
+                            </div>
+                            <div class="control-group">
+                                <label class="control-label">À Date :</label>
+                                <div class="controls">
+                                    <input type="date" class="span11" name="todate" id="todate" value="<?php echo $tdate; ?>" required='true' />
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-success" name="submit">Générer le Rapport</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-  <!-- Transactions détaillées -->
-  <div class="row-fluid">
-    <div class="span12">
-    <div class="widget-box">
-      <div class="widget-title">
-      <h5>Transactions détaillées</h5>
-      </div>
-      <div class="widget-content nopadding">
-      <table class="table table-bordered data-table">
-        <thead>
-        <tr>
-          <th>#</th>
-          <th>Type</th>
-          <th>Montant</th>
-          <th>Date</th>
-          <th>Commentaire</th>
-        </tr>
-        </thead>
-        <tbody>
-        <?php
-        // On réinitialise le curseur
-        mysqli_data_seek($resList, 0);
-        $cnt = 1;
-        while($row = mysqli_fetch_assoc($resList)) {
-          ?>
-          <tr>
-          <td><?php echo $cnt++; ?></td>
-          <td><?php echo $row['Type']; ?></td>
-          <td><?php echo number_format($row['Amount'],2); ?></td>
-          <td><?php echo $row['Date']; ?></td>
-          <td><?php echo $row['Comment']; ?></td>
-          </tr>
-          <?php
-        }
-        ?>
-        </tbody>
-      </table>
-      </div>
-    </div><!-- widget-box -->
+        <?php if ($fdate && $tdate): ?>
+            <!-- Tableau des résultats -->
+            <div class="row-fluid">
+                <div class="span12">
+                    <div class="widget-box">
+                        <div class="widget-title">
+                            <span class="icon"><i class="icon-th"></i></span>
+                            <h5>
+                                Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
+                            </h5>
+                            <div class="buttons">
+                                <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
+                                <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
+                            </div>
+                        </div>
+                        <div class="widget-content nopadding">
+                            <table class="table table-bordered data-table">
+                                <thead>
+                                    <tr>
+                                        <th>N°</th>
+                                        <th>Produit</th>
+                                        <th>Catégorie</th>
+                                        <th>Sous-catégorie</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Stock initial</th>
+                                        <th>Stock restant</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php
+                                // Préparer la requête pour éviter injection SQL
+                                $stmt = $con->prepare(
+                                    "SELECT p.ID, p.ProductName, c.CategoryName, s.SubCategoryname, p.BrandName,
+                                            p.ModelNumber, p.Stock, p.Status,
+                                            COALESCE(SUM(cart.ProductQty), 0) AS soldQty
+                                     FROM tblproducts p
+                                     JOIN tblcategory c ON c.ID = p.CatID
+                                     JOIN tblsubcategory s ON s.ID = p.SubcatID
+                                     LEFT JOIN tblcart cart ON cart.ProductId = p.ID
+                                     WHERE DATE(p.CreationDate) BETWEEN ? AND ?
+                                     GROUP BY p.ID
+                                     ORDER BY p.ID DESC"
+                                );
+                                $stmt->bind_param('ss', $fdate, $tdate);
+                                $stmt->execute();
+                                $result = $stmt->get_result();
+                                $cnt = 1;
+
+                                if ($result->num_rows > 0) {
+                                    while ($row = $result->fetch_assoc()) {
+                                        $initial = (int)$row['Stock'];
+                                        $sold = (int)$row['soldQty'];
+                                        $remain = $initial - $sold;
+                                        ?>
+                                        <tr>
+                                            <td><?= $cnt ?></td>
+                                            <td><?= htmlspecialchars($row['ProductName']) ?></td>
+                                            <td><?= htmlspecialchars($row['CategoryName']) ?></td>
+                                            <td><?= htmlspecialchars($row['SubCategoryname']) ?></td>
+                                            <td><?= htmlspecialchars($row['BrandName']) ?></td>
+                                            <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                                            <td><?= $initial ?></td>
+                                            <td><?= $remain ?></td>
+                                            <td>
+                                                <?php if($row['Status'] === '1'): ?>
+                                                    <span class="label label-success">Actif</span>
+                                                <?php else: ?>
+                                                    <span class="label label-important">Inactif</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                        <?php
+                                        $cnt++;
+                                    }
+                                } else {
+                                    echo '<tr><td colspan="9" class="text-center">Aucun enregistrement trouvé pour cette période.</td></tr>';
+                                }
+                                $stmt->close();
+                                ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="row-fluid">
+                <div class="span12">
+                    <div class="alert alert-info">
+                        <button class="close" data-dismiss="alert">×</button>
+                        <strong>Info!</strong> Veuillez sélectionner les dates de début et de fin pour générer le rapport.
+                    </div>
+                    
+                    <!-- Aperçu des produits récents -->
+                    <div class="widget-box">
+                        <div class="widget-title">
+                            <span class="icon"><i class="icon-th"></i></span>
+                            <h5>Aperçu des Produits Récents</h5>
+                        </div>
+                        <div class="widget-content nopadding">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>N°</th>
+                                        <th>Produit</th>
+                                        <th>CatID</th>
+                                        <th>SubcatID</th>
+                                        <th>Marque</th>
+                                        <th>Modèle</th>
+                                        <th>Stock</th>
+                                        <th>Prix</th>
+                                        <th>Statut</th>
+                                        <th>Date Création</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $query = mysqli_query($con, "SELECT * FROM tblproducts ORDER BY CreationDate DESC LIMIT 10");
+                                    $cnt = 1;
+                                    while($row = mysqli_fetch_array($query)) {
+                                    ?>
+                                    <tr>
+                                        <td><?php echo $cnt; ?></td>
+                                        <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['CatID']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['SubcatID']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['Stock']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['Price']); ?></td>
+                                        <td>
+                                            <?php if($row['Status'] == '1'): ?>
+                                                <span class="label label-success">Actif</span>
+                                            <?php else: ?>
+                                                <span class="label label-important">Inactif</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($row['CreationDate']); ?></td>
+                                    </tr>
+                                    <?php 
+                                    $cnt++;
+                                    } ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
-  </div><!-- row-fluid -->
+</div>
 
-  </div><!-- container-fluid -->
-</div><!-- content -->
+<?php include_once 'includes/footer.php'; ?>
 
-<?php include_once('includes/footer.php'); ?>
-
+<!-- Scripts -->
 <script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
 <script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
+<script>
+    // Validation JS: assure fromdate <= todate
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        form && form.addEventListener('submit', function(e) {
+            const from = new Date(document.getElementById('fromdate').value);
+            const to = new Date(document.getElementById('todate').value);
+            if (from > to) {
+                alert('La date de début ne peut pas être après la date de fin.');
+                e.preventDefault();
+            }
+        });
+    });
+</script>
+
 </body>
 </html>
