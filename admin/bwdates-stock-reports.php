@@ -22,24 +22,150 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     <title>Système de Gestion des Inventaires | Rapport de Stock</title>
     <?php include_once 'includes/cs.php'; ?>
     <?php include_once 'includes/responsive.php'; ?>
+    <style>
+      /* Styles pour l'interface normale */
+      .report-box {
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+      .report-header {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      .report-total {
+        font-weight: bold;
+        color: #d9534f;
+      }
+      .print-header {
+        display: none;
+      }
+      
+      /* Styles spécifiques pour l'impression */
+      @media print {
+        /* Cacher tous les éléments de navigation et UI */
+        header, #header, .header, 
+        #sidebar, .sidebar, 
+        #user-nav, #search, .navbar, 
+        footer, #footer, .footer,
+        .no-print, #breadcrumb, 
+        #content-header, .widget-title, .buttons,
+        .form-actions, .alert, .close {
+          display: none !important;
+        }
+        
+        /* Afficher l'en-tête d'impression qui est normalement caché */
+        .print-header {
+          display: block;
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        
+        /* Ajuster la mise en page pour l'impression */
+        body {
+          background: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        #content {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          left: 0 !important;
+          position: relative !important;
+        }
+        
+        .container-fluid {
+          padding: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+        }
+        
+        .row-fluid .span12 {
+          width: 100% !important;
+          margin: 0 !important;
+          float: none !important;
+        }
+        
+        /* Retirer les bordures et couleurs de fond pour l'impression */
+        .widget-box, .invoice-box {
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: none !important;
+        }
+        
+        /* Assurer que les tableaux s'impriment correctement */
+        table { page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        
+        /* Supprimer les marges et espacements inutiles */
+        hr, br.print-hidden {
+          display: none !important;
+        }
+        
+        /* Forcer l'impression en noir et blanc par défaut */
+        * {
+          color: black !important;
+          text-shadow: none !important;
+          filter: none !important;
+          -ms-filter: none !important;
+        }
+        
+        /* Exceptions pour certains éléments spécifiques */
+        .text-danger {
+          color: #d9534f !important;
+        }
+        
+        .label-success {
+          background-color: #dff0d8 !important;
+          border: 1px solid #3c763d !important;
+        }
+        
+        .label-important {
+          background-color: #f2dede !important;
+          border: 1px solid #a94442 !important;
+        }
+        
+        /* Assurer que les liens sont visibles et sans URL */
+        a, a:visited {
+          text-decoration: underline;
+        }
+        a[href]:after {
+          content: "";
+        }
+      }
+    </style>
 </head>
 <body>
-<?php include_once 'includes/header.php'; ?>
-<?php include_once 'includes/sidebar.php'; ?>
+<!-- Éléments qui seront cachés à l'impression -->
+<div class="no-print">
+    <?php include_once 'includes/header.php'; ?>
+    <?php include_once 'includes/sidebar.php'; ?>
+</div>
 
 <div id="content">
-    <div id="content-header">
+    <!-- En-tête de contenu - caché à l'impression -->
+    <div id="content-header" class="no-print">
         <div id="breadcrumb">
             <a href="dashboard.php" title="Accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
             <a href="stock-report.php" class="current">Rapport de Stock</a>
         </div>
         <h1>Rapport de Stock</h1>
     </div>
+    
     <div class="container-fluid">
-        <hr />
+        <hr class="no-print" />
         
-        <!-- Formulaire de sélection des dates -->
-        <div class="row-fluid">
+        <!-- Formulaire de sélection des dates - caché à l'impression -->
+        <div class="row-fluid no-print">
             <div class="span12">
                 <div class="widget-box">
                     <div class="widget-title">
@@ -72,14 +198,20 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
         <?php if ($fdate && $tdate): ?>
             <!-- Tableau des résultats -->
             <div class="row-fluid">
-                <div class="span12">
-                    <div class="widget-box">
+                <div class="span12" id="printArea">
+                    <!-- En-tête qui n'apparaît qu'à l'impression -->
+                    <div class="print-header">
+                        <h2>Système de Gestion des Inventaires</h2>
+                        <p>Rapport de Stock du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?></p>
+                    </div>
+                    
+                    <div class="widget-box report-box">
                         <div class="widget-title">
                             <span class="icon"><i class="icon-th"></i></span>
                             <h5>
                                 Rapport d'inventaire du <?= htmlspecialchars($fdate) ?> au <?= htmlspecialchars($tdate) ?>
                             </h5>
-                            <div class="buttons">
+                            <div class="buttons no-print">
                                 <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
                                 <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
                             </div>
@@ -88,16 +220,16 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                             <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
-                                        <th>N°</th>
-                                        <th>Nom du Produit</th>
-                                        <th>Catégorie</th>
-                                        <th>Marque</th>
-                                        <th>Modèle</th>
-                                        <th>Stock Initial</th>
-                                        <th>Vendus</th>
-                                        <th>Retournés</th>
-                                        <th>Stock Restant</th>
-                                        <th>Statut</th>
+                                        <th width="5%">N°</th>
+                                        <th width="20%">Nom du Produit</th>
+                                        <th width="15%">Catégorie</th>
+                                        <th width="15%">Marque</th>
+                                        <th width="10%">Modèle</th>
+                                        <th width="8%">Stock Initial</th>
+                                        <th width="7%">Vendus</th>
+                                        <th width="7%">Retournés</th>
+                                        <th width="8%">Stock Restant</th>
+                                        <th width="5%">Statut</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -169,12 +301,31 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 ?>
                                 </tbody>
                             </table>
+                            
+                            <!-- Pied de page du rapport -->
+                            <div class="row-fluid">
+                                <div class="span12">
+                                    <p style="margin-top: 20px;"><small>Rapport généré le <?php echo date("d/m/Y H:i"); ?></small></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bouton d'impression supplémentaire en bas de page - caché à l'impression -->
+                    <div class="row-fluid no-print" style="margin-top: 20px;">
+                        <div class="span12 text-center">
+                            <button class="btn btn-primary" onclick="window.print();">
+                                <i class="icon-print"></i> Imprimer Rapport
+                            </button>
+                            <a href="stock-report.php" class="btn">
+                                <i class="icon-refresh"></i> Nouvelle recherche
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
         <?php else: ?>
-            <div class="row-fluid">
+            <div class="row-fluid no-print">
                 <div class="span12">
                     <div class="alert alert-info">
                         <button class="close" data-dismiss="alert">×</button>
@@ -274,7 +425,10 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
     </div>
 </div>
 
-<?php include_once 'includes/footer.php'; ?>
+<!-- Pied de page - caché à l'impression -->
+<div class="no-print">
+    <?php include_once 'includes/footer.php'; ?>
+</div>
 
 <!-- Scripts -->
 <script src="js/jquery.min.js"></script>
