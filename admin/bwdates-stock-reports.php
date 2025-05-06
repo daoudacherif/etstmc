@@ -213,11 +213,11 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                             </h5>
                             <div class="buttons no-print">
                                 <button onclick="window.print()" class="btn btn-primary btn-mini"><i class="icon-print"></i> Imprimer</button>
-                                <a href="export-stock.php?from=<?= urlencode($fdate) ?>&to=<?= urlencode($tdate) ?>" class="btn btn-info btn-mini"><i class="icon-download"></i> Exporter</a>
+                              
                             </div>
                         </div>
                         <div class="widget-content nopadding">
-                            <table class="table table-bordered data-table">
+                            <table class="table table-bordered ">
                                 <thead>
                                     <tr>
                                         <th width="5%">N°</th>
