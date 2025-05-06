@@ -61,7 +61,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 </div>
                             </div>
                             <div class="form-actions">
-                                <button type="submit" class="btn btn-success" name="submit">Générer le Rapport</button>
+                                <button type="submit" class="btn btn-success" name="submit"><i class="icon-search"></i> Générer le Rapport</button>
                             </div>
                         </form>
                     </div>
@@ -89,53 +89,70 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                 <thead>
                                     <tr>
                                         <th>N°</th>
-                                        <th>Produit</th>
+                                        <th>Nom du Produit</th>
                                         <th>Catégorie</th>
-                                        <th>Sous-catégorie</th>
                                         <th>Marque</th>
                                         <th>Modèle</th>
-                                        <th>Stock initial</th>
-                                        <th>Stock restant</th>
+                                        <th>Stock Initial</th>
+                                        <th>Vendus</th>
+                                        <th>Retournés</th>
+                                        <th>Stock Restant</th>
                                         <th>Statut</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                 <?php
                                 // Préparer la requête pour éviter injection SQL
-                                $stmt = $con->prepare(
-                                    "SELECT p.ID, p.ProductName, c.CategoryName, s.SubCategoryname, p.BrandName,
-                                            p.ModelNumber, p.Stock, p.Status,
-                                            COALESCE(SUM(cart.ProductQty), 0) AS soldQty
-                                     FROM tblproducts p
-                                     JOIN tblcategory c ON c.ID = p.CatID
-                                     JOIN tblsubcategory s ON s.ID = p.SubcatID
-                                     LEFT JOIN tblcart cart ON cart.ProductId = p.ID
-                                     WHERE DATE(p.CreationDate) BETWEEN ? AND ?
-                                     GROUP BY p.ID
-                                     ORDER BY p.ID DESC"
-                                );
-                                $stmt->bind_param('ss', $fdate, $tdate);
+                                $stmt = $con->prepare("
+                                    SELECT 
+                                        p.ID, 
+                                        p.ProductName, 
+                                        COALESCE(c.CategoryName, 'N/A') AS CategoryName, 
+                                        p.BrandName, 
+                                        p.ModelNumber, 
+                                        p.Stock AS initial_stock, 
+                                        COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                                        COALESCE(
+                                            (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID AND 
+                                            DATE(ReturnDate) BETWEEN ? AND ?),
+                                            0
+                                        ) AS returned_qty,
+                                        p.Status
+                                    FROM tblproducts p
+                                    LEFT JOIN tblcategory c ON c.ID = p.CatID
+                                    LEFT JOIN tblcart cart ON cart.ProductId = p.ID AND cart.IsCheckOut = 1
+                                    WHERE DATE(p.CreationDate) BETWEEN ? AND ?
+                                    GROUP BY p.ID
+                                    ORDER BY p.ID DESC
+                                ");
+                                
+                                $stmt->bind_param('ssss', $fdate, $tdate, $fdate, $tdate);
                                 $stmt->execute();
                                 $result = $stmt->get_result();
                                 $cnt = 1;
 
                                 if ($result->num_rows > 0) {
                                     while ($row = $result->fetch_assoc()) {
-                                        $initial = (int)$row['Stock'];
-                                        $sold = (int)$row['soldQty'];
-                                        $remain = $initial - $sold;
+                                        $initial = (int)$row['initial_stock'];
+                                        $sold = (int)$row['sold_qty'];
+                                        $returned = (int)$row['returned_qty'];
+                                        $remain = $initial - $sold + $returned;
+                                        $remain = max(0, $remain);
                                         ?>
                                         <tr>
                                             <td><?= $cnt ?></td>
                                             <td><?= htmlspecialchars($row['ProductName']) ?></td>
                                             <td><?= htmlspecialchars($row['CategoryName']) ?></td>
-                                            <td><?= htmlspecialchars($row['SubCategoryname']) ?></td>
                                             <td><?= htmlspecialchars($row['BrandName']) ?></td>
                                             <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
                                             <td><?= $initial ?></td>
-                                            <td><?= $remain ?></td>
+                                            <td><?= $sold ?></td>
+                                            <td><?= $returned ?></td>
+                                            <td class="<?= $remain === 0 ? 'text-danger' : '' ?>">
+                                                <?= $remain === 0 ? 'Épuisé' : $remain ?>
+                                            </td>
                                             <td>
-                                                <?php if($row['Status'] === '1'): ?>
+                                                <?php if($row['Status'] == '1'): ?>
                                                     <span class="label label-success">Actif</span>
                                                 <?php else: ?>
                                                     <span class="label label-important">Inactif</span>
@@ -146,7 +163,7 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                                         $cnt++;
                                     }
                                 } else {
-                                    echo '<tr><td colspan="9" class="text-center">Aucun enregistrement trouvé pour cette période.</td></tr>';
+                                    echo '<tr><td colspan="10" class="text-center">Aucun enregistrement trouvé pour cette période.</td></tr>';
                                 }
                                 $stmt->close();
                                 ?>
@@ -171,48 +188,82 @@ $tdate = filter_input(INPUT_POST, 'todate', FILTER_SANITIZE_STRING);
                             <h5>Aperçu des Produits Récents</h5>
                         </div>
                         <div class="widget-content nopadding">
-                            <table class="table table-bordered table-striped">
+                            <table class="table table-bordered data-table">
                                 <thead>
                                     <tr>
                                         <th>N°</th>
-                                        <th>Produit</th>
-                                        <th>CatID</th>
-                                        <th>SubcatID</th>
+                                        <th>Nom du Produit</th>
+                                        <th>Catégorie</th>
                                         <th>Marque</th>
                                         <th>Modèle</th>
-                                        <th>Stock</th>
-                                        <th>Prix</th>
+                                        <th>Stock Initial</th>
+                                        <th>Vendus</th>
+                                        <th>Retournés</th>
+                                        <th>Stock Restant</th>
                                         <th>Statut</th>
-                                        <th>Date Création</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $query = mysqli_query($con, "SELECT * FROM tblproducts ORDER BY CreationDate DESC LIMIT 10");
-                                    $cnt = 1;
-                                    while($row = mysqli_fetch_array($query)) {
+                                    $sql = "
+                                        SELECT 
+                                            p.ID AS pid,
+                                            p.ProductName,
+                                            COALESCE(c.CategoryName, 'N/A') AS CategoryName,
+                                            p.BrandName,
+                                            p.ModelNumber,
+                                            p.Stock AS initial_stock,
+                                            COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                                            COALESCE(
+                                                (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
+                                                0
+                                            ) AS returned_qty,
+                                            p.Status
+                                        FROM tblproducts p
+                                        LEFT JOIN tblcategory c ON c.ID = p.CatID
+                                        LEFT JOIN tblcart cart ON cart.ProductId = p.ID AND cart.IsCheckOut = 1
+                                        GROUP BY p.ID
+                                        ORDER BY p.CreationDate DESC 
+                                        LIMIT 10
+                                    ";
+                                    $ret = mysqli_query($con, $sql) or die('Erreur SQL : ' . mysqli_error($con));
+                                    
+                                    if (mysqli_num_rows($ret) > 0) {
+                                        $cnt = 1;
+                                        while ($row = mysqli_fetch_assoc($ret)) {
+                                            $initial = (int)$row['initial_stock'];
+                                            $sold = (int)$row['sold_qty'];
+                                            $returned = (int)$row['returned_qty'];
+                                            $remain = $initial - $sold + $returned;
+                                            $remain = max(0, $remain);
+                                            ?>
+                                            <tr>
+                                                <td><?= $cnt ?></td>
+                                                <td><?= htmlspecialchars($row['ProductName']) ?></td>
+                                                <td><?= htmlspecialchars($row['CategoryName']) ?></td>
+                                                <td><?= htmlspecialchars($row['BrandName']) ?></td>
+                                                <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                                                <td><?= $initial ?></td>
+                                                <td><?= $sold ?></td>
+                                                <td><?= $returned ?></td>
+                                                <td class="<?= $remain === 0 ? 'text-danger' : '' ?>">
+                                                    <?= $remain === 0 ? 'Épuisé' : $remain ?>
+                                                </td>
+                                                <td>
+                                                    <?php if($row['Status'] == '1'): ?>
+                                                        <span class="label label-success">Actif</span>
+                                                    <?php else: ?>
+                                                        <span class="label label-important">Inactif</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                            <?php
+                                            $cnt++;
+                                        }
+                                    } else {
+                                        echo '<tr><td colspan="10" class="text-center">Aucun Article trouvé</td></tr>';
+                                    }
                                     ?>
-                                    <tr>
-                                        <td><?php echo $cnt; ?></td>
-                                        <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['CatID']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['SubcatID']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['Stock']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['Price']); ?></td>
-                                        <td>
-                                            <?php if($row['Status'] == '1'): ?>
-                                                <span class="label label-success">Actif</span>
-                                            <?php else: ?>
-                                                <span class="label label-important">Inactif</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($row['CreationDate']); ?></td>
-                                    </tr>
-                                    <?php 
-                                    $cnt++;
-                                    } ?>
                                 </tbody>
                             </table>
                         </div>
