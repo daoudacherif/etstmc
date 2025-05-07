@@ -252,9 +252,9 @@ if (isset($_POST['addtocart'])) {
         $newQty = $c['ProductQty'] + $quantity;
         
         // Vérifier à nouveau que le nouveau total ne dépasse pas le stock disponible
-        if ($newQty > $stock) {
+        if ($newQty > $remainingStock) {
             echo "<script>
-                    alert('Vous avez déjà " . $c['ProductQty'] . " exemplaire(s) de \"" . htmlspecialchars($productName) . "\" dans votre panier. Ajouter " . $quantity . " de plus dépasserait le stock disponible.');
+                    alert('Vous avez déjà " . $c['ProductQty'] . " exemplaire(s) de \"" . htmlspecialchars($productName) . "\" dans votre panier. Ajouter " . $quantity . " de plus dépasserait le stock restant (" . $remainingStock . ").');
                     window.location.href='cart.php';
                   </script>";
             exit;
