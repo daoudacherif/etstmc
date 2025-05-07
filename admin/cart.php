@@ -177,7 +177,6 @@ if (isset($_GET['delid'])) {
         exit;
     }
 }
-
 //////////////////////////////////////////////////////////////////////////
 // GESTION DE L'AJOUT AU PANIER
 //////////////////////////////////////////////////////////////////////////
@@ -186,13 +185,25 @@ if (isset($_POST['addtocart'])) {
     $quantity  = max(1, intval($_POST['quantity']));
     $price     = max(0, floatval($_POST['price']));
 
-    // 1) Récupérer le stock actuel
+    // 1) Récupérer le stock restant (initial - vendu + retourné)
     $stockRes = mysqli_query($con, "
-        SELECT Stock, ProductName 
-        FROM tblproducts 
-        WHERE ID = '$productId' 
+        SELECT 
+            p.Stock AS initial_stock,
+            p.ProductName,
+            COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+            COALESCE(
+                (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
+                0
+            ) AS returned_qty
+        FROM tblproducts p
+        LEFT JOIN tblcart cart 
+            ON cart.ProductId = p.ID 
+            AND cart.IsCheckOut = 1
+        WHERE p.ID = '$productId'
+        GROUP BY p.ID
         LIMIT 1
     ");
+    
     if (!$stockRes || mysqli_num_rows($stockRes) === 0) {
         echo "<script>
                 alert('Article introuvable');
@@ -200,12 +211,19 @@ if (isset($_POST['addtocart'])) {
               </script>";
         exit;
     }
-    $row   = mysqli_fetch_assoc($stockRes);
-    $stock = intval($row['Stock']);
+    
+    $row = mysqli_fetch_assoc($stockRes);
+    $initialStock = intval($row['initial_stock']);
+    $soldQty = intval($row['sold_qty']);
+    $returnedQty = intval($row['returned_qty']);
     $productName = $row['ProductName'];
+    
+    // Calcul du stock restant
+    $remainingStock = $initialStock - $soldQty + $returnedQty;
+    $remainingStock = max(0, $remainingStock);
 
     // 2) Interdire si stock épuisé ou négatif
-    if ($stock <= 0) {
+    if ($remainingStock <= 0) {
         echo "<script>
                 alert('Désolé, cet article \"" . htmlspecialchars($productName) . "\" est en rupture de stock.');
                 window.location.href='cart.php';
@@ -213,10 +231,10 @@ if (isset($_POST['addtocart'])) {
         exit;
     }
 
-    // 3) Interdire si quantité demandée > stock
-    if ($quantity > $stock) {
+    // 3) Interdire si quantité demandée > stock restant
+    if ($quantity > $remainingStock) {
         echo "<script>
-                alert('Vous avez demandé $quantity exemplaire(s) de \"" . htmlspecialchars($productName) . "\", il n\'en reste que $stock en stock.');
+                alert('Vous avez demandé $quantity exemplaire(s) de \"" . htmlspecialchars($productName) . "\", il n\'en reste que $remainingStock en stock.');
                 window.location.href='cart.php';
               </script>";
         exit;
