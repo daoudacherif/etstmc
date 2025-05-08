@@ -117,30 +117,7 @@ $resList = mysqli_query($con, $sqlList);
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
   <style>
-    .summary-box {
-      border: 1px solid #ccc;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 4px;
-      background-color: #f9f9f9;
-      margin-left: 10px;
-    }
-    .summary-box h4 {
-      margin-top: 0;
-      border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-    }
-    .balance-due {
-      font-size: 16px;
-      font-weight: bold;
-      color: #d9534f;
-    }
-    .arrivals-table {
-      margin-top: 15px;
-    }
-    .supplier-details {
-      margin-bottom: 25px;
-    }
+   
   </style>
 </head>
 <body>
