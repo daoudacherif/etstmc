@@ -123,6 +123,7 @@ $resList = mysqli_query($con, $sqlList);
       margin-bottom: 20px;
       border-radius: 4px;
       background-color: #f9f9f9;
+      margin-left: 10px;
     }
     .summary-box h4 {
       margin-top: 0;
