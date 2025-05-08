@@ -119,7 +119,7 @@ $resList = mysqli_query($con, $sqlList);
   <style>
     .summary-box {
       border: 1px solid #ccc;
-      padding: 15px;
+      padding: 20px;
       margin-bottom: 20px;
       border-radius: 4px;
       background-color: #f9f9f9;
