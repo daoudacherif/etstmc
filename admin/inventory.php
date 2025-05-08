@@ -1,9 +1,10 @@
 <?php 
 session_start();
 error_reporting(E_ALL);
+ini_set('display_errors', 1);
 include('includes/dbconnection.php');
 
-// Vérifier si l'admin est connecté (utilisation de empty comme dans votre page d'inventaire)
+// Vérifier si l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
     header('location:logout.php');
     exit;
@@ -17,6 +18,30 @@ if (isset($_GET['delid'])) {
     header('location:manage-product.php');
     exit;
 }
+
+// DEBUG - Vérifions la connexion à la base de données
+if (!$con) {
+    die("Erreur de connexion: " . mysqli_connect_error());
+}
+
+// Comptons d'abord le nombre de produits
+$countSql = "SELECT COUNT(*) as total FROM tblproducts";
+$countResult = mysqli_query($con, $countSql);
+$countRow = mysqli_fetch_assoc($countResult);
+$totalProducts = $countRow['total'];
+
+// Récupération des produits avec une requête simplifiée
+$sql = "SELECT * FROM tblproducts ORDER BY ID DESC";
+$ret = mysqli_query($con, $sql);
+
+// Vérifier si la requête a réussi
+$querySuccess = ($ret !== false);
+
+// Obtenir le nombre de lignes
+$numRows = $querySuccess ? mysqli_num_rows($ret) : 0;
+
+// Récupérer l'erreur SQL si la requête a échoué
+$sqlError = $querySuccess ? "" : mysqli_error($con);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -25,6 +50,32 @@ if (isset($_GET['delid'])) {
     <title>Gérer les Produits</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
+    <style>
+        .debug-info {
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .has-error {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .plain-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .plain-table th, .plain-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .plain-table th {
+            background-color: #f2f2f2;
+        }
+    </style>
 </head>
 <body>
 <?php include_once('includes/header.php'); ?>
@@ -39,21 +90,77 @@ if (isset($_GET['delid'])) {
         <h1>Gérer les Produits</h1>
     </div>
     <div class="container-fluid"><hr>
+        
+        <!-- DEBUG: Informations de débogage -->
+        <div class="debug-info <?= $querySuccess ? '' : 'has-error' ?>">
+            <h4>Informations de débogage</h4>
+            <p>Nombre total de produits en base: <strong><?= $totalProducts ?></strong></p>
+            <p>Requête SQL exécutée: <code><?= htmlspecialchars($sql) ?></code></p>
+            <p>Statut de la requête: <?= $querySuccess ? '<span class="label label-success">Succès</span>' : '<span class="label label-important">Échec</span>' ?></p>
+            <p>Nombre de lignes retournées: <strong><?= $numRows ?></strong></p>
+            <?php if (!$querySuccess): ?>
+                <p>Erreur SQL: <strong><?= htmlspecialchars($sqlError) ?></strong></p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Affichage basique sans DataTables -->
         <div class="row-fluid">
             <div class="span12">
                 <div class="widget-box">
                     <div class="widget-title">
                         <span class="icon"><i class="icon-th"></i></span>
-                        <h5>Liste des Produits</h5>
+                        <h5>Liste des Produits (Affichage simple)</h5>
+                    </div>
+                    <div class="widget-content">
+                        <?php if ($numRows > 0): ?>
+                            <table class="plain-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Nom</th>
+                                        <th>Stock</th>
+                                        <th>Prix</th>
+                                        <th>Statut</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    while ($row = mysqli_fetch_assoc($ret)) {
+                                        echo "<tr>";
+                                        echo "<td>" . $row['ID'] . "</td>";
+                                        echo "<td>" . htmlspecialchars($row['ProductName']) . "</td>";
+                                        echo "<td>" . $row['Stock'] . "</td>";
+                                        echo "<td>" . number_format($row['Price'], 2) . "</td>";
+                                        echo "<td>" . ($row['Status'] == 1 ? 'Actif' : 'Inactif') . "</td>";
+                                        echo "</tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
+                        <?php else: ?>
+                            <div class="alert alert-info">
+                                <strong>Information!</strong> Aucun produit trouvé dans la base de données.
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Version avec DataTables -->
+        <div class="row-fluid">
+            <div class="span12">
+                <div class="widget-box">
+                    <div class="widget-title">
+                        <span class="icon"><i class="icon-th"></i></span>
+                        <h5>Liste des Produits (avec DataTables)</h5>
                     </div>
                     <div class="widget-content nopadding">
-                        <table class="table table-bordered data-table">
+                        <table class="table table-bordered" id="product-table">
                             <thead>
                                 <tr>
                                     <th>N°</th>
                                     <th>Produit</th>
-                                    <th>Catégorie</th>
-                                    <th>Modèle</th>
                                     <th>Stock</th>
                                     <th>Prix</th>
                                     <th>Statut</th>
@@ -62,71 +169,63 @@ if (isset($_GET['delid'])) {
                             </thead>
                             <tbody>
                             <?php
-                            // Récupération des produits - Requête inspirée de votre page d'inventaire
-                            $sql = "
-                              SELECT
-                                p.ID AS pid,
-                                p.ProductName,
-                                COALESCE(c.CategoryName, 'N/A') AS CategoryName,
-                                p.ModelNumber,
-                                p.Stock,
-                                p.Price,
-                                p.Status
-                              FROM tblproducts p
-                              LEFT JOIN tblcategory c ON c.ID = p.CatID
-                              ORDER BY p.ID DESC
-                            ";
-                            $ret = mysqli_query($con, $sql) 
-                                or die('Erreur SQL : ' . mysqli_error($con));
-
-                            if (mysqli_num_rows($ret) > 0) {
+                            // Réinitialiser le pointeur de résultat
+                            mysqli_data_seek($ret, 0);
+                            
+                            if ($numRows > 0) {
                                 $cnt = 1;
                                 while ($row = mysqli_fetch_assoc($ret)) {
-                                    $statusLabel = $row['Status'] == 1
-                                        ? '<span class="label label-success">Actif</span>'
-                                        : '<span class="label label-important">Inactif</span>';
                                     ?>
                                     <tr>
-                                        <td><?= $cnt ?></td>
+                                        <td><?= $cnt++ ?></td>
                                         <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                                        <td><?= htmlspecialchars($row['CategoryName']) ?></td>
-                                        <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
                                         <td><?= intval($row['Stock']) ?></td>
                                         <td><?= number_format(floatval($row['Price']), 2) ?></td>
-                                        <td class="center"><?= $statusLabel ?></td>
-                                        <td class="center">
-                                            <a href="editproducts.php?editid=<?= $row['pid'] ?>" class="btn btn-mini btn-info"><i class="icon-edit"></i></a>
-                                            <a href="manage-product.php?delid=<?= $row['pid'] ?>" 
+                                        <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
+                                        <td>
+                                            <a href="editproducts.php?editid=<?= $row['ID'] ?>" class="btn btn-mini btn-info"><i class="icon-edit"></i></a>
+                                            <a href="manage-product.php?delid=<?= $row['ID'] ?>" 
                                                onclick="return confirm('Désactiver ce produit ?')" 
                                                class="btn btn-mini btn-danger"><i class="icon-trash"></i></a>
                                         </td>
                                     </tr>
                                     <?php
-                                    $cnt++;
                                 }
                             } else {
-                                echo '<tr><td colspan="8" class="text-center">Aucun produit trouvé</td></tr>';
+                                echo '<tr><td colspan="6" class="text-center">Aucun produit trouvé</td></tr>';
                             }
                             ?>
                             </tbody>
                         </table>
-                    </div><!-- widget-content -->
-                </div><!-- widget-box -->
-            </div><!-- span12 -->
-        </div><!-- row-fluid -->
-    </div><!-- container-fluid -->
-</div><!-- content -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php include_once('includes/footer.php'); ?>
-
-<!-- Scripts dans le même ordre que votre page d'inventaire -->
 <script src="js/jquery.min.js"></script>
-<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.uniform.js"></script>
-<script src="js/select2.min.js"></script>
 <script src="js/jquery.dataTables.min.js"></script>
-<script src="js/matrix.js"></script>
-<script src="js/matrix.tables.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialisation simple sans les plugins additionnels qui pourraient causer des problèmes
+    $('#product-table').DataTable({
+        "paging": true,
+        "ordering": true,
+        "info": true,
+        "searching": true,
+        "language": {
+            "emptyTable": "Aucune donnée disponible",
+            "info": "Affichage de _START_ à _END_ sur _TOTAL_ entrées",
+            "infoEmpty": "Affichage de 0 à 0 sur 0 entrées",
+            "search": "Rechercher:",
+            "lengthMenu": "Afficher _MENU_ entrées",
+            "zeroRecords": "Aucun résultat trouvé"
+        }
+    });
+});
+</script>
 </body>
 </html>
