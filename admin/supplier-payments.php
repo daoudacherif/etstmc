@@ -16,13 +16,14 @@ if (isset($_POST['submit'])) {
   $payDate     = $_POST['paydate'];
   $amount      = floatval($_POST['amount']);
   $comments    = mysqli_real_escape_string($con, $_POST['comments']);
+  $paymentMode = mysqli_real_escape_string($con, $_POST['paymentmode']);
 
   if ($supplierID <= 0 || $amount <= 0) {
     echo "<script>alert('Données invalides');</script>";
   } else {
     $sql = "
-      INSERT INTO tblsupplierpayments(SupplierID, PaymentDate, Amount, Comments)
-      VALUES('$supplierID', '$payDate', '$amount', '$comments')
+      INSERT INTO tblsupplierpayments(SupplierID, PaymentDate, Amount, Comments, PaymentMode)
+      VALUES('$supplierID', '$payDate', '$amount', '$comments', '$paymentMode')
     ";
     $res = mysqli_query($con, $sql);
     if ($res) {
@@ -100,6 +101,7 @@ $sqlList = "
          sp.PaymentDate,
          sp.Amount,
          sp.Comments,
+         sp.PaymentMode,
          s.SupplierName
   FROM tblsupplierpayments sp
   LEFT JOIN tblsupplier s ON s.ID = sp.SupplierID
@@ -316,6 +318,17 @@ $resList = mysqli_query($con, $sqlList);
                 </div>
               </div>
               <div class="control-group">
+                <label class="control-label">Mode de paiement :</label>
+                <div class="controls">
+                  <label class="radio inline">
+                    <input type="radio" name="paymentmode" value="espece" checked /> Espèce
+                  </label>
+                  <label class="radio inline">
+                    <input type="radio" name="paymentmode" value="carte" /> Carte
+                  </label>
+                </div>
+              </div>
+              <div class="control-group">
                 <label class="control-label">Commentaires :</label>
                 <div class="controls">
                   <input type="text" name="comments" placeholder="Référence, note..." />
@@ -350,6 +363,7 @@ $resList = mysqli_query($con, $sqlList);
                   <th>Date</th>
                   <th>Fournisseur</th>
                   <th>Montant</th>
+                  <th>Mode</th>
                   <th>Commentaires</th>
                 </tr>
               </thead>
@@ -363,6 +377,15 @@ $resList = mysqli_query($con, $sqlList);
                     <td><?php echo $row['PaymentDate']; ?></td>
                     <td><?php echo $row['SupplierName']; ?></td>
                     <td><?php echo number_format($row['Amount'],2); ?></td>
+                    <td><?php 
+                      if($row['PaymentMode'] == 'espece') {
+                        echo '<span class="label label-success">Espèce</span>';
+                      } else if($row['PaymentMode'] == 'carte') {
+                        echo '<span class="label label-info">Carte</span>';
+                      } else {
+                        echo '<span class="label">Non spécifié</span>';
+                      }
+                    ?></td>
                     <td><?php echo $row['Comments']; ?></td>
                   </tr>
                   <?php
