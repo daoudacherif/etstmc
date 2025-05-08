@@ -18,7 +18,7 @@ if (isset($_GET['delid'])) {
     exit;
 }
 
-// Récupération des produits
+// Récupération des produits - REQUÊTE SQL CORRIGÉE
 $sql = "
 SELECT
   p.ID AS pid,
@@ -26,6 +26,7 @@ SELECT
   c.CategoryName,
   p.ModelNumber,
   p.Stock,
+  p.Price,
   p.Status,
   p.CreationDate
 FROM tblproducts p
@@ -69,9 +70,9 @@ $ret = mysqli_query($con, $sql) or die('Erreur SQL : '.mysqli_error($con));
                                     <th>N°</th>
                                     <th>Produit</th>
                                     <th>Catégorie</th>
-                                    <th>Marque</th>
                                     <th>Modèle</th>
                                     <th>Stock</th>
+                                    <th>Prix</th>
                                     <th>Statut</th>
                                     <th>Actions</th>
                                 </tr>
@@ -87,9 +88,9 @@ $ret = mysqli_query($con, $sql) or die('Erreur SQL : '.mysqli_error($con));
                                     echo '<td>'.$cnt++.'</td>';
                                     echo '<td>'.htmlspecialchars($row['ProductName']).'</td>';
                                     echo '<td>'.htmlspecialchars($row['CategoryName'] ?: '—').'</td>';
-                                    
                                     echo '<td>'.htmlspecialchars($row['ModelNumber']).'</td>';
                                     echo '<td>'.intval($row['Stock']).'</td>';
+                                    echo '<td>'.number_format($row['Price'], 2).'</td>';
                                     echo '<td class="center">'.$statusLabel.'</td>';
                                     echo '<td class="center">';
                                     echo '<a href="editproducts.php?editid='.$row['pid'].'" class="btn btn-mini btn-info"><i class="icon-edit"></i></a> ';
