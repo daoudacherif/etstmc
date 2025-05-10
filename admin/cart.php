@@ -127,24 +127,13 @@ function sendSmsNotification($to, $message) {
     return true;
 }
 
-// DEBUGGING: Check cart types in database
-$debugCartType = mysqli_query($con, "SELECT COUNT(*) as count, CartType FROM tblcart WHERE IsCheckOut=0 GROUP BY CartType");
-if ($debugCartType) {
-    echo "<div style='background: #ffe; border: 1px solid #ccc; padding: 10px; margin: 10px 0;'>";
-    echo "<strong>Debug Cart Types:</strong><br>";
-    while ($row = mysqli_fetch_assoc($debugCartType)) {
-        echo "Cart Type: " . htmlspecialchars($row['CartType'] ?? 'NULL') . ", Count: " . $row['count'] . "<br>";
-    }
-    echo "</div>";
-}
-
 // Appliquer une remise (en valeur absolue ou en pourcentage)
 if (isset($_POST['applyDiscount'])) {
     $discountValue = max(0, floatval($_POST['discount']));
     
     // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND CartType='regular'");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -162,24 +151,24 @@ if (isset($_POST['applyDiscount'])) {
         $actualDiscount = min($grandTotal, $discountValue);
     }
     
-    // Stocker les informations de remise dans la session avec des clés spécifiques à ce panier
-    $_SESSION['regular_discount'] = $actualDiscount;
-    $_SESSION['regular_discountType'] = $isPercentage ? 'percentage' : 'absolute';
-    $_SESSION['regular_discountValue'] = $discountValue;
+    // Stocker les informations de remise dans la session
+    $_SESSION['discount'] = $actualDiscount;
+    $_SESSION['discountType'] = $isPercentage ? 'percentage' : 'absolute';
+    $_SESSION['discountValue'] = $discountValue;
     
     header("Location: cart.php");
     exit;
 }
 
 // Récupérer les informations de remise de la session
-$discount = $_SESSION['regular_discount'] ?? 0;
-$discountType = $_SESSION['regular_discountType'] ?? 'absolute';
-$discountValue = $_SESSION['regular_discountValue'] ?? 0;
+$discount = $_SESSION['discount'] ?? 0;
+$discountType = $_SESSION['discountType'] ?? 'absolute';
+$discountValue = $_SESSION['discountValue'] ?? 0;
 
 // Traitement de la suppression d'un élément du panier
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0 AND CartType='regular'");
+    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0");
     if ($deleteQuery) {
         echo "<script>
                 alert('Article retiré du panier');
@@ -195,7 +184,6 @@ if (isset($_POST['addtocart'])) {
     $productId = intval($_POST['productid']);
     $quantity  = max(1, intval($_POST['quantity']));
     $price     = max(0, floatval($_POST['price']));
-    $cartType  = 'regular'; // Toujours utiliser 'regular' pour cette page
 
     // 1) Récupérer le stock restant (initial - vendu + retourné)
     $stockRes = mysqli_query($con, "
@@ -256,7 +244,7 @@ if (isset($_POST['addtocart'])) {
     $checkCart = mysqli_query($con, "
         SELECT ID, ProductQty 
         FROM tblcart 
-        WHERE ProductId='$productId' AND IsCheckOut=0 AND CartType='$cartType'
+        WHERE ProductId='$productId' AND IsCheckOut=0 
         LIMIT 1
     ");
     if (mysqli_num_rows($checkCart) > 0) {
@@ -275,12 +263,12 @@ if (isset($_POST['addtocart'])) {
         mysqli_query($con, "
             UPDATE tblcart 
             SET ProductQty='$newQty', Price='$price' 
-            WHERE ID='{$c['ID']}' AND CartType='$cartType'
+            WHERE ID='{$c['ID']}'
         ");
     } else {
         mysqli_query($con, "
-            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut, CartType) 
-            VALUES('$productId','$quantity','$price','0','$cartType')
+            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) 
+            VALUES('$productId','$quantity','$price','0')
         ");
     }
 
@@ -299,10 +287,10 @@ if (isset($_POST['submit'])) {
     $custname     = mysqli_real_escape_string($con, trim($_POST['customername']));
     $custmobile   = preg_replace('/[^0-9+]/','', $_POST['mobilenumber']);
     $modepayment  = mysqli_real_escape_string($con, $_POST['modepayment']);
-    $discount     = $_SESSION['regular_discount'] ?? 0; // Utiliser la remise spécifique à ce panier
+    $discount     = $_SESSION['discount'] ?? 0;
 
     // Calcul du total
-    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND CartType='regular'");
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
     $grand = 0;
     while ($r = mysqli_fetch_assoc($cartQ)) {
         $grand += $r['ProductQty'] * $r['Price'];
@@ -314,7 +302,7 @@ if (isset($_POST['submit'])) {
         SELECT c.ProductId, c.ProductQty, p.Stock, p.ProductName
         FROM tblcart c
         JOIN tblproducts p ON p.ID = c.ProductId
-        WHERE c.IsCheckOut = 0 AND c.CartType='regular'
+        WHERE c.IsCheckOut = 0
     ");
     
     $stockError = false;
@@ -342,7 +330,7 @@ if (isset($_POST['submit'])) {
     $billingnum = mt_rand(100000000, 999999999);
 
     // Mise à jour du panier + insertion client
-    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND CartType='regular';";
+    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
     $query .= "INSERT INTO tblcustomer
                  (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount)
                VALUES
@@ -371,9 +359,9 @@ if (isset($_POST['submit'])) {
         $smsMsg     = $smsResult ? "SMS envoyé" : "Échec SMS";
 
         $_SESSION['invoiceid'] = $billingnum;
-        unset($_SESSION['regular_discount']);
-        unset($_SESSION['regular_discountType']);
-        unset($_SESSION['regular_discountValue']);
+        unset($_SESSION['discount']);
+        unset($_SESSION['discountType']);
+        unset($_SESSION['discountValue']);
 
         echo "<script>
                 alert('Facture créée : $billingnum\\n$smsMsg');
@@ -520,9 +508,8 @@ if ($productNamesQuery) {
                                         <td><?php echo $row['Price']; ?></td>
                                         <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                         <td>
-                                            <form method="post" action="cart.php" style="margin:0;">
+                                            <form method="post" action="dettecart.php" style="margin:0;">
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
-                                                <input type="hidden" name="cartType" value="regular" />
                                                 <input type="number" name="price" step="any" 
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
                                         </td>
@@ -633,7 +620,7 @@ if ($productNamesQuery) {
                                         tblproducts.Price as basePrice
                                       FROM tblcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
-                                      WHERE tblcart.IsCheckOut = 0 AND tblcart.CartType = 'regular'
+                                      WHERE tblcart.IsCheckOut = 0
                                       ORDER BY tblcart.ID ASC
                                     ");
                                     $cnt = 1;
@@ -683,7 +670,7 @@ if ($productNamesQuery) {
                                                 </td>
                                                 <td><?php echo number_format($lineTotal, 2); ?> GNF</td>
                                                 <td>
-                                                    <a href="cart.php?delid=<?php echo $row['cid']; ?>&cartType=regular"
+                                                    <a href="cart.php?delid=<?php echo $row['cid']; ?>"
                                                        onclick="return confirm('Voulez-vous vraiment retirer cet article?');">
                                                         <i class="icon-trash"></i>
                                                     </a>
