@@ -133,7 +133,7 @@ if (isset($_POST['applyDiscount'])) {
     
     // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND CartType='regular'");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -168,7 +168,7 @@ $discountValue = $_SESSION['discountValue'] ?? 0;
 // Traitement de la suppression d'un élément du panier
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0");
+    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0 AND CartType='regular'");
     if ($deleteQuery) {
         echo "<script>
                 alert('Article retiré du panier');
@@ -244,7 +244,7 @@ if (isset($_POST['addtocart'])) {
     $checkCart = mysqli_query($con, "
         SELECT ID, ProductQty 
         FROM tblcart 
-        WHERE ProductId='$productId' AND IsCheckOut=0 
+        WHERE ProductId='$productId' AND IsCheckOut=0 AND CartType='regular'
         LIMIT 1
     ");
     if (mysqli_num_rows($checkCart) > 0) {
@@ -263,12 +263,12 @@ if (isset($_POST['addtocart'])) {
         mysqli_query($con, "
             UPDATE tblcart 
             SET ProductQty='$newQty', Price='$price' 
-            WHERE ID='{$c['ID']}'
+            WHERE ID='{$c['ID']}' AND CartType='regular'
         ");
     } else {
         mysqli_query($con, "
-            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) 
-            VALUES('$productId','$quantity','$price','0')
+            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut, CartType) 
+            VALUES('$productId','$quantity','$price','0','regular')
         ");
     }
 
@@ -290,7 +290,7 @@ if (isset($_POST['submit'])) {
     $discount     = $_SESSION['discount'] ?? 0;
 
     // Calcul du total
-    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND CartType='regular'");
     $grand = 0;
     while ($r = mysqli_fetch_assoc($cartQ)) {
         $grand += $r['ProductQty'] * $r['Price'];
@@ -302,7 +302,7 @@ if (isset($_POST['submit'])) {
         SELECT c.ProductId, c.ProductQty, p.Stock, p.ProductName
         FROM tblcart c
         JOIN tblproducts p ON p.ID = c.ProductId
-        WHERE c.IsCheckOut = 0
+        WHERE c.IsCheckOut = 0 AND c.CartType='regular'
     ");
     
     $stockError = false;
@@ -330,7 +330,7 @@ if (isset($_POST['submit'])) {
     $billingnum = mt_rand(100000000, 999999999);
 
     // Mise à jour du panier + insertion client
-    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
+    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND CartType='regular';";
     $query .= "INSERT INTO tblcustomer
                  (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount)
                VALUES
@@ -508,7 +508,7 @@ if ($productNamesQuery) {
                                         <td><?php echo $row['Price']; ?></td>
                                         <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                         <td>
-                                            <form method="post" action="dettecart.php" style="margin:0;">
+                                            <form method="post" action="cart.php" style="margin:0;">
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
                                                 <input type="number" name="price" step="any" 
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
@@ -620,7 +620,7 @@ if ($productNamesQuery) {
                                         tblproducts.Price as basePrice
                                       FROM tblcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
-                                      WHERE tblcart.IsCheckOut = 0
+                                      WHERE tblcart.IsCheckOut = 0 AND tblcart.CartType = 'regular'
                                       ORDER BY tblcart.ID ASC
                                     ");
                                     $cnt = 1;
