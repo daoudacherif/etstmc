@@ -43,6 +43,31 @@ if (strlen($_SESSION['imsaid']==0)) {
     display: none;
   }
   
+  /* Styles pour les factures à terme */
+  .credit-badge {
+    display: inline-block;
+    padding: 3px 7px;
+    background-color: #f0ad4e;
+    color: white;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-left: 10px;
+  }
+  
+  .dues-info {
+    background-color: #fff3cd;
+    padding: 10px;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .payment-label {
+    font-weight: bold;
+    color: #856404;
+  }
+  
   /* Styles spécifiques pour l'impression */
   @media print {
     /* Cacher tous les éléments de navigation et UI */
@@ -129,6 +154,21 @@ if (strlen($_SESSION['imsaid']==0)) {
     a[href]:after {
       content: "";
     }
+    
+    .credit-badge {
+      border: 1px solid #000;
+      background-color: transparent !important;
+      color: #000 !important;
+    }
+    
+    .dues-info {
+      background-color: transparent !important;
+      border: 1px dashed #000 !important;
+    }
+    
+    .payment-label {
+      color: #000 !important;
+    }
   }
 </style>
 </head>
@@ -186,11 +226,15 @@ if (strlen($_SESSION['imsaid']==0)) {
                                       tblcustomer.ModeofPayment,
                                       tblcustomer.BillingDate,
                                       tblcustomer.BillingNumber,
-                                      tblcustomer.FinalAmount
+                                      tblcustomer.FinalAmount,
+                                      tblcustomer.Paid,
+                                      tblcustomer.Dues
                                     FROM 
                                       tblcustomer
                                     LEFT JOIN 
                                       tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
+                                    LEFT JOIN 
+                                      tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
                                     WHERE 
                                       tblcustomer.BillingNumber = ? OR tblcustomer.MobileNumber = ?
                                     LIMIT 1");
@@ -203,7 +247,30 @@ if (strlen($_SESSION['imsaid']==0)) {
           $customerRow = mysqli_fetch_assoc($customerResult);
           $invoiceid = $customerRow['BillingNumber'];
           $finalAmount = $customerRow['FinalAmount'];
+          $paidAmount = $customerRow['Paid'];
+          $duesAmount = $customerRow['Dues'];
           $formattedDate = date("d/m/Y", strtotime($customerRow['BillingDate']));
+          
+          // Déterminer si c'est une facture à terme
+          $isCredit = ($customerRow['Dues'] > 0 || $customerRow['ModeofPayment'] == 'credit');
+          
+          // Vérifier dans quelle table se trouvent les articles
+          $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$invoiceid'");
+          $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$invoiceid'");
+          
+          $creditItems = 0;
+          $regularItems = 0;
+          
+          if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+            $creditItems = $rowCredit['count'];
+          }
+          
+          if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+            $regularItems = $rowRegular['count'];
+          }
+          
+          // Déterminer quelle table utiliser
+          $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
         ?>
         <div id="printArea">
           <!-- En-tête qui n'apparaît qu'à l'impression -->
@@ -216,7 +283,12 @@ if (strlen($_SESSION['imsaid']==0)) {
             <div class="invoice-header">
               <div class="row-fluid">
                 <div class="span6">
-                  <h3>Facture #<?php echo htmlspecialchars($invoiceid); ?></h3>
+                  <h3>
+                    Facture #<?php echo htmlspecialchars($invoiceid); ?>
+                    <?php if ($isCredit): ?>
+                    <span class="credit-badge">Vente à Terme</span>
+                    <?php endif; ?>
+                  </h3>
                   <p>Date: <?php echo $formattedDate; ?></p>
                 </div>
                 <div class="span6 text-right">
@@ -238,6 +310,26 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <td colspan="3"><?php echo htmlspecialchars($customerRow['ModeofPayment']); ?></td>
               </tr>
             </table>
+            
+            <?php if ($isCredit): ?>
+            <!-- Affichage des informations de paiement pour les factures à terme -->
+            <div class="dues-info">
+              <div class="row-fluid">
+                <div class="span4">
+                  <span class="payment-label">Montant total:</span> 
+                  <span class="payment-value"><?php echo number_format($finalAmount, 2); ?> GNF</span>
+                </div>
+                <div class="span4">
+                  <span class="payment-label">Montant payé:</span> 
+                  <span class="payment-value"><?php echo number_format($paidAmount, 2); ?> GNF</span>
+                </div>
+                <div class="span4">
+                  <span class="payment-label">Reste à payer:</span> 
+                  <span class="payment-value"><?php echo number_format($duesAmount, 2); ?> GNF</span>
+                </div>
+              </div>
+            </div>
+            <?php endif; ?>
           
             <div class="widget-box">
               <div class="widget-title no-print"> 
@@ -258,19 +350,19 @@ if (strlen($_SESSION['imsaid']==0)) {
                   </thead>
                   <tbody>
                   <?php
-                  // Préparer la requête pour récupérer les détails des produits
+                  // Préparer la requête pour récupérer les détails des produits selon la table appropriée
                   $stmt = mysqli_prepare($con, "SELECT 
                                               tblproducts.ProductName,
                                               tblproducts.ModelNumber,
                                               tblproducts.Price,
-                                              tblcart.ProductQty,
-                                              tblcart.Price as CartPrice
+                                              $useTable.ProductQty,
+                                              $useTable.Price as CartPrice
                                             FROM 
-                                              tblcart
+                                              $useTable
                                             JOIN 
-                                              tblproducts ON tblcart.ProductId = tblproducts.ID
+                                              tblproducts ON $useTable.ProductId = tblproducts.ID
                                             WHERE 
-                                              tblcart.BillingId = ?
+                                              $useTable.BillingId = ?
                                             ORDER BY
                                               tblproducts.ProductName ASC");
                   
