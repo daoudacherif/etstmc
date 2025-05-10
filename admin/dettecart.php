@@ -10,7 +10,7 @@ if (empty($_SESSION['imsaid'])) {
 }
 
 /**
- * Obtenir un access token OAuth2 de Nimba
+ * Obtenir un access token OAuth2 de Nimba using cURL.
  */
 function getAccessToken() {
     $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
@@ -155,7 +155,7 @@ if (isset($_POST['addtocart'])) {
         exit;
     }
 
-    $existCheck = mysqli_query($con, "SELECT ID, ProductQty FROM tblcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
+    $existCheck = mysqli_query($con, "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     if (mysqli_num_rows($existCheck) > 0) {
         $c = mysqli_fetch_assoc($existCheck);
         $newQty = $c['ProductQty'] + $quantity;
@@ -164,9 +164,9 @@ if (isset($_POST['addtocart'])) {
             echo "<script>alert('Quantité totale demandée (" . $newQty . ") supérieure au stock disponible (" . $row['Stock'] . ") pour \"" . htmlspecialchars($row['ProductName']) . "\".'); window.location='dettecart.php';</script>";
             exit;
         }
-        mysqli_query($con, "UPDATE tblcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
+        mysqli_query($con, "UPDATE tblcreditcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
     } else {
-        mysqli_query($con, "INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', 0)") or die(mysqli_error($con));
+        mysqli_query($con, "INSERT INTO tblcreditcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', 0)") or die(mysqli_error($con));
     }
 
     header("Location: dettecart.php");
@@ -176,7 +176,7 @@ if (isset($_POST['addtocart'])) {
 // Supprimer un Article
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    mysqli_query($con, "DELETE FROM tblcart WHERE ID='$delid'") or die(mysqli_error($con));
+    mysqli_query($con, "DELETE FROM tblcreditcart WHERE ID='$delid'") or die(mysqli_error($con));
     header("Location: dettecart.php");
     exit;
 }
@@ -187,7 +187,7 @@ if (isset($_POST['applyDiscount'])) {
     
     // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -206,18 +206,18 @@ if (isset($_POST['applyDiscount'])) {
     }
     
     // Stocker les informations de remise dans la session
-    $_SESSION['discount'] = $actualDiscount;
-    $_SESSION['discountType'] = $isPercentage ? 'percentage' : 'absolute';
-    $_SESSION['discountValue'] = $discountValue;
+    $_SESSION['credit_discount'] = $actualDiscount;
+    $_SESSION['credit_discountType'] = $isPercentage ? 'percentage' : 'absolute';
+    $_SESSION['credit_discountValue'] = $discountValue;
     
     header("Location: dettecart.php");
     exit;
 }
 
 // Récupérer les informations de remise de la session
-$discount = $_SESSION['discount'] ?? 0;
-$discountType = $_SESSION['discountType'] ?? 'absolute';
-$discountValue = $_SESSION['discountValue'] ?? 0;
+$discount = $_SESSION['credit_discount'] ?? 0;
+$discountType = $_SESSION['credit_discountType'] ?? 'absolute';
+$discountValue = $_SESSION['credit_discountValue'] ?? 0;
 // Vérifier les stocks pour l'affichage
 $hasStockIssue = false;
 $stockIssueProducts = [];
@@ -238,7 +238,7 @@ if (isset($_POST['submit'])) {
 
     // Calcul total du panier
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -249,7 +249,7 @@ if (isset($_POST['submit'])) {
     // Vérification finale du stock
     $stockCheck = mysqli_query($con, "
         SELECT p.ProductName, p.Stock, c.ProductQty
-        FROM tblcart c
+        FROM tblcreditcart c
         JOIN tblproducts p ON p.ID = c.ProductId
         WHERE c.IsCheckOut=0
     ");
@@ -275,7 +275,7 @@ if (isset($_POST['submit'])) {
 
     // Validation du panier + Création facture
     $queries = "
-        UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;
+        UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;
         INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
         VALUES('$billingnum', '$custname', '$custmobile', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues');
     ";
@@ -285,43 +285,42 @@ if (isset($_POST['submit'])) {
         // Décrémentation du stock
         mysqli_query($con, "
             UPDATE tblproducts p
-            JOIN tblcart c ON p.ID = c.ProductId
+            JOIN tblcreditcart c ON p.ID = c.ProductId
             SET p.Stock = p.Stock - c.ProductQty
             WHERE c.BillingId='$billingnum'
         ") or die(mysqli_error($con));
 
-       // Partie à remplacer dans dettecart.php
-// Dans la section "Checkout + Facturation", remplacez le code d'envoi de SMS par celui-ci:
+        // SMS personnalisé avec vérification du statut d'envoi
+        if ($dues > 0) {
+            $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+        } else {
+            $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
+        }
 
-// SMS personnalisé avec vérification du statut d'envoi
-if ($dues > 0) {
-    $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
-} else {
-    $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
-}
+        // Envoyer le SMS et stocker le résultat (true/false)
+        $smsResult = sendSmsNotification($custmobile, $smsMessage);
 
-// Envoyer le SMS et stocker le résultat (true/false)
-$smsResult = sendSmsNotification($custmobile, $smsMessage);
+        // Journal de l'envoi SMS (si la table existe)
+        $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
+        if (mysqli_num_rows($tableExists) > 0) {
+            $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
+                           VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
+                           ($smsResult ? '1' : '0') . ", NOW())";
+            mysqli_query($con, $smsLogQuery);
+        }
 
-// Journal de l'envoi SMS (si la table existe)
-$tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
-if (mysqli_num_rows($tableExists) > 0) {
-    $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
-                   VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
-                   ($smsResult ? '1' : '0') . ", NOW())";
-    mysqli_query($con, $smsLogQuery);
-}
+        unset($_SESSION['credit_discount']);
+        unset($_SESSION['credit_discountType']);
+        unset($_SESSION['credit_discountValue']);
+        $_SESSION['invoiceid'] = $billingnum;
 
-unset($_SESSION['discount']);
-$_SESSION['invoiceid'] = $billingnum;
-
-// Afficher le statut de l'envoi SMS dans le message d'alerte
-if ($smsResult) {
-    echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
-} else {
-    echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
-}
-exit;
+        // Afficher le statut de l'envoi SMS dans le message d'alerte
+        if ($smsResult) {
+            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
+        } else {
+            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
+        }
+        exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
     }
@@ -330,7 +329,7 @@ exit;
 // Vérifier à nouveau les stocks pour l'affichage du panier
 $cartProducts = mysqli_query($con, "
     SELECT c.ID, c.ProductId, c.ProductQty, p.Stock, p.ProductName 
-    FROM tblcart c
+    FROM tblcreditcart c
     JOIN tblproducts p ON p.ID = c.ProductId
     WHERE c.IsCheckOut=0
 ");
@@ -346,7 +345,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <title>Système de Gestion d'Inventaire | Panier</title>
+    <title>Système de Gestion d'Inventaire | Panier à Terme</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
     
@@ -405,9 +404,9 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                 <a href="dashboard.php" class="tip-bottom">
                     <i class="icon-home"></i> Accueil
                 </a>
-                <a href="dettecart.php" class="current">Panier de Articles</a>
+                <a href="dettecart.php" class="current">Panier à Terme</a>
             </div>
-            <h1>Panier de Articles (Vente à terme possible)</h1>
+            <h1>Panier à Terme (Vente à crédit possible)</h1>
         </div>
   
         <div class="container-fluid">
@@ -553,18 +552,18 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
             <div class="row-fluid">
                 <div class="span12">
                    <!-- FORMULAIRE DE REMISE avec option pour pourcentage -->
-<form method="post" class="form-inline" style="text-align:right;">
-    <label>Remise :</label>
-    <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
-    
-    <select name="discountType" style="width:120px; margin-left:5px;">
-        <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
-        <option value="percentage" <?php echo ($discountType == 'percentage') ? 'selected' : ''; ?>>Pourcentage (%)</option>
-    </select>
-    
-    <button class="btn btn-info" type="submit" name="applyDiscount" style="margin-left:5px;">Appliquer</button>
-</form>
-<hr>
+                    <form method="post" class="form-inline" style="text-align:right;">
+                        <label>Remise :</label>
+                        <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
+                        
+                        <select name="discountType" style="width:120px; margin-left:5px;">
+                            <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
+                            <option value="percentage" <?php echo ($discountType == 'percentage') ? 'selected' : ''; ?>>Pourcentage (%)</option>
+                        </select>
+                        
+                        <button class="btn btn-info" type="submit" name="applyDiscount" style="margin-left:5px;">Appliquer</button>
+                    </form>
+                    <hr>
 
 
                     
@@ -636,15 +635,15 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                     <?php
                                     $ret = mysqli_query($con, "
                                       SELECT 
-                                        tblcart.ID as cid,
-                                        tblcart.ProductQty,
-                                        tblcart.Price as cartPrice,
+                                        tblcreditcart.ID as cid,
+                                        tblcreditcart.ProductQty,
+                                        tblcreditcart.Price as cartPrice,
                                         tblproducts.ProductName,
                                         tblproducts.Stock
-                                      FROM tblcart
-                                      LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
-                                      WHERE tblcart.IsCheckOut = 0
-                                      ORDER BY tblcart.ID ASC
+                                      FROM tblcreditcart
+                                      LEFT JOIN tblproducts ON tblproducts.ID = tblcreditcart.ProductId
+                                      WHERE tblcreditcart.IsCheckOut = 0
+                                      ORDER BY tblcreditcart.ID ASC
                                     ");
                                     $cnt = 1;
                                     $grandTotal = 0;
@@ -693,23 +692,23 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                             }
                                             ?>
                                            <!-- Affichage de la remise dans le tableau des totaux -->
-<tr>
-    <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
-    <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-</tr>
-<tr>
-    <th colspan="5" style="text-align: right; font-weight: bold;">
-        Remise
-        <?php if ($discountType == 'percentage'): ?>
-            (<?php echo $discountValue; ?>%)
-        <?php endif; ?>
-    </th>
-    <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
-</tr>
-<tr>
-    <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
-    <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-</tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">
+                                                    Remise
+                                                    <?php if ($discountType == 'percentage'): ?>
+                                                        (<?php echo $discountValue; ?>%)
+                                                    <?php endif; ?>
+                                                </th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
+                                            </tr>
                                             <?php
                                         } else {
                                             ?>
