@@ -11,7 +11,7 @@ if (strlen($_SESSION['imsaid']==0)) {
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<title>Système de Gestion d'Inventaire || Facture</title>
+<title>Système de Gestion d'Inventaire || Facture à Terme</title>
 <?php include_once('includes/cs.php');?>
 <?php include_once('includes/responsive.php'); ?>
 <style>
@@ -137,6 +137,32 @@ if (strlen($_SESSION['imsaid']==0)) {
       display: none !important;
     }
   }
+
+  /* Style spécifique pour facture à terme */
+  .dues-info {
+    background-color: #fff3cd;
+    padding: 10px;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .payment-label {
+    font-weight: bold;
+    color: #856404;
+  }
+
+  @media print {
+    .dues-info {
+      background-color: transparent !important;
+      border: 1px dashed #000 !important;
+    }
+    .payment-label {
+      color: black !important;
+      font-weight: bold !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -149,8 +175,8 @@ if (strlen($_SESSION['imsaid']==0)) {
 <div id="content">
   <!-- En-tête de contenu - caché à l'impression -->
   <div id="content-header" class="no-print">
-    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="manage-category.php" class="current">Facture</a> </div>
-    <h1>Facture</h1>
+    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="dettecart.php" class="current">Facture à Terme</a> </div>
+    <h1>Facture à Terme</h1>
   </div>
   
   <div class="container-fluid">
@@ -165,7 +191,7 @@ if (strlen($_SESSION['imsaid']==0)) {
         
         <div class="invoice-box">
           <div class="invoice-header">
-            <h3>Facture #<?php echo $_SESSION['invoiceid']; ?></h3>
+            <h3>Facture à Terme #<?php echo $_SESSION['invoiceid']; ?></h3>
           </div>
 
           <?php     
@@ -174,16 +200,22 @@ if (strlen($_SESSION['imsaid']==0)) {
                                     tblcustomer.CustomerName,
                                     tblcustomer.MobileNumber,
                                     tblcustomer.ModeofPayment,
-                                    tblcustomer.BillingDate 
+                                    tblcustomer.BillingDate,
+                                    tblcustomer.FinalAmount,
+                                    tblcustomer.Paid,
+                                    tblcustomer.Dues
                                   FROM 
-                                    tblcart 
+                                    tblcreditcart 
                                   JOIN 
-                                    tblcustomer ON tblcustomer.BillingNumber=tblcart.BillingId 
+                                    tblcustomer ON tblcustomer.BillingNumber=tblcreditcart.BillingId 
                                   WHERE 
                                     tblcustomer.BillingNumber='$billingid'");
 
           while ($row = mysqli_fetch_array($ret)) {
             $formattedDate = date("d/m/Y", strtotime($row['BillingDate']));
+            $finalAmount = $row['FinalAmount'];
+            $paidAmount = $row['Paid'];
+            $duesAmount = $row['Dues'];
           ?>
           <div class="customer-info">
             <table class="table" width="100%" border="1">
@@ -202,6 +234,24 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <td colspan="3"><?php echo $formattedDate; ?></td>
               </tr>
             </table>
+          </div>
+          
+          <!-- Informations de paiement à terme -->
+          <div class="dues-info">
+            <div class="row-fluid">
+              <div class="span4">
+                <span class="payment-label">Montant total:</span> 
+                <span class="payment-value"><?php echo number_format($finalAmount, 2); ?> GNF</span>
+              </div>
+              <div class="span4">
+                <span class="payment-label">Montant payé:</span> 
+                <span class="payment-value"><?php echo number_format($paidAmount, 2); ?> GNF</span>
+              </div>
+              <div class="span4">
+                <span class="payment-label">Reste à payer:</span> 
+                <span class="payment-value"><?php echo number_format($duesAmount, 2); ?> GNF</span>
+              </div>
+            </div>
           </div>
           <?php } ?>
           
@@ -228,14 +278,14 @@ if (strlen($_SESSION['imsaid']==0)) {
                                           tblproducts.ProductName,
                                           tblproducts.ModelNumber,
                                           tblproducts.Price,
-                                          tblcart.ProductQty,
-                                          tblcart.Price as CartPrice
+                                          tblcreditcart.ProductQty,
+                                          tblcreditcart.Price as CartPrice
                                         FROM 
-                                          tblcart
+                                          tblcreditcart
                                         JOIN 
-                                          tblproducts ON tblproducts.ID=tblcart.ProductId
+                                          tblproducts ON tblproducts.ID=tblcreditcart.ProductId
                                         WHERE 
-                                          tblcart.BillingId='$billingid'");
+                                          tblcreditcart.BillingId='$billingid'");
                 $cnt = 1;
                 $gtotal = 0;
 
