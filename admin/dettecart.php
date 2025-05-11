@@ -153,24 +153,44 @@ if (isset($_POST['addtocart'])) {
     $quantity  = max(1, intval($_POST['quantity']));
     $price     = max(0, floatval($_POST['price']));
 
-    // Vérifier le stock disponible avec requête préparée
+    // Vérifier si l'article est déjà dans le panier de l'utilisateur
+    $checkCartStmt = mysqli_prepare($con, 
+        "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId = ? AND IsCheckOut = 0 LIMIT 1"
+    );
+    mysqli_stmt_bind_param($checkCartStmt, "i", $productId);
+    mysqli_stmt_execute($checkCartStmt);
+    $checkCartResult = mysqli_stmt_get_result($checkCartStmt);
+    $currentCartQty = 0;
+    $cartItemId = 0;
+    
+    if (mysqli_num_rows($checkCartResult) > 0) {
+        $cartItem = mysqli_fetch_assoc($checkCartResult);
+        $currentCartQty = intval($cartItem['ProductQty']);
+        $cartItemId = $cartItem['ID'];
+    }
+
+    // CORRECTION: Requête améliorée pour calculer le stock disponible
     $stockQuery = "
         SELECT 
             p.Stock AS initial_stock,
             p.ProductName,
-            COALESCE(SUM(CASE WHEN c.IsCheckOut = 1 THEN c.ProductQty ELSE 0 END), 0) AS sold_qty,
-            COALESCE(
-                (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
-                0
+            (
+                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                FROM tblcreditcart cc
+                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
+            ) AS sold_qty,
+            (
+                SELECT COALESCE(SUM(r.Quantity), 0)
+                FROM tblreturns r
+                WHERE r.ProductID = p.ID
             ) AS returned_qty,
-            COALESCE(
-                (SELECT SUM(cc.ProductQty) FROM tblcreditcart cc WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0),
-                0
-            ) AS in_carts_qty
+            (
+                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                FROM tblcreditcart cc
+                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
+            ) AS other_carts_qty
         FROM tblproducts p
-        LEFT JOIN tblcreditcart c ON c.ProductId = p.ID
         WHERE p.ID = ?
-        GROUP BY p.ID
         LIMIT 1
     ";
     
@@ -184,7 +204,7 @@ if (isset($_POST['addtocart'])) {
         exit;
     }
     
-    mysqli_stmt_bind_param($stmt, "i", $productId);
+    mysqli_stmt_bind_param($stmt, "ii", $cartItemId, $productId);
     mysqli_stmt_execute($stmt);
     $stockResult = mysqli_stmt_get_result($stmt);
     
@@ -200,34 +220,15 @@ if (isset($_POST['addtocart'])) {
     $initialStock = intval($row['initial_stock']);
     $soldQty = intval($row['sold_qty']);
     $returnedQty = intval($row['returned_qty']);
-    $inCartsQty = intval($row['in_carts_qty']);
+    $otherCartsQty = intval($row['other_carts_qty']);
     $productName = $row['ProductName'];
     
-    // Calcul du stock réellement disponible
-    $remainingStock = $initialStock - $soldQty + $returnedQty;
-    $availableStock = $remainingStock - $inCartsQty; // Stock disponible en tenant compte des paniers actifs
-    
-    // Vérifier si l'article est déjà dans le panier
-    $checkCartStmt = mysqli_prepare($con, 
-        "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId = ? AND IsCheckOut = 0 LIMIT 1"
-    );
-    mysqli_stmt_bind_param($checkCartStmt, "i", $productId);
-    mysqli_stmt_execute($checkCartStmt);
-    $checkCartResult = mysqli_stmt_get_result($checkCartStmt);
-    $currentCartQty = 0;
-    $cartItemId = 0;
-    
-    if (mysqli_num_rows($checkCartResult) > 0) {
-        $cartItem = mysqli_fetch_assoc($checkCartResult);
-        $currentCartQty = intval($cartItem['ProductQty']);
-        $cartItemId = $cartItem['ID'];
-    }
-    
-    // Ajuster le stock disponible en ajoutant ce qui est déjà dans le panier
-    $availableForUser = $availableStock + $currentCartQty;
+    // CORRECTION: Calcul du stock disponible
+    // Stock initial - vendu + retourné - réservé dans d'autres paniers
+    $availableStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
     
     // Vérification que le stock est strictement supérieur à 0
-    if ($remainingStock <= 0) {
+    if ($availableStock <= 0) {
         echo "<script>
                 alert('Article \"" . htmlspecialchars($productName) . "\" en rupture de stock.');
                 window.location.href='dettecart.php';
@@ -236,9 +237,15 @@ if (isset($_POST['addtocart'])) {
     }
     
     // Vérification que la quantité demandée est disponible
-    if ($quantity > $availableForUser) {
+    // Pour un article déjà dans le panier, nous devons vérifier si la nouvelle quantité totale est disponible
+    $newTotalQty = $quantity;
+    if ($cartItemId > 0) {
+        $newTotalQty = $currentCartQty + $quantity;
+    }
+    
+    if ($newTotalQty > $availableStock) {
         echo "<script>
-                alert('Vous avez demandé $quantity exemplaire(s) de \"" . htmlspecialchars($productName) . "\", il n\'en reste que $availableForUser disponible(s).');
+                alert('Vous avez demandé " . $newTotalQty . " exemplaire(s) de \"" . htmlspecialchars($productName) . "\", il n\'en reste que " . $availableStock . " disponible(s).');
                 window.location.href='dettecart.php';
               </script>";
         exit;
@@ -250,12 +257,10 @@ if (isset($_POST['addtocart'])) {
     try {
         if ($cartItemId > 0) {
             // Mise à jour de la quantité si l'article est déjà dans le panier
-            $newQty = $currentCartQty + $quantity;
-            
             $updateStmt = mysqli_prepare($con, 
                 "UPDATE tblcreditcart SET ProductQty = ?, Price = ? WHERE ID = ?"
             );
-            mysqli_stmt_bind_param($updateStmt, "idi", $newQty, $price, $cartItemId);
+            mysqli_stmt_bind_param($updateStmt, "idi", $newTotalQty, $price, $cartItemId);
             $updateSuccess = mysqli_stmt_execute($updateStmt);
             
             if (!$updateSuccess) {
@@ -391,6 +396,7 @@ if (isset($_POST['submit'])) {
     // Récupérer les articles du panier pour calcul et vérification
     $cartItemsStmt = mysqli_prepare($con, "
         SELECT 
+            c.ID,
             c.ProductId,
             c.ProductQty,
             c.Price
@@ -407,7 +413,8 @@ if (isset($_POST['submit'])) {
         $grandTotal += $item['ProductQty'] * $item['Price'];
         $cartProducts[] = [
             'id' => $item['ProductId'],
-            'qty' => $item['ProductQty']
+            'qty' => $item['ProductQty'],
+            'cart_id' => $item['ID']
         ];
     }
 
@@ -423,28 +430,37 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-    // Vérification finale du stock pour chaque article
+    // CORRECTION: Vérification finale du stock pour chaque article
     $stockErrors = [];
     
     foreach ($cartProducts as $product) {
+        // Requête corrigée pour vérifier le stock disponible
         $stockCheckQuery = "
             SELECT 
                 p.ID,
                 p.ProductName,
                 p.Stock AS initial_stock,
-                COALESCE(SUM(CASE WHEN c.IsCheckOut = 1 THEN c.ProductQty ELSE 0 END), 0) AS sold_qty,
-                COALESCE(
-                    (SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID),
-                    0
-                ) AS returned_qty
+                (
+                    SELECT COALESCE(SUM(cc.ProductQty), 0)
+                    FROM tblcreditcart cc
+                    WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
+                ) AS sold_qty,
+                (
+                    SELECT COALESCE(SUM(r.Quantity), 0)
+                    FROM tblreturns r
+                    WHERE r.ProductID = p.ID
+                ) AS returned_qty,
+                (
+                    SELECT COALESCE(SUM(cc.ProductQty), 0)
+                    FROM tblcreditcart cc
+                    WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
+                ) AS other_carts_qty
             FROM tblproducts p
-            LEFT JOIN tblcreditcart c ON c.ProductId = p.ID
             WHERE p.ID = ?
-            GROUP BY p.ID
         ";
         
         $stockStmt = mysqli_prepare($con, $stockCheckQuery);
-        mysqli_stmt_bind_param($stockStmt, "i", $product['id']);
+        mysqli_stmt_bind_param($stockStmt, "ii", $product['cart_id'], $product['id']);
         mysqli_stmt_execute($stockStmt);
         $stockResult = mysqli_stmt_get_result($stockStmt);
         
@@ -452,7 +468,10 @@ if (isset($_POST['submit'])) {
             $initialStock = intval($stockRow['initial_stock']);
             $soldQty = intval($stockRow['sold_qty']);
             $returnedQty = intval($stockRow['returned_qty']);
-            $availableStock = $initialStock - $soldQty + $returnedQty;
+            $otherCartsQty = intval($stockRow['other_carts_qty']);
+            
+            // CORRECTION: Calcul du stock disponible 
+            $availableStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
             
             if ($availableStock <= 0) {
                 $stockErrors[] = "Article '{$stockRow['ProductName']}' est en rupture de stock";
@@ -567,26 +586,64 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// Vérifier à nouveau les stocks pour l'affichage du panier avec requête préparée
-$cartStmt = mysqli_prepare($con, "
-    SELECT c.ID, c.ProductId, c.ProductQty, p.Stock, p.ProductName,
-           COALESCE(SUM(CASE WHEN sold.IsCheckOut = 1 THEN sold.ProductQty ELSE 0 END), 0) AS sold_qty,
-           COALESCE((SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID), 0) AS returned_qty
+// CORRECTION: Vérifier à nouveau les stocks pour l'affichage du panier
+$cartQuery = mysqli_prepare($con, "
+    SELECT 
+        c.ID, 
+        c.ProductId, 
+        c.ProductQty, 
+        p.ProductName,
+        p.Stock AS initial_stock
     FROM tblcreditcart c
     JOIN tblproducts p ON p.ID = c.ProductId
-    LEFT JOIN tblcreditcart sold ON sold.ProductId = p.ID
     WHERE c.IsCheckOut = 0
-    GROUP BY c.ID
 ");
-mysqli_stmt_execute($cartStmt);
-$cartProducts = mysqli_stmt_get_result($cartStmt);
+mysqli_stmt_execute($cartQuery);
+$cartResult = mysqli_stmt_get_result($cartQuery);
+$cartItems = [];
 
-while ($product = mysqli_fetch_assoc($cartProducts)) {
-    $realStock = $product['Stock'] - $product['sold_qty'] + $product['returned_qty'];
+while ($item = mysqli_fetch_assoc($cartResult)) {
+    $cartItems[] = $item;
+}
+
+// Vérifier le stock pour chaque article dans le panier
+foreach ($cartItems as $item) {
+    // Requête pour obtenir les données de stock réel
+    $stockQuery = "
+        SELECT 
+            (
+                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                FROM tblcreditcart cc
+                WHERE cc.ProductId = ? AND cc.IsCheckOut = 1
+            ) AS sold_qty,
+            (
+                SELECT COALESCE(SUM(r.Quantity), 0)
+                FROM tblreturns r
+                WHERE r.ProductID = ?
+            ) AS returned_qty,
+            (
+                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                FROM tblcreditcart cc
+                WHERE cc.ProductId = ? AND cc.IsCheckOut = 0 AND cc.ID != ?
+            ) AS other_carts_qty
+    ";
     
-    if ($realStock <= 0 || $realStock < $product['ProductQty']) {
+    $stockStmt = mysqli_prepare($con, $stockQuery);
+    mysqli_stmt_bind_param($stockStmt, "iiii", $item['ProductId'], $item['ProductId'], $item['ProductId'], $item['ID']);
+    mysqli_stmt_execute($stockStmt);
+    $stockResult = mysqli_stmt_get_result($stockStmt);
+    $stockData = mysqli_fetch_assoc($stockResult);
+    
+    $soldQty = intval($stockData['sold_qty']);
+    $returnedQty = intval($stockData['returned_qty']);
+    $otherCartsQty = intval($stockData['other_carts_qty']);
+    
+    // Calcul correct du stock disponible
+    $availableStock = $item['initial_stock'] - $soldQty + $returnedQty - $otherCartsQty;
+    
+    if ($availableStock < $item['ProductQty']) {
         $hasStockIssue = true;
-        $stockIssueProducts[] = $product['ProductName'];
+        $stockIssueProducts[] = $item['ProductName'];
     }
 }
 ?>
@@ -754,19 +811,50 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                 <?php
                                 $i = 1;
                                 while ($row = mysqli_fetch_assoc($searchResult)) {
-                                    // Vérifier le stock disponible réel avec la nouvelle méthode
+                                    // CORRECTION: Vérifier le stock disponible réel avec la méthode corrigée
                                     $productId = $row['ID'];
+                                    
+                                    // Trouver d'abord si l'article est déjà dans le panier
+                                    $cartCheckStmt = mysqli_prepare($con, "
+                                        SELECT ID, ProductQty 
+                                        FROM tblcreditcart 
+                                        WHERE ProductId = ? AND IsCheckOut = 0
+                                    ");
+                                    mysqli_stmt_bind_param($cartCheckStmt, "i", $productId);
+                                    mysqli_stmt_execute($cartCheckStmt);
+                                    $cartCheckResult = mysqli_stmt_get_result($cartCheckStmt);
+                                    
+                                    $cartItemId = 0;
+                                    $cartItemQty = 0;
+                                    if (mysqli_num_rows($cartCheckResult) > 0) {
+                                        $cartItem = mysqli_fetch_assoc($cartCheckResult);
+                                        $cartItemId = $cartItem['ID'];
+                                        $cartItemQty = $cartItem['ProductQty'];
+                                    }
+                                    
+                                    // Obtenir les données de stock
                                     $stockCheckStmt = mysqli_prepare($con, "
                                         SELECT 
                                             p.Stock AS initial_stock,
-                                            COALESCE(SUM(CASE WHEN c.IsCheckOut = 1 THEN c.ProductQty ELSE 0 END), 0) AS sold_qty,
-                                            COALESCE((SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID), 0) AS returned_qty
+                                            (
+                                                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                                                FROM tblcreditcart cc
+                                                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
+                                            ) AS sold_qty,
+                                            (
+                                                SELECT COALESCE(SUM(r.Quantity), 0)
+                                                FROM tblreturns r
+                                                WHERE r.ProductID = p.ID
+                                            ) AS returned_qty,
+                                            (
+                                                SELECT COALESCE(SUM(cc.ProductQty), 0)
+                                                FROM tblcreditcart cc
+                                                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
+                                            ) AS other_carts_qty
                                         FROM tblproducts p
-                                        LEFT JOIN tblcreditcart c ON c.ProductId = p.ID
                                         WHERE p.ID = ?
-                                        GROUP BY p.ID
                                     ");
-                                    mysqli_stmt_bind_param($stockCheckStmt, "i", $productId);
+                                    mysqli_stmt_bind_param($stockCheckStmt, "ii", $cartItemId, $productId);
                                     mysqli_stmt_execute($stockCheckStmt);
                                     $stockCheckResult = mysqli_stmt_get_result($stockCheckStmt);
                                     $stockData = mysqli_fetch_assoc($stockCheckResult);
@@ -774,8 +862,10 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                     $initialStock = intval($stockData['initial_stock'] ?? 0);
                                     $soldQty = intval($stockData['sold_qty'] ?? 0);
                                     $returnedQty = intval($stockData['returned_qty'] ?? 0);
+                                    $otherCartsQty = intval($stockData['other_carts_qty'] ?? 0);
                                     
-                                    $realStock = $initialStock - $soldQty + $returnedQty;
+                                    // CORRECTION: Calcul correct du stock disponible
+                                    $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
                                     $realStock = max(0, $realStock);
                                     
                                     $disableAdd = ($realStock <= 0);
@@ -847,9 +937,6 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                     </form>
                     <hr>
 
-
-                    
-  
                     <!-- FORMULAIRE DE CHECKOUT (informations client + montant payé) -->
                     <form method="post" class="form-horizontal" id="checkoutForm">
                         <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>" />
@@ -916,7 +1003,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                 </thead>
                                 <tbody>
                                     <?php
-                                    // Utiliser une requête préparée pour obtenir les articles du panier
+                                    // CORRECTION: Requête améliorée pour afficher le panier avec stock réel
                                     $cartQuery = "
                                       SELECT 
                                         c.ID as cid,
@@ -924,17 +1011,10 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                         c.ProductQty,
                                         c.Price as cartPrice,
                                         p.ProductName,
-                                        p.Stock as initial_stock,
-                                        COALESCE(SUM(CASE WHEN sold.IsCheckOut = 1 THEN sold.ProductQty ELSE 0 END), 0) AS sold_qty,
-                                        COALESCE(
-                                            (SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID),
-                                            0
-                                        ) AS returned_qty
+                                        p.Stock as initial_stock
                                       FROM tblcreditcart c
                                       LEFT JOIN tblproducts p ON p.ID = c.ProductId
-                                      LEFT JOIN tblcreditcart sold ON sold.ProductId = p.ID
                                       WHERE c.IsCheckOut = 0
-                                      GROUP BY c.ID
                                       ORDER BY c.ID ASC
                                     ";
                                     
@@ -947,19 +1027,47 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                     $num = mysqli_num_rows($ret);
                                     if ($num > 0) {
                                         while ($row = mysqli_fetch_array($ret)) {
+                                            $cartId = $row['cid'];
+                                            $productId = $row['ProductId'];
                                             $pq = $row['ProductQty'];
                                             $ppu = $row['cartPrice'];
                                             $initialStock = intval($row['initial_stock']);
-                                            $soldQty = intval($row['sold_qty']);
-                                            $returnedQty = intval($row['returned_qty']);
                                             
-                                            // Calcul du stock réellement disponible
-                                            $realStock = $initialStock - $soldQty + $returnedQty;
+                                            // CORRECTION: Obtenir les données pour le calcul du stock
+                                            $stockStmt = mysqli_prepare($con, "
+                                                SELECT 
+                                                    (
+                                                        SELECT COALESCE(SUM(cc.ProductQty), 0)
+                                                        FROM tblcreditcart cc
+                                                        WHERE cc.ProductId = ? AND cc.IsCheckOut = 1
+                                                    ) AS sold_qty,
+                                                    (
+                                                        SELECT COALESCE(SUM(r.Quantity), 0)
+                                                        FROM tblreturns r
+                                                        WHERE r.ProductID = ?
+                                                    ) AS returned_qty,
+                                                    (
+                                                        SELECT COALESCE(SUM(cc.ProductQty), 0)
+                                                        FROM tblcreditcart cc
+                                                        WHERE cc.ProductId = ? AND cc.IsCheckOut = 0 AND cc.ID != ?
+                                                    ) AS other_carts_qty
+                                            ");
+                                            mysqli_stmt_bind_param($stockStmt, "iiii", $productId, $productId, $productId, $cartId);
+                                            mysqli_stmt_execute($stockStmt);
+                                            $stockResult = mysqli_stmt_get_result($stockStmt);
+                                            $stockData = mysqli_fetch_assoc($stockResult);
+                                            
+                                            $soldQty = intval($stockData['sold_qty']);
+                                            $returnedQty = intval($stockData['returned_qty']);
+                                            $otherCartsQty = intval($stockData['other_carts_qty']);
+                                            
+                                            // CORRECTION: Calcul correct du stock réellement disponible
+                                            $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
                                             
                                             // Vérification du stock pour cette ligne
-                                            $stockIssue = ($realStock <= 0 || $realStock < $pq);
+                                            $stockIssue = ($realStock < $pq);
                                             $rowClass = $stockIssue ? 'class="stock-error"' : '';
                                             $stockStatus = '';
                                             
