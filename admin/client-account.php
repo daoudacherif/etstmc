@@ -40,10 +40,12 @@ $res = mysqli_query($con, $sql);
 <html lang="fr">
 <head>
   <title>Compte Client</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
 </head>
 <body>
+
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 
@@ -65,66 +67,73 @@ $res = mysqli_query($con, $sql);
     <hr>
 
     <!-- Tableau des clients -->
-    <table class="table table-bordered table-striped">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Nom du client</th>
-          <th>Téléphone</th>
-          <th>Total Facturé</th>
-          <th>Total Payé</th>
-          <th>Reste à Payer</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-      <?php
-      // Variables pour accumuler les totaux
-      $grandBilled = 0;
-      $grandPaid   = 0;
-      $grandDue    = 0;
+    <div class="widget-box">
+      <div class="widget-title"> <span class="icon"><i class="icon-th"></i></span>
+        <h5>Liste des clients</h5>
+      </div>
+      <div class="widget-content nopadding">
+        <table class="table table-bordered table-striped data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nom du client</th>
+              <th>Téléphone</th>
+              <th>Total Facturé</th>
+              <th>Total Payé</th>
+              <th>Reste à Payer</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php
+          // Variables pour accumuler les totaux
+          $grandBilled = 0;
+          $grandPaid   = 0;
+          $grandDue    = 0;
 
-      $cnt = 1;
-      while ($row = mysqli_fetch_assoc($res)) {
-        $customerName = $row['CustomerName'];
-        $mobile       = $row['MobileNumber'];
-        $billed       = floatval($row['totalBilled']);
-        $paid         = floatval($row['totalPaid']);
-        $due          = floatval($row['totalDue']);
+          $cnt = 1;
+          while ($row = mysqli_fetch_assoc($res)) {
+            $customerName = $row['CustomerName'];
+            $mobile       = $row['MobileNumber'];
+            $billed       = floatval($row['totalBilled']);
+            $paid         = floatval($row['totalPaid']);
+            $due          = floatval($row['totalDue']);
 
-        // Accumuler dans les variables globales
-        $grandBilled += $billed;
-        $grandPaid   += $paid;
-        $grandDue    += $due;
-        ?>
-        <tr>
-          <td><?php echo $cnt++; ?></td>
-          <td><?php echo $customerName; ?></td>
-          <td><?php echo $mobile; ?></td>
-          <td><?php echo number_format($billed,2); ?></td>
-          <td><?php echo number_format($paid,2); ?></td>
-          <td><?php echo number_format($due,2); ?></td>
-          <td>
-            <a href="client-account-details.php?name=<?php echo urlencode($customerName); ?>&mobile=<?php echo urlencode($mobile); ?>" 
-               class="btn btn-info btn-small">Détails</a>
-          </td>
-        </tr>
-        <?php
-      } // end while
-      ?>
-      </tbody>
+            // Accumuler dans les variables globales
+            $grandBilled += $billed;
+            $grandPaid   += $paid;
+            $grandDue    += $due;
+            ?>
+            <tr>
+              <td><?php echo $cnt++; ?></td>
+              <td><?php echo $customerName; ?></td>
+              <td><?php echo $mobile; ?></td>
+              <td><?php echo number_format($billed,2); ?></td>
+              <td><?php echo number_format($paid,2); ?></td>
+              <td><?php echo number_format($due,2); ?></td>
+              <td>
+                <a href="client-account-details.php?name=<?php echo urlencode($customerName); ?>&mobile=<?php echo urlencode($mobile); ?>" 
+                  class="btn btn-info btn-small">Détails</a>
+              </td>
+            </tr>
+            <?php
+          } // end while
+          ?>
+          </tbody>
 
-      <!-- Ligne de total -->
-      <tfoot>
-        <tr style="font-weight: bold;">
-          <td colspan="3" style="text-align: right;">TOTAL GÉNÉRAL</td>
-          <td><?php echo number_format($grandBilled,2); ?></td>
-          <td><?php echo number_format($grandPaid,2); ?></td>
-          <td><?php echo number_format($grandDue,2); ?></td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
+          <!-- Ligne de total -->
+          <tfoot>
+            <tr style="font-weight: bold;">
+              <td colspan="3" style="text-align: right;">TOTAL GÉNÉRAL</td>
+              <td><?php echo number_format($grandBilled,2); ?></td>
+              <td><?php echo number_format($grandPaid,2); ?></td>
+              <td><?php echo number_format($grandDue,2); ?></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
   </div><!-- container-fluid -->
 </div><!-- content -->
@@ -132,6 +141,12 @@ $res = mysqli_query($con, $sql);
 <?php include_once('includes/footer.php'); ?>
 <!-- scripts -->
 <script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
+<script src="js/matrix.tables.js"></script>
 </body>
 </html>
