@@ -84,16 +84,16 @@
         }
 
         .hero {
-            min-height: 90vh;
-            background:url('https://unsplash.com/fr/photos/photographie-en-contre-plongee-de-grues-au-sommet-dun-batiment-8Gg2Ne_uTcM') no-repeat center center/cover;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            text-align: center;
-            padding: 2rem 1rem;
-        }
+    min-height: 90vh;
+    background: url('https://images.unsplash.com/photo-1560748952-1d2d768c2337?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center/cover;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    padding: 2rem 1rem;
+}
 
         .hero h1 {
             font-size: 3.5rem;
