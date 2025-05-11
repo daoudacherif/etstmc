@@ -126,8 +126,18 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item "><a class="nav-link button" href="admin/login.php">Connexion</a></li>
-                </ul>
+                    
+                <li class="nav-item "><a class="nav-link button" href="admin/login.php">Connexion</a></li>
+                <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Magasins
+          </a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="https://second.etstmc.com/admin/login.php">Bailobaya</a></li>
+            
+          </ul>
+        </li>
+            </ul>
             </div>
         </div>
     </nav>
