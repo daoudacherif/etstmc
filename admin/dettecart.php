@@ -1,11 +1,5 @@
 <?php
 session_start();
-
-// Generate CSRF token if it doesn't exist
-if (!isset($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
@@ -16,60 +10,17 @@ if (empty($_SESSION['imsaid'])) {
 }
 
 /**
- * Function to manage stock movements with logging
- * @param mysqli $con Database connection
- * @param int $productId Product ID
- * @param int $quantity Quantity (negative for decrease)
- * @param string $reference Reference number (invoice/order number)
- * @return bool Success status
- */
-function updateProductStock($con, $productId, $quantity, $reference = null) {
-    // Get current stock for logging
-    $checkStmt = mysqli_prepare($con, "SELECT Stock, ProductName FROM tblproducts WHERE ID = ? LIMIT 1");
-    mysqli_stmt_bind_param($checkStmt, "i", $productId);
-    mysqli_stmt_execute($checkStmt);
-    $result = mysqli_stmt_get_result($checkStmt);
-    
-    if (!$row = mysqli_fetch_assoc($result)) {
-        error_log("Stock update failed: Product ID $productId not found");
-        return false;
-    }
-    
-    $oldStock = $row['ProductName'];
-    $productName = $row['ProductName'];
-    $newStock = max(0, $oldStock + $quantity); // Ensure stock never goes negative
-    
-    // Update the stock
-    $updateStmt = mysqli_prepare($con, "UPDATE tblproducts SET Stock = ? WHERE ID = ?");
-    mysqli_stmt_bind_param($updateStmt, "ii", $newStock, $productId);
-    $success = mysqli_stmt_execute($updateStmt);
-    
-    if (!$success || mysqli_affected_rows($con) == 0) {
-        error_log("Stock update failed for product: $productName (ID: $productId)");
-        return false;
-    }
-    
-    // Log the stock change
-    $direction = ($quantity < 0) ? "decreased" : "increased";
-    $absQuantity = abs($quantity);
-    error_log("Stock $direction by $absQuantity for product: $productName (ID: $productId). Old: $oldStock, New: $newStock. Reference: $reference");
-    
-    return true;
-}
-
-/**
  * Obtenir un access token OAuth2 de Nimba using cURL.
  */
 function getAccessToken() {
-    // Idéalement, ces informations devraient être dans un fichier de configuration sécurisé
-    $config = [
-        'url' => "https://api.nimbasms.com/v1/oauth/token",
-        'client_id' => "1608e90e20415c7edf0226bf86e7effd",
-        'client_secret' => "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs"
-    ];
+    $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
+    
+    // Replace with your real credentials
+    $client_id     = "1608e90e20415c7edf0226bf86e7effd";      
+    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
     
     // Encode the credentials in Base64 ("client_id:client_secret")
-    $credentials = base64_encode($config['client_id'] . ":" . $config['client_secret']);
+    $credentials = base64_encode($client_id . ":" . $client_secret);
     
     $headers = array(
         "Authorization: Basic " . $credentials,
@@ -82,12 +33,12 @@ function getAccessToken() {
     
     // Use cURL for the POST request
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $config['url']);
+    curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); // Sécurité SSL activée
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // For development only!
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     
@@ -118,75 +69,65 @@ function getAccessToken() {
  * The payload sent is logged so you can verify the SMS content.
  */
 function sendSmsNotification($to, $message) {
-    // Idéalement, ces informations devraient être dans un fichier de configuration sécurisé
-    $config = [
-        'url' => "https://api.nimbasms.com/v1/messages",
-        'service_id' => "1608e90e20415c7edf0226bf86e7effd",
-        'secret_token' => "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs",
-        'sender_name' => "SMS 9080"
-    ];
+    // Nimba API endpoint for sending SMS
+    $url = "https://api.nimbasms.com/v1/messages";
     
-    // Version sécurisée avec cURL au lieu de file_get_contents
-    $ch = curl_init();
+    // Replace with your actual service credentials (as provided by Nimba)
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";    
+    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
     
     // Build the Basic Auth string (Base64 of "service_id:secret_token")
-    $authString = base64_encode($config['service_id'] . ":" . $config['secret_token']);
+    $authString = base64_encode($service_id . ":" . $secret_token);
     
     // Prepare the JSON payload with recipient, message and sender_name
     $payload = array(
         "to"          => array($to),
         "message"     => $message,
-        "sender_name" => $config['sender_name']
+        "sender_name" => "SMS 9080"   // Replace with your approved sender name with Nimba
     );
     $postData = json_encode($payload);
     
     // Log the payload for debugging (check your server error logs)
     error_log("Nimba SMS Payload: " . $postData);
     
-    curl_setopt($ch, CURLOPT_URL, $config['url']);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true); // Sécurité SSL activée
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    $headers = array(
         "Authorization: Basic " . $authString,
         "Content-Type: application/json"
-    ]);
+    );
     
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => $postData,
+            "ignore_errors" => true
+        )
+    );
     
-    if ($response === FALSE) {
-        $error = curl_error($ch);
-        error_log("cURL error while sending SMS: " . $error);
-        curl_close($ch);
-        return false;
-    }
-    curl_close($ch);
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
     
     // Log complete API response for debugging
     error_log("Nimba API SMS Response: " . $response);
     
-    if ($httpCode != 201) {
-        error_log("SMS send failed. HTTP Code: $httpCode. Details: " . print_r(json_decode($response, true), true));
+    // Retrieve HTTP status code from response headers
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    if (empty($http_response_header)) {
+        error_log("No HTTP response headers - SMS send failed");
+        return false;
+    }
+    
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
+    
+    if ($status_code != 201) {
+        error_log("SMS send failed. HTTP Code: $status_code. Details: " . print_r(json_decode($response, true), true));
         return false;
     }
     
     return true;
 }
-
-// Vérification CSRF pour toutes les requêtes POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        error_log("CSRF token validation failed");
-        echo "<script>
-                alert('Erreur de sécurité. Veuillez réessayer.');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-}
-
 // ----------- Gestion Panier -----------
 
 // Ajout au panier
@@ -195,195 +136,59 @@ if (isset($_POST['addtocart'])) {
     $quantity  = max(1, intval($_POST['quantity']));
     $price     = max(0, floatval($_POST['price']));
 
-    // Vérifier si l'article est déjà dans le panier de l'utilisateur
-    $checkCartStmt = mysqli_prepare($con, 
-        "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId = ? AND IsCheckOut = 0 LIMIT 1"
-    );
-    mysqli_stmt_bind_param($checkCartStmt, "i", $productId);
-    mysqli_stmt_execute($checkCartStmt);
-    $checkCartResult = mysqli_stmt_get_result($checkCartStmt);
-    $currentCartQty = 0;
-    $cartItemId = 0;
-    
-    if (mysqli_num_rows($checkCartResult) > 0) {
-        $cartItem = mysqli_fetch_assoc($checkCartResult);
-        $currentCartQty = intval($cartItem['ProductQty']);
-        $cartItemId = $cartItem['ID'];
-    }
-
-    // Vérifier le stock disponible avec requête préparée
-    $stockQuery = "
-        SELECT 
-            p.Stock AS initial_stock,
-            p.ProductName,
-            (
-                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                FROM tblcreditcart cc
-                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
-            ) AS sold_qty,
-            (
-                SELECT COALESCE(SUM(r.Quantity), 0)
-                FROM tblreturns r
-                WHERE r.ProductID = p.ID
-            ) AS returned_qty,
-            (
-                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                FROM tblcreditcart cc
-                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
-            ) AS other_carts_qty
-        FROM tblproducts p
-        WHERE p.ID = ?
-        LIMIT 1
-    ";
-    
-    $stmt = mysqli_prepare($con, $stockQuery);
-    if (!$stmt) {
-        error_log("Erreur préparation requête stock: " . mysqli_error($con));
-        echo "<script>
-                alert('Erreur système lors de la vérification du stock');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-    
-    mysqli_stmt_bind_param($stmt, "ii", $cartItemId, $productId);
-    mysqli_stmt_execute($stmt);
-    $stockResult = mysqli_stmt_get_result($stmt);
-    
-    if (!$stockResult || mysqli_num_rows($stockResult) === 0) {
-        echo "<script>
-                alert('Article introuvable');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-    
-    $row = mysqli_fetch_assoc($stockResult);
-    $initialStock = intval($row['initial_stock']);
-    $soldQty = intval($row['sold_qty']);
-    $returnedQty = intval($row['returned_qty']);
-    $otherCartsQty = intval($row['other_carts_qty']);
-    $productName = $row['ProductName'];
-    
-    // Calcul du stock disponible
-    // Stock initial - vendu + retourné - réservé dans d'autres paniers
-    $availableStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
-    
-    // Vérification que le stock est strictement supérieur à 0
-    if ($availableStock <= 0) {
-        echo "<script>
-                alert('Article \"" . htmlspecialchars($productName) . "\" en rupture de stock.');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-    
-    // Vérification que la quantité demandée est disponible
-    // Pour un article déjà dans le panier, nous devons vérifier si la nouvelle quantité totale est disponible
-    $newTotalQty = $quantity;
-    if ($cartItemId > 0) {
-        $newTotalQty = $currentCartQty + $quantity;
-    }
-    
-    if ($newTotalQty > $availableStock) {
-        echo "<script>
-                alert('Vous avez demandé " . $newTotalQty . " exemplaire(s) de \"" . htmlspecialchars($productName) . "\", il n\'en reste que " . $availableStock . " disponible(s).');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-
-    // INSERT ou UPDATE avec requêtes préparées
-    mysqli_begin_transaction($con); // Démarrer une transaction pour garantir l'intégrité des données
-    
-    try {
-        if ($cartItemId > 0) {
-            // Mise à jour de la quantité si l'article est déjà dans le panier
-            $updateStmt = mysqli_prepare($con, 
-                "UPDATE tblcreditcart SET ProductQty = ?, Price = ? WHERE ID = ?"
-            );
-            mysqli_stmt_bind_param($updateStmt, "idi", $newTotalQty, $price, $cartItemId);
-            $updateSuccess = mysqli_stmt_execute($updateStmt);
-            
-            if (!$updateSuccess) {
-                throw new Exception("Erreur lors de la mise à jour du panier: " . mysqli_error($con));
-            }
-        } else {
-            // Insertion d'un nouvel article dans le panier
-            $insertStmt = mysqli_prepare($con, 
-                "INSERT INTO tblcreditcart(ProductId, ProductQty, Price, IsCheckOut) VALUES(?, ?, ?, 0)"
-            );
-            mysqli_stmt_bind_param($insertStmt, "iid", $productId, $quantity, $price);
-            $insertSuccess = mysqli_stmt_execute($insertStmt);
-            
-            if (!$insertSuccess) {
-                throw new Exception("Erreur lors de l'ajout au panier: " . mysqli_error($con));
-            }
+    // Vérifier le stock disponible
+    $stockCheck = mysqli_query($con, "SELECT Stock, ProductName FROM tblproducts WHERE ID='$productId'");
+    if ($row = mysqli_fetch_assoc($stockCheck)) {
+        // Vérification que le stock est strictement supérieur à 0
+        if ($row['Stock'] <= 0) {
+            echo "<script>alert('Article \"" . htmlspecialchars($row['ProductName']) . "\" en rupture de stock.'); window.location='dettecart.php';</script>";
+            exit;
         }
         
-        mysqli_commit($con);
-        
-        echo "<script>
-                alert('Article \"" . htmlspecialchars($productName) . "\" ajouté au panier !');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-        
-    } catch (Exception $e) {
-        mysqli_rollback($con);
-        error_log($e->getMessage());
-        echo "<script>
-                alert('Une erreur est survenue lors de l\'ajout au panier. Veuillez réessayer.');
-                window.location.href='dettecart.php';
-              </script>";
+        // Vérification que la quantité demandée est disponible
+        if ($row['Stock'] < $quantity) {
+            echo "<script>alert('Stock insuffisant pour \"" . htmlspecialchars($row['ProductName']) . "\". Stock disponible: " . $row['Stock'] . "'); window.location='dettecart.php';</script>";
+            exit;
+        }
+    } else {
+        echo "<script>alert('Article introuvable.'); window.location='dettecart.php';</script>";
         exit;
     }
+
+    $existCheck = mysqli_query($con, "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
+    if (mysqli_num_rows($existCheck) > 0) {
+        $c = mysqli_fetch_assoc($existCheck);
+        $newQty = $c['ProductQty'] + $quantity;
+        // Vérification que la nouvelle quantité totale ne dépasse pas le stock disponible
+        if ($newQty > $row['Stock']) {
+            echo "<script>alert('Quantité totale demandée (" . $newQty . ") supérieure au stock disponible (" . $row['Stock'] . ") pour \"" . htmlspecialchars($row['ProductName']) . "\".'); window.location='dettecart.php';</script>";
+            exit;
+        }
+        mysqli_query($con, "UPDATE tblcreditcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
+    } else {
+        mysqli_query($con, "INSERT INTO tblcreditcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', 0)") or die(mysqli_error($con));
+    }
+
+    header("Location: dettecart.php");
+    exit;
 }
 
 // Supprimer un Article
-if (isset($_GET['delid']) && isset($_GET['csrf_token'])) {
-    // Vérification CSRF pour les requêtes GET critiques
-    if ($_GET['csrf_token'] !== $_SESSION['csrf_token']) {
-        error_log("CSRF token validation failed for cart item deletion");
-        echo "<script>
-                alert('Erreur de sécurité. Veuillez réessayer.');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-    
+if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    
-    $deleteStmt = mysqli_prepare($con, "DELETE FROM tblcreditcart WHERE ID = ? AND IsCheckOut = 0");
-    mysqli_stmt_bind_param($deleteStmt, "i", $delid);
-    mysqli_stmt_execute($deleteStmt);
-    
-    if (mysqli_affected_rows($con) > 0) {
-        echo "<script>
-                alert('Article retiré du panier');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    } else {
-        echo "<script>
-                alert('Erreur lors de la suppression de l\'article');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
+    mysqli_query($con, "DELETE FROM tblcreditcart WHERE ID='$delid'") or die(mysqli_error($con));
+    header("Location: dettecart.php");
+    exit;
 }
 
 // Appliquer une remise (en valeur absolue ou en pourcentage)
 if (isset($_POST['applyDiscount'])) {
     $discountValue = max(0, floatval($_POST['discount']));
     
-    // Calculer le grand total avant d'appliquer la remise avec une requête préparée
+    // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_prepare($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
-    mysqli_stmt_execute($cartQuery);
-    $result = mysqli_stmt_get_result($cartQuery);
-    
-    while ($row = mysqli_fetch_assoc($result)) {
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
+    while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
     
@@ -413,18 +218,14 @@ if (isset($_POST['applyDiscount'])) {
 $discount = $_SESSION['credit_discount'] ?? 0;
 $discountType = $_SESSION['credit_discountType'] ?? 'absolute';
 $discountValue = $_SESSION['credit_discountValue'] ?? 0;
-
 // Vérifier les stocks pour l'affichage
 $hasStockIssue = false;
 $stockIssueProducts = [];
 
-// Récupérer la liste des noms de Articles pour la datalist avec requête préparée
+// Récupérer la liste des noms de Articles pour la datalist
 $productNames = [];
-$productStmt = mysqli_prepare($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName");
-mysqli_stmt_execute($productStmt);
-$productResult = mysqli_stmt_get_result($productStmt);
-
-while ($row = mysqli_fetch_assoc($productResult)) {
+$productQuery = mysqli_query($con, "SELECT ProductName FROM tblproducts ORDER BY ProductName");
+while ($row = mysqli_fetch_assoc($productQuery)) {
     $productNames[] = $row['ProductName'];
 }
 
@@ -435,56 +236,32 @@ if (isset($_POST['submit'])) {
     $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
     $paidNow = max(0, floatval($_POST['paid']));
 
-    // Récupérer les articles du panier pour calcul et vérification
-    $cartItemsStmt = mysqli_prepare($con, "
-        SELECT 
-            c.ID,
-            c.ProductId,
-            c.ProductQty,
-            c.Price,
-            p.ProductName,
-            p.Stock
-        FROM tblcreditcart c
-        JOIN tblproducts p ON p.ID = c.ProductId
-        WHERE c.IsCheckOut = 0
-    ");
-    mysqli_stmt_execute($cartItemsStmt);
-    $cartItems = mysqli_stmt_get_result($cartItemsStmt);
-    
+    // Calcul total du panier
     $grandTotal = 0;
-    $cartProducts = [];
-    $initialStocks = []; // Pour garder trace du stock initial avant modification
-    
-    while ($item = mysqli_fetch_assoc($cartItems)) {
-        $grandTotal += $item['ProductQty'] * $item['Price'];
-        $cartProducts[] = [
-            'id' => $item['ProductId'],
-            'qty' => $item['ProductQty'],
-            'cart_id' => $item['ID'],
-            'name' => $item['ProductName']
-        ];
-        $initialStocks[$item['ProductId']] = $item['Stock'];
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
+    while ($row = mysqli_fetch_assoc($cartQuery)) {
+        $grandTotal += $row['ProductQty'] * $row['Price'];
     }
 
     $netTotal = max(0, $grandTotal - $discount);
     $dues = max(0, $netTotal - $paidNow);
 
-    // Si le panier est vide, rediriger
-    if (empty($cartProducts)) {
-        echo "<script>
-                alert('Votre panier est vide. Veuillez ajouter des articles avant de procéder au paiement.');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
-    }
-
-    // Vérification finale du stock pour chaque article
-    $stockErrors = [];
+    // Vérification finale du stock
+    $stockCheck = mysqli_query($con, "
+        SELECT p.ProductName, p.Stock, c.ProductQty
+        FROM tblcreditcart c
+        JOIN tblproducts p ON p.ID = c.ProductId
+        WHERE c.IsCheckOut=0
+    ");
     
-    foreach ($cartProducts as $product) {
-        // Vérifier directement avec le stock actuel dans tblproducts
-        if ($initialStocks[$product['id']] < $product['qty']) {
-            $stockErrors[] = "Stock insuffisant pour {$product['name']} (demandé: {$product['qty']}, disponible: {$initialStocks[$product['id']]})";
+    $stockErrors = [];
+    while ($row = mysqli_fetch_assoc($stockCheck)) {
+        // Vérification du stock suffisant
+        if ($row['Stock'] <= 0) {
+            $stockErrors[] = "{$row['ProductName']} est en rupture de stock";
+        }
+        else if ($row['Stock'] < $row['ProductQty']) {
+            $stockErrors[] = "Stock insuffisant pour {$row['ProductName']} (demandé: {$row['ProductQty']}, disponible: {$row['Stock']})";
         }
     }
     
@@ -494,248 +271,73 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-    // Début de la transaction pour le checkout
-    mysqli_begin_transaction($con);
-    
-    try {
-        // Générer un numéro de facture unique
-        $billingnum = mt_rand(100000000, 999999999);
-        
-        // Log de début de transaction
-        error_log("CHECKOUT: Starting transaction for order #$billingnum with " . count($cartProducts) . " products");
-        
-        // Mise à jour du panier avec requête préparée
-        $updateCartStmt = mysqli_prepare($con, 
-            "UPDATE tblcreditcart SET BillingId = ?, IsCheckOut = 1 WHERE IsCheckOut = 0"
-        );
-        mysqli_stmt_bind_param($updateCartStmt, "s", $billingnum);
-        
-        if (!mysqli_stmt_execute($updateCartStmt) || mysqli_affected_rows($con) != count($cartProducts)) {
-            throw new Exception("Erreur lors de la mise à jour du panier: " . mysqli_error($con));
-        }
-        
-        error_log("CHECKOUT: Cart items marked as checked out: " . mysqli_affected_rows($con));
-        
-        // Ajout du client avec requête préparée
-        $addCustomerStmt = mysqli_prepare($con, 
-            "INSERT INTO tblcustomer (BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues) 
-             VALUES (?, ?, ?, ?, NOW(), ?, ?, ?)"
-        );
-        mysqli_stmt_bind_param($addCustomerStmt, "ssssddd", $billingnum, $custname, $custmobile, $modepayment, $netTotal, $paidNow, $dues);
-        
-        if (!mysqli_stmt_execute($addCustomerStmt)) {
-            throw new Exception("Erreur lors de l'ajout du client: " . mysqli_error($con));
-        }
-        
-        error_log("CHECKOUT: Customer added to database for order #$billingnum");
-        
-        // SOLUTION AMÉLIORÉE: Mise à jour du stock pour chaque article
-        $stockUpdateErrors = [];
-        $stockUpdates = [];
-        
-        // Préparation de la requête d'update stock
-        $updateStockStmt = mysqli_prepare($con, 
-            "UPDATE tblproducts SET Stock = Stock - ? WHERE ID = ? AND Stock >= ?"
-        );
-        
-        foreach ($cartProducts as $product) {
-            // Vérifier le stock actuel une dernière fois
-            $stockCheckStmt = mysqli_prepare($con, "SELECT Stock FROM tblproducts WHERE ID = ?");
-            mysqli_stmt_bind_param($stockCheckStmt, "i", $product['id']);
-            mysqli_stmt_execute($stockCheckStmt);
-            $stockCheck = mysqli_stmt_get_result($stockCheckStmt);
-            $currentStock = mysqli_fetch_assoc($stockCheck)['Stock'];
-            
-            // Décrémenter le stock seulement si suffisant
-            if ($currentStock >= $product['qty']) {
-                mysqli_stmt_bind_param($updateStockStmt, "iii", $product['qty'], $product['id'], $product['qty']);
-                $updateResult = mysqli_stmt_execute($updateStockStmt);
-                
-                if (!$updateResult || mysqli_affected_rows($con) == 0) {
-                    $stockUpdateErrors[] = "Échec de mise à jour du stock pour le produit {$product['name']} (ID: {$product['id']})";
-                    continue;
-                }
-                
-                // Enregistrer l'opération pour vérification
-                $stockUpdates[] = [
-                    'id' => $product['id'],
-                    'name' => $product['name'],
-                    'before' => $currentStock,
-                    'after' => $currentStock - $product['qty'],
-                    'qty' => $product['qty']
-                ];
-                
-                error_log("CHECKOUT: Stock updated for product '{$product['name']}' (ID: {$product['id']}). Before: $currentStock, After: " . ($currentStock - $product['qty']));
-            } else {
-                $stockUpdateErrors[] = "Stock insuffisant pour {$product['name']} lors de la mise à jour (demandé: {$product['qty']}, disponible: $currentStock)";
-            }
-        }
-        
-        // Vérifier s'il y a eu des erreurs de mise à jour de stock
-        if (!empty($stockUpdateErrors)) {
-            throw new Exception("Erreurs lors de la mise à jour du stock:\n- " . implode("\n- ", $stockUpdateErrors));
-        }
-        
-        // Vérification finale que TOUS les stocks ont été mis à jour
-        if (count($stockUpdates) != count($cartProducts)) {
-            throw new Exception("Certains produits n'ont pas eu leur stock mis à jour correctement");
-        }
-        
-        // Vérification que les stocks ont bien été décrémentés
-        $verificationErrors = [];
-        foreach ($stockUpdates as $update) {
-            $verifyStmt = mysqli_prepare($con, "SELECT Stock FROM tblproducts WHERE ID = ?");
-            mysqli_stmt_bind_param($verifyStmt, "i", $update['id']);
-            mysqli_stmt_execute($verifyStmt);
-            $verifyResult = mysqli_stmt_get_result($verifyStmt);
-            $actualStock = mysqli_fetch_assoc($verifyResult)['Stock'];
-            
-            if ($actualStock != $update['after']) {
-                $verificationErrors[] = "Le stock pour '{$update['name']}' devrait être {$update['after']} mais est $actualStock";
-            }
-        }
-        
-        if (!empty($verificationErrors)) {
-            error_log("STOCK VERIFICATION ERRORS: " . implode(", ", $verificationErrors));
-            // Tenter de corriger automatiquement
-            foreach ($stockUpdates as $update) {
-                $fixStmt = mysqli_prepare($con, "UPDATE tblproducts SET Stock = ? WHERE ID = ?");
-                mysqli_stmt_bind_param($fixStmt, "ii", $update['after'], $update['id']);
-                mysqli_stmt_execute($fixStmt);
-                error_log("STOCK FIX: Corrected stock for '{$update['name']}' to {$update['after']}");
-            }
-        }
-        
-        // Confirmer toutes les modifications
-        mysqli_commit($con);
-        error_log("CHECKOUT: Transaction successfully committed for order #$billingnum");
-        
-        // Préparation du SMS en fonction du solde dû
+    $billingnum = mt_rand(100000000, 999999999);
+
+    // Validation du panier + Création facture
+    $queries = "
+        UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;
+        INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
+        VALUES('$billingnum', '$custname', '$custmobile', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues');
+    ";
+    if (mysqli_multi_query($con, $queries)) {
+        while (mysqli_more_results($con) && mysqli_next_result($con)) {}
+
+        // Décrémentation du stock
+        mysqli_query($con, "
+            UPDATE tblproducts p
+            JOIN tblcreditcart c ON p.ID = c.ProductId
+            SET p.Stock = p.Stock - c.ProductQty
+            WHERE c.BillingId='$billingnum'
+        ") or die(mysqli_error($con));
+
+        // SMS personnalisé avec vérification du statut d'envoi
         if ($dues > 0) {
-            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande (Facture: $billingnum) est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+            $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
         } else {
-            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande (Facture: $billingnum) est confirmée. Merci pour votre confiance !";
+            $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
         }
-        
-        // Envoyer le SMS et stocker le résultat
+
+        // Envoyer le SMS et stocker le résultat (true/false)
         $smsResult = sendSmsNotification($custmobile, $smsMessage);
-        
+
         // Journal de l'envoi SMS (si la table existe)
-        $tableExistsStmt = mysqli_prepare($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
-        mysqli_stmt_execute($tableExistsStmt);
-        $tableExists = mysqli_stmt_get_result($tableExistsStmt);
-        
+        $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
         if (mysqli_num_rows($tableExists) > 0) {
-            $escapedMessage = mysqli_real_escape_string($con, $smsMessage);
-            $smsStatus = $smsResult ? 1 : 0;
-            
-            $smsLogStmt = mysqli_prepare($con, 
-                "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) VALUES (?, ?, ?, NOW())"
-            );
-            mysqli_stmt_bind_param($smsLogStmt, "ssi", $custmobile, $escapedMessage, $smsStatus);
-            mysqli_stmt_execute($smsLogStmt);
+            $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
+                           VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
+                           ($smsResult ? '1' : '0') . ", NOW())";
+            mysqli_query($con, $smsLogQuery);
         }
-        
-        // Nettoyage de la session et redirection
+
         unset($_SESSION['credit_discount']);
         unset($_SESSION['credit_discountType']);
         unset($_SESSION['credit_discountValue']);
         $_SESSION['invoiceid'] = $billingnum;
-        
-        // Résumé des articles achetés pour le message
-        $productSummary = "";
-        foreach ($cartProducts as $index => $product) {
-            if ($index < 3) { // Limiter à 3 produits pour l'alerte
-                $productSummary .= "- {$product['name']} (Qté: {$product['qty']})\n";
-            }
-        }
-        if (count($cartProducts) > 3) {
-            $productSummary .= "- et " . (count($cartProducts) - 3) . " autre(s) article(s)";
-        }
-        
+
         // Afficher le statut de l'envoi SMS dans le message d'alerte
         if ($smsResult) {
-            echo "<script>
-                    alert('Facture créée: $billingnum - SMS envoyé avec succès\\n\\nArticles:\\n$productSummary');
-                    window.location='invoice_dettecard.php?print=auto';
-                  </script>";
+            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
         } else {
-            echo "<script>
-                    alert('Facture créée: $billingnum - ÉCHEC de l\\'envoi du SMS\\n\\nArticles:\\n$productSummary');
-                    window.location='invoice_dettecard.php?print=auto';
-                  </script>";
+            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
         }
         exit;
-        
-    } catch (Exception $e) {
-        mysqli_rollback($con);
-        error_log("CHECKOUT ERROR: " . $e->getMessage());
-        echo "<script>
-                alert('Erreur lors du paiement: " . addslashes($e->getMessage()) . "');
-                window.location.href='dettecart.php';
-              </script>";
-        exit;
+    } else {
+        die('Erreur SQL : ' . mysqli_error($con));
     }
 }
 
 // Vérifier à nouveau les stocks pour l'affichage du panier
-$cartQuery = mysqli_prepare($con, "
-    SELECT 
-        c.ID, 
-        c.ProductId, 
-        c.ProductQty, 
-        p.ProductName,
-        p.Stock AS initial_stock
+$cartProducts = mysqli_query($con, "
+    SELECT c.ID, c.ProductId, c.ProductQty, p.Stock, p.ProductName 
     FROM tblcreditcart c
     JOIN tblproducts p ON p.ID = c.ProductId
-    WHERE c.IsCheckOut = 0
+    WHERE c.IsCheckOut=0
 ");
-mysqli_stmt_execute($cartQuery);
-$cartResult = mysqli_stmt_get_result($cartQuery);
-$cartItems = [];
 
-while ($item = mysqli_fetch_assoc($cartResult)) {
-    $cartItems[] = $item;
-}
-
-// Vérifier le stock pour chaque article dans le panier
-foreach ($cartItems as $item) {
-    // Requête pour obtenir les données de stock réel
-    $stockQuery = "
-        SELECT 
-            (
-                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                FROM tblcreditcart cc
-                WHERE cc.ProductId = ? AND cc.IsCheckOut = 1
-            ) AS sold_qty,
-            (
-                SELECT COALESCE(SUM(r.Quantity), 0)
-                FROM tblreturns r
-                WHERE r.ProductID = ?
-            ) AS returned_qty,
-            (
-                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                FROM tblcreditcart cc
-                WHERE cc.ProductId = ? AND cc.IsCheckOut = 0 AND cc.ID != ?
-            ) AS other_carts_qty
-    ";
-    
-    $stockStmt = mysqli_prepare($con, $stockQuery);
-    mysqli_stmt_bind_param($stockStmt, "iiii", $item['ProductId'], $item['ProductId'], $item['ProductId'], $item['ID']);
-    mysqli_stmt_execute($stockStmt);
-    $stockResult = mysqli_stmt_get_result($stockStmt);
-    $stockData = mysqli_fetch_assoc($stockResult);
-    
-    $soldQty = intval($stockData['sold_qty']);
-    $returnedQty = intval($stockData['returned_qty']);
-    $otherCartsQty = intval($stockData['other_carts_qty']);
-    
-    // Calcul correct du stock disponible
-    $availableStock = $item['initial_stock'] - $soldQty + $returnedQty - $otherCartsQty;
-    
-    if ($availableStock < $item['ProductQty']) {
+while ($product = mysqli_fetch_assoc($cartProducts)) {
+    if ($product['Stock'] <= 0 || $product['Stock'] < $product['ProductQty']) {
         $hasStockIssue = true;
-        $stockIssueProducts[] = $item['ProductName'];
+        $stockIssueProducts[] = $product['ProductName'];
     }
 }
 ?>
@@ -861,27 +463,20 @@ foreach ($cartItems as $item) {
             <?php
             if (!empty($_GET['searchTerm'])) {
                 $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
-                $searchSql = "
-                    SELECT 
-                        p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price, p.Stock,
-                        c.CategoryName, s.SubCategoryName
+                $sql = "
+                    SELECT p.ID, p.ProductName, p.BrandName, p.ModelNumber, p.Price, p.Stock,
+                           c.CategoryName, s.SubCategoryName
                     FROM tblproducts p
                     LEFT JOIN tblcategory c ON c.ID = p.CatID
                     LEFT JOIN tblsubcategory s ON s.ID = p.SubcatID
-                    WHERE 
-                        p.ProductName LIKE ? OR p.ModelNumber LIKE ?
+                    WHERE (p.ProductName LIKE '%$searchTerm%' OR p.ModelNumber LIKE '%$searchTerm%')
                 ";
-                
-                $searchStmt = mysqli_prepare($con, $searchSql);
-                $searchParam = "%$searchTerm%";
-                mysqli_stmt_bind_param($searchStmt, "ss", $searchParam, $searchParam);
-                mysqli_stmt_execute($searchStmt);
-                $searchResult = mysqli_stmt_get_result($searchStmt);
-                $count = mysqli_num_rows($searchResult);
+                $res = mysqli_query($con, $sql);
+                $count = mysqli_num_rows($res);
                 ?>
                 <div class="row-fluid">
                     <div class="span12">
-                        <h4>Résultats de recherche pour "<em><?php echo htmlspecialchars($searchTerm); ?></em>"</h4>
+                        <h4>Résultats de recherche pour "<em><?php echo htmlentities($searchTerm); ?></em>"</h4>
                         <?php if ($count > 0) { ?>
                             <table class="table table-bordered table-striped">
                                 <thead>
@@ -902,71 +497,14 @@ foreach ($cartItems as $item) {
                                 <tbody>
                                 <?php
                                 $i = 1;
-                                while ($row = mysqli_fetch_assoc($searchResult)) {
-                                    // Vérifier le stock disponible réel avec la nouvelle méthode
-                                    $productId = $row['ID'];
-                                    
-                                    // Trouver d'abord si l'article est déjà dans le panier
-                                    $cartCheckStmt = mysqli_prepare($con, "
-                                        SELECT ID, ProductQty 
-                                        FROM tblcreditcart 
-                                        WHERE ProductId = ? AND IsCheckOut = 0
-                                    ");
-                                    mysqli_stmt_bind_param($cartCheckStmt, "i", $productId);
-                                    mysqli_stmt_execute($cartCheckStmt);
-                                    $cartCheckResult = mysqli_stmt_get_result($cartCheckStmt);
-                                    
-                                    $cartItemId = 0;
-                                    $cartItemQty = 0;
-                                    if (mysqli_num_rows($cartCheckResult) > 0) {
-                                        $cartItem = mysqli_fetch_assoc($cartCheckResult);
-                                        $cartItemId = $cartItem['ID'];
-                                        $cartItemQty = $cartItem['ProductQty'];
-                                    }
-                                    
-                                    // Obtenir les données de stock
-                                    $stockCheckStmt = mysqli_prepare($con, "
-                                        SELECT 
-                                            p.Stock AS initial_stock,
-                                            (
-                                                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                                                FROM tblcreditcart cc
-                                                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
-                                            ) AS sold_qty,
-                                            (
-                                                SELECT COALESCE(SUM(r.Quantity), 0)
-                                                FROM tblreturns r
-                                                WHERE r.ProductID = p.ID
-                                            ) AS returned_qty,
-                                            (
-                                                SELECT COALESCE(SUM(cc.ProductQty), 0)
-                                                FROM tblcreditcart cc
-                                                WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
-                                            ) AS other_carts_qty
-                                        FROM tblproducts p
-                                        WHERE p.ID = ?
-                                    ");
-                                    mysqli_stmt_bind_param($stockCheckStmt, "ii", $cartItemId, $productId);
-                                    mysqli_stmt_execute($stockCheckStmt);
-                                    $stockCheckResult = mysqli_stmt_get_result($stockCheckStmt);
-                                    $stockData = mysqli_fetch_assoc($stockCheckResult);
-                                    
-                                    $initialStock = intval($stockData['initial_stock'] ?? 0);
-                                    $soldQty = intval($stockData['sold_qty'] ?? 0);
-                                    $returnedQty = intval($stockData['returned_qty'] ?? 0);
-                                    $otherCartsQty = intval($stockData['other_carts_qty'] ?? 0);
-                                    
-                                    // Calcul correct du stock disponible
-                                    $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
-                                    $realStock = max(0, $realStock);
-                                    
-                                    $disableAdd = ($realStock <= 0);
+                                while ($row = mysqli_fetch_assoc($res)) {
+                                    $disableAdd = ($row['Stock'] <= 0);
                                     $rowClass = $disableAdd ? 'class="stock-error"' : '';
                                     $stockStatus = '';
                                     
-                                    if ($realStock <= 0) {
+                                    if ($row['Stock'] <= 0) {
                                         $stockStatus = '<span class="stock-status stock-danger">Rupture</span>';
-                                    } elseif ($realStock < 5) {
+                                    } elseif ($row['Stock'] < 5) {
                                         $stockStatus = '<span class="stock-status stock-warning">Faible</span>';
                                     } else {
                                         $stockStatus = '<span class="stock-status stock-ok">Disponible</span>';
@@ -974,22 +512,21 @@ foreach ($cartItems as $item) {
                                     ?>
                                     <tr <?php echo $rowClass; ?>>
                                         <td><?php echo $i++; ?></td>
-                                        <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['CategoryName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['SubCategoryName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
-                                        <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
-                                        <td><?php echo number_format($row['Price'], 2); ?></td>
-                                        <td><?php echo $realStock . ' ' . $stockStatus; ?></td>
+                                        <td><?php echo $row['ProductName']; ?></td>
+                                        <td><?php echo $row['CategoryName']; ?></td>
+                                        <td><?php echo $row['SubCategoryName']; ?></td>
+                                        <td><?php echo $row['BrandName']; ?></td>
+                                        <td><?php echo $row['ModelNumber']; ?></td>
+                                        <td><?php echo $row['Price']; ?></td>
+                                        <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                         <td>
                                             <form method="post" action="dettecart.php" style="margin:0;">
-                                                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>" />
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
                                                 <input type="number" name="price" step="any" 
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
                                         </td>
                                         <td>
-                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $realStock; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> />
+                                            <input type="number" name="quantity" value="1" min="1" max="<?php echo $row['Stock']; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> />
                                         </td>
                                         <td>
                                             <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php echo $disableAdd ? 'disabled' : ''; ?>>
@@ -1016,9 +553,8 @@ foreach ($cartItems as $item) {
                 <div class="span12">
                    <!-- FORMULAIRE DE REMISE avec option pour pourcentage -->
                     <form method="post" class="form-inline" style="text-align:right;">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>" />
                         <label>Remise :</label>
-                        <input type="number" name="discount" step="any" value="<?php echo htmlspecialchars($discountValue); ?>" style="width:80px;" />
+                        <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
                         
                         <select name="discountType" style="width:120px; margin-left:5px;">
                             <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
@@ -1029,9 +565,11 @@ foreach ($cartItems as $item) {
                     </form>
                     <hr>
 
+
+                    
+  
                     <!-- FORMULAIRE DE CHECKOUT (informations client + montant payé) -->
-                    <form method="post" class="form-horizontal" id="checkoutForm">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>" />
+                    <form method="post" class="form-horizontal" name="submit">
                         <div class="control-group">
                             <label class="control-label">Nom du Client :</label>
                             <div class="controls">
@@ -1068,7 +606,7 @@ foreach ($cartItems as $item) {
                         </div>
   
                         <div class="form-actions" style="text-align:center;">
-                            <button class="btn btn-primary" type="submit" name="submit" id="submitCheckout" <?php echo $hasStockIssue ? 'disabled' : ''; ?>>
+                            <button class="btn btn-primary" type="submit" name="submit" <?php echo $hasStockIssue ? 'disabled' : ''; ?>>
                                 Valider & Créer la Facture
                             </button>
                         </div>
@@ -1095,177 +633,110 @@ foreach ($cartItems as $item) {
                                 </thead>
                                 <tbody>
                                     <?php
-                                    // Requête améliorée pour afficher le panier avec stock réel
-                                    $cartQuery = "
+                                    $ret = mysqli_query($con, "
                                       SELECT 
-                                        c.ID as cid,
-                                        c.ProductId,
-                                        c.ProductQty,
-                                        c.Price as cartPrice,
-                                        p.ProductName,
-                                        p.Stock as initial_stock
-                                      FROM tblcreditcart c
-                                      LEFT JOIN tblproducts p ON p.ID = c.ProductId
-                                      WHERE c.IsCheckOut = 0
-                                      ORDER BY c.ID ASC
-                                    ";
-                                    
-                                    $stmt = mysqli_prepare($con, $cartQuery);
-                                    mysqli_stmt_execute($stmt);
-                                    $ret = mysqli_stmt_get_result($stmt);
-                                    
+                                        tblcreditcart.ID as cid,
+                                        tblcreditcart.ProductQty,
+                                        tblcreditcart.Price as cartPrice,
+                                        tblproducts.ProductName,
+                                        tblproducts.Stock
+                                      FROM tblcreditcart
+                                      LEFT JOIN tblproducts ON tblproducts.ID = tblcreditcart.ProductId
+                                      WHERE tblcreditcart.IsCheckOut = 0
+                                      ORDER BY tblcreditcart.ID ASC
+                                    ");
                                     $cnt = 1;
                                     $grandTotal = 0;
                                     $num = mysqli_num_rows($ret);
                                     if ($num > 0) {
                                         while ($row = mysqli_fetch_array($ret)) {
-                                            $cartId = $row['cid'];
-                                            $productId = $row['ProductId'];
-                                            $pq = $row['ProductQty'];
-                                            $ppu = $row['cartPrice'];
-                                            $initialStock = intval($row['initial_stock']);
-                                            
-                                            // Obtenir les données pour le calcul du stock
-                                            $stockStmt = mysqli_prepare($con, "
-                                                SELECT 
-                                                    (
-                                                        SELECT COALESCE(SUM(cc.ProductQty), 0)
-                                                        FROM tblcreditcart cc
-                                                        WHERE cc.ProductId = ? AND cc.IsCheckOut = 1
-                                                    ) AS sold_qty,
-                                                    (
-                                                        SELECT COALESCE(SUM(r.Quantity), 0)
-                                                        FROM tblreturns r
-                                                        WHERE r.ProductID = ?
-                                                    ) AS returned_qty,
-                                                    (
-                                                        SELECT COALESCE(SUM(cc.ProductQty), 0)
-                                                        FROM tblcreditcart cc
-                                                        WHERE cc.ProductId = ? AND cc.IsCheckOut = 0 AND cc.ID != ?
-                                                    ) AS other_carts_qty
-                                            ");
-                                            mysqli_stmt_bind_param($stockStmt, "iiii", $productId, $productId, $productId, $cartId);
-                                            mysqli_stmt_execute($stockStmt);
-                                            $stockResult = mysqli_stmt_get_result($stockStmt);
-                                            $stockData = mysqli_fetch_assoc($stockResult);
-                                            
-                                            $soldQty = intval($stockData['sold_qty']);
-                                            $returnedQty = intval($stockData['returned_qty']);
-                                            $otherCartsQty = intval($stockData['other_carts_qty']);
-                                            
-                                            // Calcul correct du stock réellement disponible
-                                            $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
+                                            $pq    = $row['ProductQty'];
+                                            $ppu   = $row['cartPrice'];
+                                            $stock = $row['Stock'];
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
                                             
                                             // Vérification du stock pour cette ligne
-                                            $stockIssue = ($realStock < $pq);
+                                            $stockIssue = ($stock <= 0 || $stock < $pq);
                                             $rowClass = $stockIssue ? 'class="stock-error"' : '';
                                             $stockStatus = '';
                                             
-                                            if ($realStock <= 0) {
+                                            if ($stock <= 0) {
                                                 $stockStatus = '<span class="stock-warning">RUPTURE</span>';
-                                            } elseif ($realStock < $pq) {
-                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';
+                                            } elseif ($stock < $pq) {
+                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';}
+                                                ?>
+                                                <tr <?php echo $rowClass; ?>>
+                                                    <td><?php echo $cnt; ?></td>
+                                                    <td><?php echo $row['ProductName']; ?></td>
+                                                    <td><?php echo $pq; ?></td>
+                                                    <td>
+                                                        <?php echo $stock; ?>
+                                                        <?php echo $stockStatus; ?>
+                                                    </td>
+                                                    <td><?php echo number_format($ppu, 2); ?></td>
+                                                    <td><?php echo number_format($lineTotal, 2); ?></td>
+                                                    <td>
+                                                        <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
+                                                           onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
+                                                            <i class="icon-trash"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                <?php
+                                                $cnt++;
+                                            }
+                                            $netTotal = $grandTotal - $discount;
+                                            if ($netTotal < 0) {
+                                                $netTotal = 0;
                                             }
                                             ?>
-                                            <tr <?php echo $rowClass; ?>>
-                                                <td><?php echo $cnt; ?></td>
-                                                <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                                                <td><?php echo $pq; ?></td>
-                                                <td>
-                                                    <?php echo $realStock; ?>
-                                                    <?php echo $stockStatus; ?>
-                                                </td>
-                                                <td><?php echo number_format($ppu, 2); ?></td>
-                                                <td><?php echo number_format($lineTotal, 2); ?></td>
-                                                <td>
-                                                    <a href="dettecart.php?delid=<?php echo $row['cid']; ?>&csrf_token=<?php echo urlencode($_SESSION['csrf_token']); ?>"
-                                                       onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
-                                                        <i class="icon-trash"></i>
-                                                    </a>
-                                                </td>
+                                           <!-- Affichage de la remise dans le tableau des totaux -->
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">
+                                                    Remise
+                                                    <?php if ($discountType == 'percentage'): ?>
+                                                        (<?php echo $discountValue; ?>%)
+                                                    <?php endif; ?>
+                                                </th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                             </tr>
                                             <?php
-                                            $cnt++;
-                                        }
-                                        $netTotal = $grandTotal - $discount;
-                                        if ($netTotal < 0) {
-                                            $netTotal = 0;
+                                        } else {
+                                            ?>
+                                            <tr>
+                                                <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
+                                            </tr>
+                                            <?php
                                         }
                                         ?>
-                                       <!-- Affichage de la remise dans le tableau des totaux -->
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">
-                                                Remise
-                                                <?php if ($discountType == 'percentage'): ?>
-                                                    (<?php echo htmlspecialchars($discountValue); ?>%)
-                                                <?php endif; ?>
-                                            </th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-                                        </tr>
-                                        <?php
-                                    } else {
-                                        ?>
-                                        <tr>
-                                            <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
-                                        </tr>
-                                        <?php
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div><!-- widget-content -->
-                    </div><!-- widget-box -->
-                </div>
-            </div><!-- row-fluid -->
-        </div><!-- container-fluid -->
-    </div><!-- content -->
+                                    </tbody>
+                                </table>
+                            </div><!-- widget-content -->
+                        </div><!-- widget-box -->
+                    </div>
+                </div><!-- row-fluid -->
+            </div><!-- container-fluid -->
+        </div><!-- content -->
       
-    <!-- Footer -->
-    <?php include_once('includes/footer.php'); ?>
-    
-    <!-- SCRIPTS -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Vérifier la présence d'articles dans le panier avant de permettre la validation
-        const checkoutForm = document.getElementById('checkoutForm');
-        if (checkoutForm) {
-            checkoutForm.addEventListener('submit', function(e) {
-                // Vérifier si le panier contient des articles
-                const hasItems = <?php echo ($num > 0) ? 'true' : 'false'; ?>;
-                if (!hasItems) {
-                    e.preventDefault();
-                    alert('Votre panier est vide. Veuillez ajouter des articles avant de procéder au paiement.');
-                    return false;
-                }
-                
-                // Vérifier s'il y a des problèmes de stock
-                const stockWarning = <?php echo $hasStockIssue ? 'true' : 'false'; ?>;
-                if (stockWarning) {
-                    e.preventDefault();
-                    alert('Il y a des problèmes de stock avec certains articles dans votre panier. Veuillez les ajuster avant de continuer.');
-                    return false;
-                }
-            });
-        }
-    });
-    </script>
-    <script src="js/jquery.min.js"></script>
-    <script src="js/jquery.ui.custom.js"></script>
-    <script src="js/bootstrap.min.js"></script>
-    <script src="js/jquery.uniform.js"></script>
-    <script src="js/select2.min.js"></script>
-    <script src="js/jquery.dataTables.min.js"></script>
-    <script src="js/matrix.js"></script>
-    <script src="js/matrix.tables.js"></script>
-</body>
-</html>
+        <!-- Footer -->
+        <?php include_once('includes/footer.php'); ?>
+        <!-- SCRIPTS -->
+        <script src="js/jquery.min.js"></script>
+        <script src="js/jquery.ui.custom.js"></script>
+        <script src="js/bootstrap.min.js"></script>
+        <script src="js/jquery.uniform.js"></script>
+        <script src="js/select2.min.js"></script>
+        <script src="js/jquery.dataTables.min.js"></script>
+        <script src="js/matrix.js"></script>
+        <script src="js/matrix.tables.js"></script>
+    </body>
+    </html>
