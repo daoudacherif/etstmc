@@ -36,16 +36,21 @@ $sqlList = "SELECT * FROM tblsupplier ORDER BY ID DESC";
 $resList = mysqli_query($con, $sqlList);
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <title>Gestion des Fournisseurs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+</head>
+<body>
+
 <?php include_once('includes/header.php'); ?>
 <?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">
   <div id="content-header">
+    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="supplier.php" class="current">Fournisseurs</a> </div>
     <h1>Fournisseurs</h1>
   </div>
   <div class="container-fluid">
@@ -64,31 +69,31 @@ $resList = mysqli_query($con, $sqlList);
               <div class="control-group">
                 <label class="control-label">Nom du Fournisseur :</label>
                 <div class="controls">
-                  <input type="text" name="suppliername" required />
+                  <input type="text" class="span11" name="suppliername" required />
                 </div>
               </div>
               <div class="control-group">
                 <label class="control-label">Téléphone :</label>
                 <div class="controls">
-                  <input type="text" name="phone" />
+                  <input type="text" class="span11" name="phone" />
                 </div>
               </div>
               <div class="control-group">
                 <label class="control-label">Email :</label>
                 <div class="controls">
-                  <input type="email" name="email" />
+                  <input type="email" class="span11" name="email" />
                 </div>
               </div>
               <div class="control-group">
                 <label class="control-label">Adresse :</label>
                 <div class="controls">
-                  <textarea name="address"></textarea>
+                  <textarea name="address" class="span11"></textarea>
                 </div>
               </div>
               <div class="control-group">
                 <label class="control-label">Commentaires :</label>
                 <div class="controls">
-                  <textarea name="comments"></textarea>
+                  <textarea name="comments" class="span11"></textarea>
                 </div>
               </div>
               <div class="form-actions">
@@ -151,9 +156,14 @@ $resList = mysqli_query($con, $sqlList);
 </div><!-- content -->
 
 <?php include_once('includes/footer.php'); ?>
+<!-- scripts -->
 <script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
 <script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
 </body>
 </html>
