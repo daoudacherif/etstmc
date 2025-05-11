@@ -1,8 +1,24 @@
+<?php
+// Récupérer le type d'utilisateur connecté
+$adminid = $_SESSION['imsaid'];
+$ret = mysqli_query($con, "SELECT UserName FROM tbladmin WHERE ID='$adminid'");
+$row = mysqli_fetch_array($ret);
+$username = $row['UserName'];
+
+// Compteur du panier - vous pouvez conserver ou ajuster selon votre besoin
+$ret1 = mysqli_query($con, "SELECT count(ID) as cartcount FROM tblcart WHERE UserId = '$adminid'");
+$row1 = mysqli_fetch_array($ret1);
+$cartcountcount = $row1['cartcount'];
+?>
+
 <!-- Menu latéral modernisé et organisé -->
 <div id="sidebar">
   <ul>
+    <?php if($username != 'saler'): ?>
+    <!-- MENU POUR LES UTILISATEURS NORMAUX -->
+    
     <!-- Tableau de bord -->
-    <li class="active">
+    <li class="<?php echo basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : ''; ?>">
       <a href="dashboard.php"><i class="icon icon-home"></i> <span>Tableau de bord</span></a>
     </li>
 
@@ -24,7 +40,9 @@
         <li><a href="inventory.php">Inventaire</a></li>
       </ul>
     </li>
+    <?php endif; ?>
 
+    <!-- PARTIE COMMUNE (VENTES) - visible pour tous les utilisateurs -->
     <!-- Ventes -->
     <li class="submenu">
       <a href="#"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
@@ -36,6 +54,9 @@
       </ul>
     </li>
 
+    <?php if($username != 'saler'): ?>
+    <!-- SUITE DU MENU POUR LES UTILISATEURS NORMAUX -->
+    
     <!-- Recherche -->
     <li class="submenu">
       <a href="#"><i class="icon-search"></i> <span>Recherche</span></a>
@@ -73,5 +94,6 @@
         <li><a href="daily-repport.php">Journalier</a></li>
       </ul>
     </li>
+    <?php endif; ?>
   </ul>
 </div>
