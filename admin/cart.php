@@ -434,9 +434,9 @@ if (isset($_POST['submit'])) {
             
             if ($stockRow = mysqli_fetch_assoc($stockResult)) {
                 $initialStock = intval($stockRow['initial_stock']);
-                $soldQty = intval($stockRow['sold_qty']);
+                
                 $returnedQty = intval($stockRow['returned_qty']);
-                $availableStock = $initialStock - $soldQty + $returnedQty;
+                $availableStock = $initialStock + $returnedQty;
                 
                 if ($product['qty'] > $availableStock) {
                     $stockErrors[] = "Article '{$stockRow['ProductName']}': Quantité demandée ({$product['qty']}) supérieure au stock disponible ({$availableStock})";
