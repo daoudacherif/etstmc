@@ -856,26 +856,28 @@ if ($productNamesResult) {
                                     <?php
                                     // Requête améliorée pour obtenir les articles du panier
                                     $cartQuery = "
-                                      SELECT 
-                                        c.ID as cid,
-                                        c.ProductId,
-                                        c.ProductQty,
-                                        c.Price as cartPrice,
-                                        p.ProductName,
-                                        p.Stock as initial_stock,
-                                        p.Price as basePrice,
-                                        COALESCE(SUM(CASE WHEN sold.IsCheckOut = 1 THEN sold.ProductQty ELSE 0 END), 0) AS sold_qty,
-                                        COALESCE(
-                                            (SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID),
-                                            0
-                                        ) AS returned_qty
-                                      FROM tblcart c
-                                      LEFT JOIN tblproducts p ON p.ID = c.ProductId
-                                      LEFT JOIN tblcart sold ON sold.ProductId = p.ID
-                                      WHERE c.IsCheckOut = 0
-                                      GROUP BY c.ID
-                                      ORDER BY c.ID ASC
-                                    ";
+  SELECT 
+    c.ID as cid,
+    c.ProductId,
+    c.ProductQty,
+    c.Price as cartPrice,
+    p.ProductName,
+    p.Stock as initial_stock,
+    p.Price as basePrice,
+    (
+        SELECT COALESCE(SUM(sold.ProductQty), 0) 
+        FROM tblcart sold 
+        WHERE sold.ProductId = p.ID AND sold.IsCheckOut = 1
+    ) AS sold_qty,
+    COALESCE(
+        (SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID),
+        0
+    ) AS returned_qty
+  FROM tblcart c
+  LEFT JOIN tblproducts p ON p.ID = c.ProductId
+  WHERE c.IsCheckOut = 0
+  ORDER BY c.ID ASC
+";
                                     
                                     $stmt = mysqli_prepare($con, $cartQuery);
                                     mysqli_stmt_execute($stmt);
