@@ -85,7 +85,7 @@
 
         .hero {
             min-height: 90vh;
-            background: linear-gradient(135deg, #0a9396, #94d2bd);
+            background:url('https://unsplash.com/fr/photos/photographie-en-contre-plongee-de-grues-au-sommet-dun-batiment-8Gg2Ne_uTcM') no-repeat center center/cover;
             display: flex;
             flex-direction: column;
             justify-content: center;
