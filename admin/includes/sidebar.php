@@ -72,7 +72,7 @@ try {
       </ul>
     </li>
 
-    <?php if($username != 'saler'): ?>
+  
     <!-- SUITE DU MENU POUR LES UTILISATEURS NORMAUX -->
     
     <!-- Recherche -->
@@ -112,6 +112,6 @@ try {
         <li><a href="daily-repport.php">Journalier</a></li>
       </ul>
     </li>
-    <?php endif; ?>
+   
   </ul>
 </div>
