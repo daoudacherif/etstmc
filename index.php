@@ -70,7 +70,7 @@
             color: #333;
             font-weight: 500;
             padding: 8px 15px;
-            transition: all 0.2s ease;
+            transition: all 2s ease;
         }
 
         .dropdown-item:hover, .dropdown-item:focus {
