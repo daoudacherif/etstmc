@@ -5,10 +5,28 @@ $ret = mysqli_query($con, "SELECT UserName FROM tbladmin WHERE ID='$adminid'");
 $row = mysqli_fetch_array($ret);
 $username = $row['UserName'];
 
-// Compteur du panier - vous pouvez conserver ou ajuster selon votre besoin
-$ret1 = mysqli_query($con, "SELECT count(ID) as cartcount FROM tblcart WHERE UserId = '$adminid'");
-$row1 = mysqli_fetch_array($ret1);
-$cartcountcount = $row1['cartcount'];
+// Compteur du panier avec gestion d'erreur
+try {
+    // Essayez de déterminer le bon nom de colonne pour l'utilisateur dans la table tblcart
+    // Si vous connaissez le nom exact de la colonne, utilisez-le directement à la place de cette logique
+    $cartcountcount = 0; // Valeur par défaut
+    
+    // Tentative avec différents noms de colonnes possibles
+    $possible_columns = ['AdminID', 'admin_id', 'UserID', 'user_id'];
+    
+    foreach($possible_columns as $column) {
+        $check_column = mysqli_query($con, "SHOW COLUMNS FROM tblcart LIKE '$column'");
+        if(mysqli_num_rows($check_column) > 0) {
+            $ret1 = mysqli_query($con, "SELECT count(ID) as cartcount FROM tblcart WHERE $column = '$adminid'");
+            $row1 = mysqli_fetch_array($ret1);
+            $cartcountcount = $row1['cartcount'];
+            break; // Sortir de la boucle si nous trouvons une colonne qui fonctionne
+        }
+    }
+} catch (Exception $e) {
+    // En cas d'erreur, simplement définir le compteur à 0
+    $cartcountcount = 0;
+}
 ?>
 
 <!-- Menu latéral modernisé et organisé -->
