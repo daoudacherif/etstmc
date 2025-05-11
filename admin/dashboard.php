@@ -44,16 +44,7 @@ if (strlen($_SESSION['imsaid']==0)) {
         <div class="widget-box widget-plain">
           <div class="center">
             <ul class="quick-actions">
-              <?php 
-              $query1 = mysqli_query($con,"Select * from tblbrand where Status='1'");
-              $brandcount = mysqli_num_rows($query1);
-              ?>
-              <li class="bg_lb">
-                <a href="manage-brand.php">
-                  <i class="fa fa-building-o fa-3x"></i><br />
-                  <span class="label label-important" style="margin-top:5%"><?php echo $brandcount; ?></span> Marques 
-                </a>
-              </li>
+             
               <?php 
               $query2 = mysqli_query($con,"Select * from tblcategory where Status='1'");
               $catcount = mysqli_num_rows($query2);
@@ -64,16 +55,7 @@ if (strlen($_SESSION['imsaid']==0)) {
                   <span class="label label-success" style="margin-top:7%"><?php echo $catcount; ?></span> Catégories 
                 </a>
               </li>
-              <?php 
-              $query3 = mysqli_query($con,"Select * from tblsubcategory where Status='1'");
-              $subcatcount = mysqli_num_rows($query3);
-              ?>
-              <li class="bg_lo">
-                <a href="manage-subcategory.php">
-                  <i class="icon-th"></i> 
-                  <span class="label label--success" style="margin-top:7%"><?php echo $subcatcount; ?></span>&nbsp; Sous-catégories
-                </a>
-              </li>
+             
               <?php 
               $query4 = mysqli_query($con,"Select * from tblproducts");
               $productcount = mysqli_num_rows($query4);
@@ -89,7 +71,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               $totuser = mysqli_num_rows($query5);
               ?>
               <li class="bg_lo span3">
-                <a href="form-common.html">
+                <a href="profile.php">
                   <i class="icon-user"></i>
                   <span class="label label--success" style="margin-top:5%"><?php echo $totuser; ?></span> Utilisateurs
                 </a>
