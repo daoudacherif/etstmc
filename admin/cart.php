@@ -700,12 +700,7 @@ if ($productNamesResult) {
                                         SELECT 
                                             p.Stock AS initial_stock,
                                             COALESCE(SUM(CASE WHEN c.IsCheckOut = 1 THEN c.ProductQty ELSE 0 END), 0) AS sold_qty,
-                                            COALESCE((SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID), 0) AS returned_qty,
-                                            COALESCE((
-                                                SELECT SUM(cart.ProductQty) 
-                                                FROM tblcart cart 
-                                                WHERE cart.ProductId = p.ID AND cart.IsCheckOut = 0
-                                            ), 0) AS in_carts_qty
+                                            COALESCE((SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID), 0) AS returned_qty
                                         FROM tblproducts p
                                         LEFT JOIN tblcart c ON c.ProductId = p.ID
                                         WHERE p.ID = ?
@@ -719,21 +714,19 @@ if ($productNamesResult) {
                                     $initialStock = intval($stockData['initial_stock'] ?? 0);
                                     $soldQty = intval($stockData['sold_qty'] ?? 0);
                                     $returnedQty = intval($stockData['returned_qty'] ?? 0);
-                                    $inCartsQty = intval($stockData['in_carts_qty'] ?? 0);
                                     
                                     $realStock = $initialStock - $soldQty + $returnedQty;
-                                    $availableStock = $realStock - $inCartsQty; // Stock disponible hors paniers
                                     
-                                    $disableAdd = ($availableStock <= 0);
+                                    $disableAdd = ($realStock <= 0);
                                     $rowClass = '';
                                     $stockStatusClass = '';
                                     $stockStatusText = '';
                                     
-                                    if ($availableStock <= 0) {
+                                    if ($realStock <= 0) {
                                         $rowClass = 'class="stock-error"';
                                         $stockStatusClass = 'stock-danger';
                                         $stockStatusText = 'RUPTURE';
-                                    } elseif ($availableStock < 5) {
+                                    } elseif ($realStock < 5) {
                                         $rowClass = 'class="stock-warning"';
                                         $stockStatusClass = 'stock-warning';
                                         $stockStatusText = 'FAIBLE';
@@ -749,12 +742,9 @@ if ($productNamesResult) {
                                         <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
                                         <td><?php echo number_format($row['Price'], 2); ?> GNF</td>
                                         <td>
-                                            <?php echo $availableStock; ?> / <?php echo $realStock; ?>
+                                            <?php echo $realStock; ?>
                                             <div class="stock-status <?php echo $stockStatusClass; ?>">
                                                 <?php echo $stockStatusText; ?>
-                                                <?php if ($inCartsQty > 0): ?>
-                                                    (<?php echo $inCartsQty; ?> réservés)
-                                                <?php endif; ?>
                                             </div>
                                         </td>
                                         <td>
@@ -765,8 +755,8 @@ if ($productNamesResult) {
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
                                         </td>
                                         <td>
-                                            <input type="number" class="quantity-input" name="quantity" value="1" min="1" max="<?php echo $availableStock; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> 
-                                                   data-max="<?php echo $availableStock; ?>" />
+                                            <input type="number" class="quantity-input" name="quantity" value="1" min="1" max="<?php echo $realStock; ?>" style="width:60px;" <?php echo $disableAdd ? 'disabled' : ''; ?> 
+                                                   data-max="<?php echo $realStock; ?>" />
                                         </td>
                                         <td>
                                             <button type="submit" name="addtocart" class="btn btn-success btn-small" <?php echo $disableAdd ? 'disabled' : ''; ?>>
@@ -878,14 +868,7 @@ if ($productNamesResult) {
                                         COALESCE(
                                             (SELECT SUM(r.Quantity) FROM tblreturns r WHERE r.ProductID = p.ID),
                                             0
-                                        ) AS returned_qty,
-                                        (
-                                            SELECT COALESCE(SUM(other_cart.ProductQty), 0) 
-                                            FROM tblcart other_cart 
-                                            WHERE other_cart.ProductId = p.ID 
-                                            AND other_cart.IsCheckOut = 0 
-                                            AND other_cart.ID != c.ID
-                                        ) AS other_carts_qty
+                                        ) AS returned_qty
                                       FROM tblcart c
                                       LEFT JOIN tblproducts p ON p.ID = c.ProductId
                                       LEFT JOIN tblcart sold ON sold.ProductId = p.ID
@@ -911,13 +894,11 @@ if ($productNamesResult) {
                                             $initialStock = intval($row['initial_stock']);
                                             $soldQty = intval($row['sold_qty']);
                                             $returnedQty = intval($row['returned_qty']);
-                                            $otherCartsQty = intval($row['other_carts_qty']);
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
                                             
-                                            // Calcul du stock réellement disponible
+                                            // Calcul du stock réellement disponible basé uniquement sur stock initial + retours - vendus
                                             $remainingStock = $initialStock - $soldQty + $returnedQty;
-                                            $trueAvailableStock = $remainingStock - $otherCartsQty;
                                             
                                             // Vérifier si le stock actuel est suffisant
                                             $stockSuffisant = $remainingStock >= $pq;
@@ -931,7 +912,7 @@ if ($productNamesResult) {
                                             
                                             if (!$stockSuffisant) {
                                                 $rowClass = 'class="error"';
-                                            } elseif ($trueAvailableStock < 5) {
+                                            } elseif ($remainingStock < 5) {
                                                 $rowClass = 'class="warning"';
                                             }
                                             ?>
@@ -953,10 +934,10 @@ if ($productNamesResult) {
                                                     if ($remainingStock <= 0) {
                                                         $stockStatus = 'RUPTURE';
                                                         $stockStatusClass = 'label-important';
-                                                    } elseif ($trueAvailableStock < $pq) {
+                                                    } elseif ($remainingStock < $pq) {
                                                         $stockStatus = 'INSUFFISANT';
                                                         $stockStatusClass = 'label-important';
-                                                    } elseif ($trueAvailableStock < 5) {
+                                                    } elseif ($remainingStock < 5) {
                                                         $stockStatus = 'FAIBLE';
                                                         $stockStatusClass = 'label-warning';
                                                     } else {
@@ -967,11 +948,8 @@ if ($productNamesResult) {
                                                     <br>
                                                     <span class="label <?php echo $stockStatusClass; ?>">
                                                         <?php echo $stockStatus; ?>
-                                                        (<?php echo $trueAvailableStock; ?> / <?php echo $remainingStock; ?>)
+                                                        (<?php echo $remainingStock; ?>)
                                                     </span>
-                                                    <?php if ($otherCartsQty > 0): ?>
-                                                        <br><small>(<?php echo $otherCartsQty; ?> dans d'autres paniers)</small>
-                                                    <?php endif; ?>
                                                 </td>
                                                 <td>
                                                     <?php echo number_format($basePrice, 2); ?> GNF
