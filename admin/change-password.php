@@ -8,7 +8,7 @@ if (strlen($_SESSION['imsaid']==0)) {
     if(isset($_POST['submit']))
 {
 $adminid=$_SESSION['imsaid'];
-$cpassword=md5($_POST['currentpassword']);
+$cpassword=($_POST['currentpassword']);
 $newpassword=md5($_POST['newpassword']);
 $query=mysqli_query($con,"select ID from tbladmin where ID='$adminid' and   Password='$cpassword'");
 $row=mysqli_fetch_array($query);
