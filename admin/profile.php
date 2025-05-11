@@ -18,15 +18,16 @@ if (strlen($_SESSION['imsaid']==0)) {
       $email = $_POST['email'];
       $regdate = date('Y-m-d H:i:s');
       
-      // Check if username already exists
-      $check = mysqli_query($con, "SELECT ID FROM tbladmin WHERE UserName='$username'");
-      if(mysqli_num_rows($check) > 0) {
-        echo '<script>alert("Ce nom d\'utilisateur existe déjà. Veuillez réessayer.")</script>';
+      // Vérifier seulement si l'email existe déjà pour éviter les doublons d'email
+      $check_email = mysqli_query($con, "SELECT ID FROM tbladmin WHERE Email='$email'");
+      if(mysqli_num_rows($check_email) > 0) {
+        echo '<script>alert("Cette adresse e-mail est déjà utilisée. Veuillez en utiliser une autre.")</script>';
       } else {
+        // Créer directement l'utilisateur saler sans vérifier si ce nom d'utilisateur existe déjà
         $query = mysqli_query($con, "INSERT INTO tbladmin(AdminName, UserName, MobileNumber, Email, Password, AdminRegdate) 
                                      VALUES('$adminname', '$username', '$mobileno', '$email', '$password', '$regdate')");
         if($query) {
-          echo '<script>alert("Nouvel utilisateur créé avec succès.")</script>';
+          echo '<script>alert("Nouvel utilisateur saler créé avec succès.")</script>';
         } else {
           echo '<script>alert("Échec de la création. Veuillez réessayer.")</script>';
         }
@@ -69,13 +70,7 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <input type="text" class="span11" name="adminname" id="adminname" required='true' />
               </div>
             </div>
-            <div class="control-group">
-              <label class="control-label">Nom d'utilisateur :</label>
-              <div class="controls">
-                <input type="text" class="span11" name="username" id="username" value="saler" readonly='true' />
-                <span class="help-block">Le nom d'utilisateur doit être "saler"</span>
-              </div>
-            </div>
+           
             <div class="control-group">
               <label class="control-label">Mot de passe :</label>
               <div class="controls">
