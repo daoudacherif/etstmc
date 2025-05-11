@@ -1,8 +1,20 @@
 <?php
 // Function to check if the current user has a specific permission
 function user_has_permission($permission_name) {
+    // Return true for all permissions during development
+    // UNCOMMENT THIS LINE FOR TESTING
+    // return true;
+    
     global $con;
+    
+    if (!isset($_SESSION['imsaid'])) return false;
+    
     $admin_id = $_SESSION['imsaid'];
+    
+    // Check if permissions are cached in session
+    if (isset($_SESSION['user_permissions']) && isset($_SESSION['user_permissions'][$permission_name])) {
+        return true;
+    }
     
     $query = mysqli_query($con, "
         SELECT COUNT(*) as count FROM tbladmin a
@@ -11,6 +23,12 @@ function user_has_permission($permission_name) {
         JOIN permissions p ON rp.permission_id = p.permission_id
         WHERE a.ID = '$admin_id' AND p.permission_name = '$permission_name'
     ");
+    
+    if (!$query) {
+        // If query fails, log the error and return false
+        error_log("Permission query failed: " . mysqli_error($con));
+        return false;
+    }
     
     $result = mysqli_fetch_assoc($query);
     return ($result['count'] > 0);
@@ -57,8 +75,8 @@ function user_has_permission($permission_name) {
     <li class="submenu <?php echo (in_array(basename($_SERVER['PHP_SELF']), ['cart.php', 'dettecart.php', 'return.php', 'transact.php'])) ? 'open' : ''; ?>">
       <a href="#"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
       <ul>
-        <li><a href="cart.php">Comptant <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
-        <li><a href="dettecart.php">Terme <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
+        <li><a href="cart.php">Comptant <?php if(isset($cartcountcount)): ?><span class="label label-important"><?php echo htmlentities($cartcountcount);?></span><?php endif; ?></a></li>
+        <li><a href="dettecart.php">Terme <?php if(isset($cartcountcount)): ?><span class="label label-important"><?php echo htmlentities($cartcountcount);?></span><?php endif; ?></a></li>
         <li><a href="return.php">Retour</a></li>
         <li><a href="transact.php">Transactions</a></li>
       </ul>
@@ -123,8 +141,11 @@ function user_has_permission($permission_name) {
         <?php if(user_has_permission('manage_permissions')): ?>
         <li><a href="profile.php#permission-tab">Gestion des Permissions</a></li>
         <?php endif; ?>
+        <?php if(user_has_permission('create_users')): ?>
+        <li><a href="profile.php#user-creation-tab">Créer Utilisateur</a></li>
+        <?php endif; ?>
         <?php if(user_has_permission('manage_users')): ?>
-        <li><a href="user-management.php">Gestion des Utilisateurs</a></li>
+        <li><a href="profile.php#user-role-tab">Gérer Utilisateurs</a></li>
         <?php endif; ?>
       </ul>
     </li>

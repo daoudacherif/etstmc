@@ -19,10 +19,44 @@ if (strlen($_SESSION['imsaid']==0)) {
     }
   }
   
+  // Create User
+  if(isset($_POST['create_user'])) {
+    $admin_name = mysqli_real_escape_string($con, $_POST['new_admin_name']);
+    $username = mysqli_real_escape_string($con, $_POST['new_username']);
+    $email = mysqli_real_escape_string($con, $_POST['new_email']);
+    $mobile = mysqli_real_escape_string($con, $_POST['new_mobile']);
+    $password = password_hash($_POST['new_password'], PASSWORD_DEFAULT); // Secure password hashing
+    
+    // Check if username or email already exists
+    $check_query = mysqli_query($con, "SELECT * FROM tbladmin WHERE UserName='$username' OR Email='$email'");
+    if(mysqli_num_rows($check_query) > 0) {
+      echo '<script>alert("Nom d\'utilisateur ou email déjà utilisé.");</script>';
+    } else {
+      // Insert new user
+      $query = mysqli_query($con, "INSERT INTO tbladmin (AdminName, UserName, Email, MobileNumber, Password, AdminRegdate) 
+                                  VALUES ('$admin_name', '$username', '$email', '$mobile', '$password', NOW())");
+      
+      if($query) {
+        $new_user_id = mysqli_insert_id($con);
+        
+        // Assign selected roles
+        if(isset($_POST['user_roles']) && is_array($_POST['user_roles'])) {
+          foreach($_POST['user_roles'] as $role_id) {
+            mysqli_query($con, "INSERT INTO user_roles (user_id, role_id) VALUES ('$new_user_id', '$role_id')");
+          }
+        }
+        
+        echo '<script>alert("Utilisateur créé avec succès.");</script>';
+      } else {
+        echo '<script>alert("Erreur lors de la création de l\'utilisateur.");</script>';
+      }
+    }
+  }
+  
   // Create Role
   if(isset($_POST['create_role'])) {
-    $role_name = $_POST['role_name'];
-    $role_description = $_POST['role_description'];
+    $role_name = mysqli_real_escape_string($con, $_POST['role_name']);
+    $role_description = mysqli_real_escape_string($con, $_POST['role_description']);
     $query = mysqli_query($con, "INSERT INTO roles (role_name, role_description) VALUES ('$role_name', '$role_description')");
     if ($query) {
       echo '<script>alert("Rôle créé avec succès.")</script>';
@@ -53,8 +87,14 @@ if (strlen($_SESSION['imsaid']==0)) {
   
   // Create Permission
   if(isset($_POST['create_permission'])) {
-    $permission_name = $_POST['permission_name'];
-    $permission_category = $_POST['permission_category'];
+    $permission_name = mysqli_real_escape_string($con, $_POST['permission_name']);
+    $permission_category = mysqli_real_escape_string($con, $_POST['permission_category']);
+    
+    // Handle new category
+    if($permission_category == 'new' && !empty($_POST['new_category'])) {
+      $permission_category = mysqli_real_escape_string($con, $_POST['new_category']);
+    }
+    
     $query = mysqli_query($con, "INSERT INTO permissions (permission_name, category) VALUES ('$permission_name', '$permission_category')");
     if ($query) {
       echo '<script>alert("Permission créée avec succès.")</script>';
@@ -173,6 +213,27 @@ if (strlen($_SESSION['imsaid']==0)) {
       echo '<script>alert("Erreur lors du retrait du rôle.")</script>';
     }
   }
+  
+  // Delete User
+  if(isset($_GET['delete_user'])) {
+    $user_id = $_GET['delete_user'];
+    
+    // Don't allow deletion of the currently logged-in user
+    if($user_id == $_SESSION['imsaid']) {
+      echo '<script>alert("Vous ne pouvez pas supprimer votre propre compte.")</script>';
+    } else {
+      // Delete user's role assignments
+      mysqli_query($con, "DELETE FROM user_roles WHERE user_id = '$user_id'");
+      
+      // Delete user
+      $query = mysqli_query($con, "DELETE FROM tbladmin WHERE ID = '$user_id'");
+      if ($query) {
+        echo '<script>alert("Utilisateur supprimé avec succès.")</script>';
+      } else {
+        echo '<script>alert("Erreur lors de la suppression de l\'utilisateur.")</script>';
+      }
+    }
+  }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -223,6 +284,7 @@ if (strlen($_SESSION['imsaid']==0)) {
         <li><a href="#role-tab" data-toggle="tab">Gestion des Rôles</a></li>
         <li><a href="#permission-tab" data-toggle="tab">Gestion des Permissions</a></li>
         <li><a href="#user-role-tab" data-toggle="tab">Attribution des Rôles</a></li>
+        <li><a href="#user-creation-tab" data-toggle="tab">Créer Utilisateur</a></li>
       </ul>
       
       <div class="tab-content">
@@ -506,7 +568,7 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <div class="control-group">
                   <label class="control-label">Catégorie:</label>
                   <div class="controls">
-                    <select name="permission_category" class="span6">
+                    <select name="permission_category" class="span6" id="permission_category">
                       <option value="">-- Aucune Catégorie --</option>
                       <?php
                       // Get all unique categories
@@ -646,6 +708,14 @@ if (strlen($_SESSION['imsaid']==0)) {
                       <a href="#" data-toggle="modal" data-target="#assignRoleModal<?php echo $user['ID']; ?>" class="btn btn-info btn-sm">
                         <i class="icon-plus"></i> Assigner Rôle
                       </a>
+                      
+                      <?php if($user['ID'] != $_SESSION['imsaid']): // Don't allow deletion of self ?>
+                      <a href="profile.php?delete_user=<?php echo $user['ID']; ?>" 
+                         onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur? Cette action est irréversible.');" 
+                         class="btn btn-danger btn-sm">
+                        <i class="icon-trash"></i> Supprimer
+                      </a>
+                      <?php endif; ?>
                     </td>
                   </tr>
                   
@@ -689,6 +759,71 @@ if (strlen($_SESSION['imsaid']==0)) {
             </div>
           </div>
         </div>
+        
+        <!-- User Creation Tab -->
+        <div class="tab-pane" id="user-creation-tab">
+          <div class="widget-box">
+            <div class="widget-title"> <span class="icon"> <i class="icon-plus"></i> </span>
+              <h5>Créer Nouvel Utilisateur</h5>
+            </div>
+            <div class="widget-content">
+              <form method="post" class="form-horizontal" id="create-user-form">
+                <div class="control-group">
+                  <label class="control-label">Nom Complet:</label>
+                  <div class="controls">
+                    <input type="text" name="new_admin_name" required placeholder="Nom complet" class="span6">
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">Nom d'utilisateur:</label>
+                  <div class="controls">
+                    <input type="text" name="new_username" required placeholder="Nom d'utilisateur" class="span6">
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">Email:</label>
+                  <div class="controls">
+                    <input type="email" name="new_email" required placeholder="Adresse email" class="span6">
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">Numéro de téléphone:</label>
+                  <div class="controls">
+                    <input type="text" name="new_mobile" required placeholder="Numéro de téléphone" class="span6" pattern="[0-9]+">
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">Mot de passe:</label>
+                  <div class="controls">
+                    <input type="password" name="new_password" required placeholder="Mot de passe" class="span6" minlength="8">
+                    <p class="help-block">Le mot de passe doit contenir au moins 8 caractères.</p>
+                  </div>
+                </div>
+                <div class="control-group">
+                  <label class="control-label">Rôles:</label>
+                  <div class="controls">
+                    <div class="checkbox-container">
+                      <?php
+                      $all_roles_query = mysqli_query($con, "SELECT * FROM roles ORDER BY role_name");
+                      while($role = mysqli_fetch_array($all_roles_query)) {
+                        echo '<div class="checkbox-item">';
+                        echo '<label>';
+                        echo '<input type="checkbox" name="user_roles[]" value="'.$role['role_id'].'">';
+                        echo ' ' . $role['role_name'];
+                        echo '</label>';
+                        echo '</div>';
+                      }
+                      ?>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" name="create_user" class="btn btn-success">Créer Utilisateur</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -698,19 +833,31 @@ if (strlen($_SESSION['imsaid']==0)) {
 <?php include_once('includes/js.php');?>
 <script>
 $(document).ready(function(){
-  // Activate Bootstrap tabs
+  // Wait for all DOM elements to load
+  setTimeout(function() {
+    // Set active tab based on URL hash
+    if (window.location.hash) {
+      var hash = window.location.hash;
+      $('a[href="' + hash + '"]').tab('show');
+    }
+  }, 300);
+  
+  // Activate tabs on click
   $('a[data-toggle="tab"]').on('click', function (e) {
     e.preventDefault();
     $(this).tab('show');
+    
+    // Update URL hash when changing tabs
+    var hash = $(this).attr('href');
+    if(history.pushState) {
+      history.pushState(null, null, hash);
+    } else {
+      location.hash = hash;
+    }
   });
   
-  // Set active tab based on URL hash
-  if (window.location.hash) {
-    $('a[href="' + window.location.hash + '"]').tab('show');
-  }
-  
   // Category selection toggle
-  $('select[name="permission_category"]').change(function(){
+  $('#permission_category').change(function(){
     if($(this).val() === 'new') {
       $('#new-category').show();
     } else {
