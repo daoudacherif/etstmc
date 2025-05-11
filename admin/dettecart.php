@@ -16,6 +16,48 @@ if (empty($_SESSION['imsaid'])) {
 }
 
 /**
+ * Function to manage stock movements with logging
+ * @param mysqli $con Database connection
+ * @param int $productId Product ID
+ * @param int $quantity Quantity (negative for decrease)
+ * @param string $reference Reference number (invoice/order number)
+ * @return bool Success status
+ */
+function updateProductStock($con, $productId, $quantity, $reference = null) {
+    // Get current stock for logging
+    $checkStmt = mysqli_prepare($con, "SELECT Stock, ProductName FROM tblproducts WHERE ID = ? LIMIT 1");
+    mysqli_stmt_bind_param($checkStmt, "i", $productId);
+    mysqli_stmt_execute($checkStmt);
+    $result = mysqli_stmt_get_result($checkStmt);
+    
+    if (!$row = mysqli_fetch_assoc($result)) {
+        error_log("Stock update failed: Product ID $productId not found");
+        return false;
+    }
+    
+    $oldStock = $row['ProductName'];
+    $productName = $row['ProductName'];
+    $newStock = max(0, $oldStock + $quantity); // Ensure stock never goes negative
+    
+    // Update the stock
+    $updateStmt = mysqli_prepare($con, "UPDATE tblproducts SET Stock = ? WHERE ID = ?");
+    mysqli_stmt_bind_param($updateStmt, "ii", $newStock, $productId);
+    $success = mysqli_stmt_execute($updateStmt);
+    
+    if (!$success || mysqli_affected_rows($con) == 0) {
+        error_log("Stock update failed for product: $productName (ID: $productId)");
+        return false;
+    }
+    
+    // Log the stock change
+    $direction = ($quantity < 0) ? "decreased" : "increased";
+    $absQuantity = abs($quantity);
+    error_log("Stock $direction by $absQuantity for product: $productName (ID: $productId). Old: $oldStock, New: $newStock. Reference: $reference");
+    
+    return true;
+}
+
+/**
  * Obtenir un access token OAuth2 de Nimba using cURL.
  */
 function getAccessToken() {
@@ -169,7 +211,7 @@ if (isset($_POST['addtocart'])) {
         $cartItemId = $cartItem['ID'];
     }
 
-    // CORRECTION: Requête améliorée pour calculer le stock disponible
+    // Vérifier le stock disponible avec requête préparée
     $stockQuery = "
         SELECT 
             p.Stock AS initial_stock,
@@ -223,7 +265,7 @@ if (isset($_POST['addtocart'])) {
     $otherCartsQty = intval($row['other_carts_qty']);
     $productName = $row['ProductName'];
     
-    // CORRECTION: Calcul du stock disponible
+    // Calcul du stock disponible
     // Stock initial - vendu + retourné - réservé dans d'autres paniers
     $availableStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
     
@@ -399,8 +441,11 @@ if (isset($_POST['submit'])) {
             c.ID,
             c.ProductId,
             c.ProductQty,
-            c.Price
+            c.Price,
+            p.ProductName,
+            p.Stock
         FROM tblcreditcart c
+        JOIN tblproducts p ON p.ID = c.ProductId
         WHERE c.IsCheckOut = 0
     ");
     mysqli_stmt_execute($cartItemsStmt);
@@ -408,14 +453,17 @@ if (isset($_POST['submit'])) {
     
     $grandTotal = 0;
     $cartProducts = [];
+    $initialStocks = []; // Pour garder trace du stock initial avant modification
     
     while ($item = mysqli_fetch_assoc($cartItems)) {
         $grandTotal += $item['ProductQty'] * $item['Price'];
         $cartProducts[] = [
             'id' => $item['ProductId'],
             'qty' => $item['ProductQty'],
-            'cart_id' => $item['ID']
+            'cart_id' => $item['ID'],
+            'name' => $item['ProductName']
         ];
+        $initialStocks[$item['ProductId']] = $item['Stock'];
     }
 
     $netTotal = max(0, $grandTotal - $discount);
@@ -430,57 +478,13 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-    // CORRECTION: Vérification finale du stock pour chaque article
+    // Vérification finale du stock pour chaque article
     $stockErrors = [];
     
     foreach ($cartProducts as $product) {
-        // Requête corrigée pour vérifier le stock disponible
-        $stockCheckQuery = "
-            SELECT 
-                p.ID,
-                p.ProductName,
-                p.Stock AS initial_stock,
-                (
-                    SELECT COALESCE(SUM(cc.ProductQty), 0)
-                    FROM tblcreditcart cc
-                    WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 1
-                ) AS sold_qty,
-                (
-                    SELECT COALESCE(SUM(r.Quantity), 0)
-                    FROM tblreturns r
-                    WHERE r.ProductID = p.ID
-                ) AS returned_qty,
-                (
-                    SELECT COALESCE(SUM(cc.ProductQty), 0)
-                    FROM tblcreditcart cc
-                    WHERE cc.ProductId = p.ID AND cc.IsCheckOut = 0 AND cc.ID != ?
-                ) AS other_carts_qty
-            FROM tblproducts p
-            WHERE p.ID = ?
-        ";
-        
-        $stockStmt = mysqli_prepare($con, $stockCheckQuery);
-        mysqli_stmt_bind_param($stockStmt, "ii", $product['cart_id'], $product['id']);
-        mysqli_stmt_execute($stockStmt);
-        $stockResult = mysqli_stmt_get_result($stockStmt);
-        
-        if ($stockRow = mysqli_fetch_assoc($stockResult)) {
-            $initialStock = intval($stockRow['initial_stock']);
-            $soldQty = intval($stockRow['sold_qty']);
-            $returnedQty = intval($stockRow['returned_qty']);
-            $otherCartsQty = intval($stockRow['other_carts_qty']);
-            
-            // CORRECTION: Calcul du stock disponible 
-            $availableStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
-            
-            if ($availableStock <= 0) {
-                $stockErrors[] = "Article '{$stockRow['ProductName']}' est en rupture de stock";
-            } 
-            else if ($product['qty'] > $availableStock) {
-                $stockErrors[] = "Stock insuffisant pour {$stockRow['ProductName']} (demandé: {$product['qty']}, disponible: {$availableStock})";
-            }
-        } else {
-            $stockErrors[] = "Article non trouvé dans l'inventaire (ID: {$product['id']})";
+        // Vérifier directement avec le stock actuel dans tblproducts
+        if ($initialStocks[$product['id']] < $product['qty']) {
+            $stockErrors[] = "Stock insuffisant pour {$product['name']} (demandé: {$product['qty']}, disponible: {$initialStocks[$product['id']]})";
         }
     }
     
@@ -497,15 +501,20 @@ if (isset($_POST['submit'])) {
         // Générer un numéro de facture unique
         $billingnum = mt_rand(100000000, 999999999);
         
+        // Log de début de transaction
+        error_log("CHECKOUT: Starting transaction for order #$billingnum with " . count($cartProducts) . " products");
+        
         // Mise à jour du panier avec requête préparée
         $updateCartStmt = mysqli_prepare($con, 
             "UPDATE tblcreditcart SET BillingId = ?, IsCheckOut = 1 WHERE IsCheckOut = 0"
         );
         mysqli_stmt_bind_param($updateCartStmt, "s", $billingnum);
         
-        if (!mysqli_stmt_execute($updateCartStmt)) {
+        if (!mysqli_stmt_execute($updateCartStmt) || mysqli_affected_rows($con) != count($cartProducts)) {
             throw new Exception("Erreur lors de la mise à jour du panier: " . mysqli_error($con));
         }
+        
+        error_log("CHECKOUT: Cart items marked as checked out: " . mysqli_affected_rows($con));
         
         // Ajout du client avec requête préparée
         $addCustomerStmt = mysqli_prepare($con, 
@@ -518,28 +527,94 @@ if (isset($_POST['submit'])) {
             throw new Exception("Erreur lors de l'ajout du client: " . mysqli_error($con));
         }
         
-        // Mise à jour du stock pour chaque article
+        error_log("CHECKOUT: Customer added to database for order #$billingnum");
+        
+        // SOLUTION AMÉLIORÉE: Mise à jour du stock pour chaque article
+        $stockUpdateErrors = [];
+        $stockUpdates = [];
+        
+        // Préparation de la requête d'update stock
         $updateStockStmt = mysqli_prepare($con, 
-            "UPDATE tblproducts 
-             SET Stock = Stock - ? 
-             WHERE ID = ?"
+            "UPDATE tblproducts SET Stock = Stock - ? WHERE ID = ? AND Stock >= ?"
         );
         
         foreach ($cartProducts as $product) {
-            mysqli_stmt_bind_param($updateStockStmt, "ii", $product['qty'], $product['id']);
-            if (!mysqli_stmt_execute($updateStockStmt)) {
-                throw new Exception("Erreur lors de la mise à jour du stock pour l'article ID {$product['id']}: " . mysqli_error($con));
+            // Vérifier le stock actuel une dernière fois
+            $stockCheckStmt = mysqli_prepare($con, "SELECT Stock FROM tblproducts WHERE ID = ?");
+            mysqli_stmt_bind_param($stockCheckStmt, "i", $product['id']);
+            mysqli_stmt_execute($stockCheckStmt);
+            $stockCheck = mysqli_stmt_get_result($stockCheckStmt);
+            $currentStock = mysqli_fetch_assoc($stockCheck)['Stock'];
+            
+            // Décrémenter le stock seulement si suffisant
+            if ($currentStock >= $product['qty']) {
+                mysqli_stmt_bind_param($updateStockStmt, "iii", $product['qty'], $product['id'], $product['qty']);
+                $updateResult = mysqli_stmt_execute($updateStockStmt);
+                
+                if (!$updateResult || mysqli_affected_rows($con) == 0) {
+                    $stockUpdateErrors[] = "Échec de mise à jour du stock pour le produit {$product['name']} (ID: {$product['id']})";
+                    continue;
+                }
+                
+                // Enregistrer l'opération pour vérification
+                $stockUpdates[] = [
+                    'id' => $product['id'],
+                    'name' => $product['name'],
+                    'before' => $currentStock,
+                    'after' => $currentStock - $product['qty'],
+                    'qty' => $product['qty']
+                ];
+                
+                error_log("CHECKOUT: Stock updated for product '{$product['name']}' (ID: {$product['id']}). Before: $currentStock, After: " . ($currentStock - $product['qty']));
+            } else {
+                $stockUpdateErrors[] = "Stock insuffisant pour {$product['name']} lors de la mise à jour (demandé: {$product['qty']}, disponible: $currentStock)";
+            }
+        }
+        
+        // Vérifier s'il y a eu des erreurs de mise à jour de stock
+        if (!empty($stockUpdateErrors)) {
+            throw new Exception("Erreurs lors de la mise à jour du stock:\n- " . implode("\n- ", $stockUpdateErrors));
+        }
+        
+        // Vérification finale que TOUS les stocks ont été mis à jour
+        if (count($stockUpdates) != count($cartProducts)) {
+            throw new Exception("Certains produits n'ont pas eu leur stock mis à jour correctement");
+        }
+        
+        // Vérification que les stocks ont bien été décrémentés
+        $verificationErrors = [];
+        foreach ($stockUpdates as $update) {
+            $verifyStmt = mysqli_prepare($con, "SELECT Stock FROM tblproducts WHERE ID = ?");
+            mysqli_stmt_bind_param($verifyStmt, "i", $update['id']);
+            mysqli_stmt_execute($verifyStmt);
+            $verifyResult = mysqli_stmt_get_result($verifyStmt);
+            $actualStock = mysqli_fetch_assoc($verifyResult)['Stock'];
+            
+            if ($actualStock != $update['after']) {
+                $verificationErrors[] = "Le stock pour '{$update['name']}' devrait être {$update['after']} mais est $actualStock";
+            }
+        }
+        
+        if (!empty($verificationErrors)) {
+            error_log("STOCK VERIFICATION ERRORS: " . implode(", ", $verificationErrors));
+            // Tenter de corriger automatiquement
+            foreach ($stockUpdates as $update) {
+                $fixStmt = mysqli_prepare($con, "UPDATE tblproducts SET Stock = ? WHERE ID = ?");
+                mysqli_stmt_bind_param($fixStmt, "ii", $update['after'], $update['id']);
+                mysqli_stmt_execute($fixStmt);
+                error_log("STOCK FIX: Corrected stock for '{$update['name']}' to {$update['after']}");
             }
         }
         
         // Confirmer toutes les modifications
         mysqli_commit($con);
+        error_log("CHECKOUT: Transaction successfully committed for order #$billingnum");
         
         // Préparation du SMS en fonction du solde dû
         if ($dues > 0) {
-            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande (Facture: $billingnum) est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
         } else {
-            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande est confirmée. Merci pour votre confiance !";
+            $smsMessage = "Bonjour " . htmlspecialchars($custname) . ", votre commande (Facture: $billingnum) est confirmée. Merci pour votre confiance !";
         }
         
         // Envoyer le SMS et stocker le résultat
@@ -567,17 +642,34 @@ if (isset($_POST['submit'])) {
         unset($_SESSION['credit_discountValue']);
         $_SESSION['invoiceid'] = $billingnum;
         
+        // Résumé des articles achetés pour le message
+        $productSummary = "";
+        foreach ($cartProducts as $index => $product) {
+            if ($index < 3) { // Limiter à 3 produits pour l'alerte
+                $productSummary .= "- {$product['name']} (Qté: {$product['qty']})\n";
+            }
+        }
+        if (count($cartProducts) > 3) {
+            $productSummary .= "- et " . (count($cartProducts) - 3) . " autre(s) article(s)";
+        }
+        
         // Afficher le statut de l'envoi SMS dans le message d'alerte
         if ($smsResult) {
-            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
+            echo "<script>
+                    alert('Facture créée: $billingnum - SMS envoyé avec succès\\n\\nArticles:\\n$productSummary');
+                    window.location='invoice_dettecard.php?print=auto';
+                  </script>";
         } else {
-            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
+            echo "<script>
+                    alert('Facture créée: $billingnum - ÉCHEC de l\\'envoi du SMS\\n\\nArticles:\\n$productSummary');
+                    window.location='invoice_dettecard.php?print=auto';
+                  </script>";
         }
         exit;
         
     } catch (Exception $e) {
         mysqli_rollback($con);
-        error_log("Erreur lors de la validation du panier: " . $e->getMessage());
+        error_log("CHECKOUT ERROR: " . $e->getMessage());
         echo "<script>
                 alert('Erreur lors du paiement: " . addslashes($e->getMessage()) . "');
                 window.location.href='dettecart.php';
@@ -586,7 +678,7 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// CORRECTION: Vérifier à nouveau les stocks pour l'affichage du panier
+// Vérifier à nouveau les stocks pour l'affichage du panier
 $cartQuery = mysqli_prepare($con, "
     SELECT 
         c.ID, 
@@ -811,7 +903,7 @@ foreach ($cartItems as $item) {
                                 <?php
                                 $i = 1;
                                 while ($row = mysqli_fetch_assoc($searchResult)) {
-                                    // CORRECTION: Vérifier le stock disponible réel avec la méthode corrigée
+                                    // Vérifier le stock disponible réel avec la nouvelle méthode
                                     $productId = $row['ID'];
                                     
                                     // Trouver d'abord si l'article est déjà dans le panier
@@ -864,7 +956,7 @@ foreach ($cartItems as $item) {
                                     $returnedQty = intval($stockData['returned_qty'] ?? 0);
                                     $otherCartsQty = intval($stockData['other_carts_qty'] ?? 0);
                                     
-                                    // CORRECTION: Calcul correct du stock disponible
+                                    // Calcul correct du stock disponible
                                     $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
                                     $realStock = max(0, $realStock);
                                     
@@ -1003,7 +1095,7 @@ foreach ($cartItems as $item) {
                                 </thead>
                                 <tbody>
                                     <?php
-                                    // CORRECTION: Requête améliorée pour afficher le panier avec stock réel
+                                    // Requête améliorée pour afficher le panier avec stock réel
                                     $cartQuery = "
                                       SELECT 
                                         c.ID as cid,
@@ -1033,7 +1125,7 @@ foreach ($cartItems as $item) {
                                             $ppu = $row['cartPrice'];
                                             $initialStock = intval($row['initial_stock']);
                                             
-                                            // CORRECTION: Obtenir les données pour le calcul du stock
+                                            // Obtenir les données pour le calcul du stock
                                             $stockStmt = mysqli_prepare($con, "
                                                 SELECT 
                                                     (
@@ -1061,7 +1153,7 @@ foreach ($cartItems as $item) {
                                             $returnedQty = intval($stockData['returned_qty']);
                                             $otherCartsQty = intval($stockData['other_carts_qty']);
                                             
-                                            // CORRECTION: Calcul correct du stock réellement disponible
+                                            // Calcul correct du stock réellement disponible
                                             $realStock = $initialStock - $soldQty + $returnedQty - $otherCartsQty;
                                             $lineTotal = $pq * $ppu;
                                             $grandTotal += $lineTotal;
