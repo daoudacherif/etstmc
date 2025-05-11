@@ -18,7 +18,7 @@ if(isset($_POST['login']))
         
         // Vérifier si l'utilisateur est un "saler" et rediriger en conséquence
         if($ret['UserName'] == 'saler'){
-            header('location:sale-dashboard.php');
+            header('location:dashboard.php');
         } else {
             header('location:dashboard.php');
         }
