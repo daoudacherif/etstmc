@@ -3,33 +3,27 @@ session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
-// Code de connexion modifié pour gérer spécialement les utilisateurs "saler" et "admin"
+// Code de connexion modifié pour utiliser AdminName et gérer les redirections
 if(isset($_POST['login']))
 {
-    $adminuser=$_POST['username'];
-    $password=md5($_POST['password']);
+    $adminname = $_POST['adminname']; // Utilisation de AdminName au lieu de UserName
+    $password = md5($_POST['password']);
     
-    // Vérifie si le nom d'utilisateur est "saler" ou "admin"
-    if($adminuser == 'saler' || $adminuser == 'admin') {
-        // Pour les utilisateurs saler ou admin, on vérifie seulement le mot de passe
-        $query=mysqli_query($con, "SELECT ID FROM tbladmin WHERE UserName='$adminuser' AND Password='$password' LIMIT 1");
-        $ret=mysqli_fetch_array($query);
-        if($ret>0){
-            $_SESSION['imsaid']=$ret['ID'];
-            header('location:dashboard.php');
+    // Requête pour vérifier l'authenticité des informations d'identification
+    $query = mysqli_query($con, "SELECT ID, UserName FROM tbladmin WHERE AdminName='$adminname' AND Password='$password'");
+    $ret = mysqli_fetch_array($query);
+    
+    if($ret > 0){
+        $_SESSION['imsaid'] = $ret['ID'];
+        
+        // Vérifier si l'utilisateur est un "saler" et rediriger en conséquence
+        if($ret['UserName'] == 'saler'){
+            header('location:sale-dashboard.php');
         } else {
-            echo '<script>alert("Mot de passe incorrect pour l\'utilisateur '.$adminuser.'.")</script>';
+            header('location:dashboard.php');
         }
     } else {
-        // Pour les autres utilisateurs, comportement normal
-        $query=mysqli_query($con, "SELECT ID FROM tbladmin WHERE UserName='$adminuser' AND Password='$password'");
-        $ret=mysqli_fetch_array($query);
-        if($ret>0){
-            $_SESSION['imsaid']=$ret['ID'];
-            header('location:dashboard.php');
-        } else {
-            echo '<script>alert("Détails invalides.")</script>';
-        }
+        echo '<script>alert("Détails invalides. Veuillez réessayer.")</script>';
     }
 }
 ?>
@@ -53,7 +47,7 @@ if(isset($_POST['login']))
             <div class="control-group">
                 <div class="controls">
                     <div class="main_input_box">
-                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'utilisateur" name="username" required="true" />
+                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'administrateur" name="adminname" required="true" />
                     </div>
                 </div>
             </div>
