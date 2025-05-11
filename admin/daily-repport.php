@@ -32,38 +32,21 @@ $export = isset($_GET['export']) ? $_GET['export'] : '';
 // Récupération des données (utilisé pour tous les cas : affichage et exports)
 // --- Calculer les totaux (Ventes, Dépôts, Retraits, Retours) ---
 
-// Ventes Régulières
-$sqlSalesRegular = "
-  SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalSales
+// Ventes
+$sqlSales = "
+  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
   FROM tblcart c
+  JOIN tblproducts p ON p.ID = c.ProductId
   WHERE c.IsCheckOut='1'
     AND c.CartDate BETWEEN ? AND ?
 ";
-$stmtSalesRegular = $con->prepare($sqlSalesRegular);
-$stmtSalesRegular->bind_param('ss', $startDateTime, $endDateTime);
-$stmtSalesRegular->execute();
-$resultSalesRegular = $stmtSalesRegular->get_result();
-$rowSalesRegular = $resultSalesRegular->fetch_assoc();
-$totalSalesRegular = $rowSalesRegular['totalSales'];
-$stmtSalesRegular->close();
-
-// Ventes à Crédit
-$sqlSalesCredit = "
-  SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalSales
-  FROM tblcreditcart c
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN ? AND ?
-";
-$stmtSalesCredit = $con->prepare($sqlSalesCredit);
-$stmtSalesCredit->bind_param('ss', $startDateTime, $endDateTime);
-$stmtSalesCredit->execute();
-$resultSalesCredit = $stmtSalesCredit->get_result();
-$rowSalesCredit = $resultSalesCredit->fetch_assoc();
-$totalSalesCredit = $rowSalesCredit['totalSales'];
-$stmtSalesCredit->close();
-
-// Total des ventes (régulières + crédit)
-$totalSales = $totalSalesRegular + $totalSalesCredit;
+$stmtSales = $con->prepare($sqlSales);
+$stmtSales->bind_param('ss', $startDateTime, $endDateTime);
+$stmtSales->execute();
+$resultSales = $stmtSales->get_result();
+$rowSales = $resultSales->fetch_assoc();
+$totalSales = $rowSales['totalSales'];
+$stmtSales->close();
 
 // Dépôts/Retraits
 $sqlTransactions = "
@@ -102,8 +85,7 @@ $netBalance = ($totalSales + $totalDeposits) - ($totalWithdrawals + $totalReturn
 
 // --- 3) Récupérer la liste unifiée pour l'affichage / export ---
 $sqlList = "
-  -- Ventes régulières
-  SELECT 'Vente' AS Type, (c.ProductQty * c.Price) AS Amount,
+  SELECT 'Vente' AS Type, (c.ProductQty * p.Price) AS Amount,
        c.CartDate AS Date, p.ProductName AS Comment
   FROM tblcart c
   JOIN tblproducts p ON p.ID = c.ProductId
@@ -112,17 +94,6 @@ $sqlList = "
   
   UNION ALL
   
-  -- Ventes à crédit
-  SELECT 'Vente à Terme' AS Type, (c.ProductQty * c.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName AS Comment
-  FROM tblcreditcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN ? AND ?
-  
-  UNION ALL
-  
-  -- Transactions de caisse
   SELECT 
     CASE 
       WHEN TransType='IN' THEN 'Dépôt' 
@@ -135,7 +106,6 @@ $sqlList = "
   
   UNION ALL
   
-  -- Retours
   SELECT 'Retour' AS Type, (r.Quantity * p.Price) AS Amount,
        r.ReturnDate AS Date, r.Reason AS Comment
   FROM tblreturns r
@@ -145,7 +115,7 @@ $sqlList = "
   ORDER BY Date DESC
 ";
 $stmtList = $con->prepare($sqlList);
-$stmtList->bind_param('ssssssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $startDateTime, $endDateTime, $start, $end);
+$stmtList->bind_param('ssssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $start, $end);
 $stmtList->execute();
 $resultList = $stmtList->get_result();
 
@@ -157,28 +127,24 @@ $sqlProducts = "
     COALESCE(c.CategoryName, 'N/A') AS CategoryName,
     p.BrandName,
     p.Stock AS initial_stock,
-    (COALESCE(SUM(cart_regular.ProductQty), 0) + COALESCE(SUM(cart_credit.ProductQty), 0)) AS sold_qty,
+    COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
     COALESCE(
       (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID AND 
       ReturnDate BETWEEN ? AND ?),
       0
     ) AS returned_qty,
     p.Price,
-    (COALESCE(SUM(cart_regular.ProductQty * cart_regular.Price), 0) + COALESCE(SUM(cart_credit.ProductQty * cart_credit.Price), 0)) AS total_sales
+    (COALESCE(SUM(cart.ProductQty), 0) * p.Price) AS total_sales
   FROM tblproducts p
   LEFT JOIN tblcategory c ON c.ID = p.CatID
-  -- Jointure pour les ventes régulières
-  LEFT JOIN tblcart cart_regular ON cart_regular.ProductId = p.ID AND cart_regular.IsCheckOut = 1
-    AND cart_regular.CartDate BETWEEN ? AND ?
-  -- Jointure pour les ventes à crédit
-  LEFT JOIN tblcreditcart cart_credit ON cart_credit.ProductId = p.ID AND cart_credit.IsCheckOut = 1
-    AND cart_credit.CartDate BETWEEN ? AND ?
+  LEFT JOIN tblcart cart ON cart.ProductId = p.ID AND cart.IsCheckOut = 1
+    AND cart.CartDate BETWEEN ? AND ?
   GROUP BY p.ID
   ORDER BY total_sales DESC
   LIMIT 10
 ";
 $stmtProducts = $con->prepare($sqlProducts);
-$stmtProducts->bind_param('ssssss', $start, $end, $startDateTime, $endDateTime, $startDateTime, $endDateTime);
+$stmtProducts->bind_param('ssss', $start, $end, $startDateTime, $endDateTime);
 $stmtProducts->execute();
 $resultProducts = $stmtProducts->get_result();
 
@@ -204,7 +170,7 @@ if ($export === 'pdf' && $dompdf_available) {
   <div class="summary">
     <h3>Résumé</h3>
     <table>
-      <tr><th>Ventes (Régulières + Crédit)</th><td class="text-right"><?php echo number_format($totalSales, 2); ?></td></tr>
+      <tr><th>Ventes</th><td class="text-right"><?php echo number_format($totalSales, 2); ?></td></tr>
       <tr><th>Dépôts</th><td class="text-right"><?php echo number_format($totalDeposits, 2); ?></td></tr>
       <tr><th>Retraits</th><td class="text-right"><?php echo number_format($totalWithdrawals, 2); ?></td></tr>
       <tr><th>Retours</th><td class="text-right"><?php echo number_format($totalReturns, 2); ?></td></tr>
@@ -304,7 +270,7 @@ if ($export === 'excel') {
   
   echo "<h3>Résumé</h3>";
   echo "<table border='1'>";
-  echo "<tr><th>Ventes (Régulières + Crédit)</th><td class='text-right'>".number_format($totalSales, 2)."</td></tr>";
+  echo "<tr><th>Ventes</th><td class='text-right'>".number_format($totalSales, 2)."</td></tr>";
   echo "<tr><th>Dépôts</th><td class='text-right'>".number_format($totalDeposits, 2)."</td></tr>";
   echo "<tr><th>Retraits</th><td class='text-right'>".number_format($totalWithdrawals, 2)."</td></tr>";
   echo "<tr><th>Retours</th><td class='text-right'>".number_format($totalReturns, 2)."</td></tr>";
@@ -520,11 +486,6 @@ if ($export === 'excel') {
     .btn-print {
       margin-left: 10px;
     }
-    
-    /* Style pour les ventes à terme */
-    .label-credit {
-      background-color: #f0ad4e;
-    }
   </style>
 </head>
 <body>
@@ -606,16 +567,8 @@ if ($export === 'excel') {
                 <div class="span12">
                   <table class="table table-bordered">
                     <tr>
-                      <th>Ventes régulières</th>
-                      <td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td>
-                    </tr>
-                    <tr>
-                      <th>Ventes à terme</th>
-                      <td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td>
-                    </tr>
-                    <tr>
-                      <th>Total des ventes</th>
-                      <td class="text-right"><strong><?php echo number_format($totalSales, 2); ?></strong></td>
+                      <th>Ventes</th>
+                      <td class="text-right"><?php echo number_format($totalSales, 2); ?></td>
                     </tr>
                     <tr>
                       <th>Dépôts</th>
@@ -719,7 +672,6 @@ if ($export === 'excel') {
                     $typeClass = '';
                     switch($row['Type']) {
                       case 'Vente': $typeClass = 'label-success'; break;
-                      case 'Vente à Terme': $typeClass = 'label-credit'; break;
                       case 'Dépôt': $typeClass = 'label-info'; break;
                       case 'Retrait': $typeClass = 'label-warning'; break;
                       case 'Retour': $typeClass = 'label-important'; break;
