@@ -69,6 +69,7 @@ try {
         <li><a href="dettecart.php">Terme <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
         <li><a href="return.php">Retour</a></li>
         <li><a href="transact.php">Transactions</a></li>
+        <li><a href="facture.php">Factures</a></li>
       </ul>
     </li>
 
