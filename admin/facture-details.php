@@ -172,11 +172,12 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                 $custInfo = null;
                 
                 if($type == 'credit') {
-                  $custQuery = mysqli_query($con, "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
+                  // Modified this line to correct the table name from 'tblcustumer' to 'tblcustomer'
+                  $custQuery = mysqli_query($con, "SELECT * FROM tblcustomer WHERE BillingNumber='$billingId'");
                   
                   // Check for database query errors
                   if(!$custQuery) {
-                    displayError("Erreur lors de la récupération des informations client.", "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
+                    displayError("Erreur lors de la récupération des informations client.", "SELECT * FROM tblcustomer WHERE BillingNumber='$billingId'");
                   } else if(mysqli_num_rows($custQuery) > 0) {
                     $custInfo = mysqli_fetch_assoc($custQuery);
                   }
