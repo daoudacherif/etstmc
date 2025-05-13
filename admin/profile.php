@@ -17,7 +17,7 @@ if (strlen($_SESSION['imsaid']==0)) {
       $success = $stmt->execute();
       if($success) {
         echo "<script>alert('Utilisateur activé avec succès.');</script>";
-        echo "<script>window.location.href='manage-users.php'</script>";
+        echo "<script>window.location.href='profile.php'</script>";
       }
     }
     
@@ -28,7 +28,7 @@ if (strlen($_SESSION['imsaid']==0)) {
       $success = $stmt->execute();
       if($success) {
         echo "<script>alert('Utilisateur désactivé avec succès.');</script>";
-        echo "<script>window.location.href='manage-users.php'</script>";
+        echo "<script>window.location.href='profile.php'</script>";
       }
     }
     
@@ -39,7 +39,7 @@ if (strlen($_SESSION['imsaid']==0)) {
       $success = $stmt->execute();
       if($success) {
         echo "<script>alert('Utilisateur supprimé avec succès.');</script>";
-        echo "<script>window.location.href='manage-users.php'</script>";
+        echo "<script>window.location.href='profile.php'</script>";
       }
     }
   }
