@@ -20,8 +20,11 @@
     ?>
     <li class="dropdown" id="profile-messages"><a title="" href="#" data-toggle="dropdown" data-target="#profile-messages" class="dropdown-toggle"><i class="icon icon-user"></i> <span class="text">Welcome <?php echo $name; ?></span><b class="caret"></b></a>
       <ul class="dropdown-menu">
+        <?php if($username != 'saler'): ?>
+        <!-- Profile link only shown to regular users -->
         <li><a href="profile.php"><i class="icon-user"></i> My Profile</a></li>
         <li class="divider"></li>
+        <?php endif; ?>
         <li><a href="change-password.php"><i class="icon-check"></i> Setting</a></li>
         <li class="divider"></li>
         <li><a href="logout.php"><i class="icon-key"></i> Log Out</a></li>
