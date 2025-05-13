@@ -3,27 +3,47 @@ session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
-// Code de connexion modifié pour utiliser AdminName et gérer les redirections
+// Updated login code to check user status and use secure password verification
 if(isset($_POST['login']))
 {
-    $adminname = $_POST['adminname']; // Utilisation de AdminName au lieu de UserName
-    $password = md5($_POST['password']);
+    $username = $_POST['username']; // Changed to username for consistency
+    $password = $_POST['password']; // Plain password (not md5)
     
-    // Requête pour vérifier l'authenticité des informations d'identification
-    $query = mysqli_query($con, "SELECT ID, UserName FROM tbladmin WHERE AdminName='$adminname' AND Password='$password'");
-    $ret = mysqli_fetch_array($query);
+    // Use prepared statement to prevent SQL injection
+    $stmt = $con->prepare("SELECT ID, UserName, Password, Status FROM tbladmin WHERE UserName=?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
-    if($ret > 0){
-        $_SESSION['imsaid'] = $ret['ID'];
+    if($result->num_rows > 0) {
+        $user = $result->fetch_assoc();
         
-        // Vérifier si l'utilisateur est un "saler" et rediriger en conséquence
-        if($ret['UserName'] == 'saler'){
+        // Check if user is active
+        if($user['Status'] == 0) {
+            echo '<script>alert("Votre compte a été désactivé. Veuillez contacter l\'administrateur.")</script>';
+        } 
+        // Verify password - if using password_hash, use password_verify
+        else if(password_verify($password, $user['Password'])) {
+            $_SESSION['imsaid'] = $user['ID'];
             header('location:dashboard.php');
-        } else {
+        } 
+        // For backward compatibility with md5 passwords
+        else if(md5($password) == $user['Password']) {
+            $_SESSION['imsaid'] = $user['ID'];
+            
+            // Optional: upgrade old MD5 password to new secure hash
+            $new_hash = password_hash($password, PASSWORD_DEFAULT);
+            $update_stmt = $con->prepare("UPDATE tbladmin SET Password=? WHERE ID=?");
+            $update_stmt->bind_param("si", $new_hash, $user['ID']);
+            $update_stmt->execute();
+            
             header('location:dashboard.php');
         }
+        else {
+            echo '<script>alert("Mot de passe incorrect. Veuillez réessayer.")</script>';
+        }
     } else {
-        echo '<script>alert("Détails invalides. Veuillez réessayer.")</script>';
+        echo '<script>alert("Nom d\'utilisateur invalide. Veuillez réessayer.")</script>';
     }
 }
 ?>
@@ -47,7 +67,7 @@ if(isset($_POST['login']))
             <div class="control-group">
                 <div class="controls">
                     <div class="main_input_box">
-                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'administrateur" name="adminname" required="true" />
+                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'utilisateur" name="username" required="true" />
                     </div>
                 </div>
             </div>
