@@ -3,15 +3,15 @@ session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
 
-// Updated login code to check user status and use secure password verification
+// Updated login code to use AdminName instead of UserName
 if(isset($_POST['login']))
 {
-    $username = $_POST['username']; 
+    $adminname = $_POST['adminname']; // Changed to adminname 
     $password = $_POST['password']; 
     
-    // Use prepared statement to prevent SQL injection
-    $stmt = $con->prepare("SELECT ID, UserName, Password, Status FROM tbladmin WHERE UserName=?");
-    $stmt->bind_param("s", $username);
+    // Use prepared statement to prevent SQL injection - now using AdminName
+    $stmt = $con->prepare("SELECT ID, UserName, Password, Status FROM tbladmin WHERE AdminName=?");
+    $stmt->bind_param("s", $adminname);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -48,7 +48,7 @@ if(isset($_POST['login']))
             }
         }
     } else {
-        echo '<script>alert("Nom d\'utilisateur invalide. Veuillez réessayer.")</script>';
+        echo '<script>alert("Nom d\'administrateur invalide. Veuillez réessayer.")</script>';
     }
 }
 ?>
@@ -72,7 +72,7 @@ if(isset($_POST['login']))
             <div class="control-group">
                 <div class="controls">
                     <div class="main_input_box">
-                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'utilisateur" name="username" required="true" />
+                        <span class="add-on bg_lg"><i class="icon-user"> </i></span><input type="text" placeholder="Nom d'administrateur" name="adminname" required="true" />
                     </div>
                 </div>
             </div>
