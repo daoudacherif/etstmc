@@ -6,8 +6,8 @@ include('includes/dbconnection.php');
 // Updated login code to check user status and use secure password verification
 if(isset($_POST['login']))
 {
-    $username = $_POST['username']; // Changed to username for consistency
-    $password = $_POST['password']; // Plain password (not md5)
+    $username = $_POST['username']; 
+    $password = $_POST['password']; 
     
     // Use prepared statement to prevent SQL injection
     $stmt = $con->prepare("SELECT ID, UserName, Password, Status FROM tbladmin WHERE UserName=?");
@@ -22,25 +22,30 @@ if(isset($_POST['login']))
         if($user['Status'] == 0) {
             echo '<script>alert("Votre compte a été désactivé. Veuillez contacter l\'administrateur.")</script>';
         } 
-        // Verify password - if using password_hash, use password_verify
-        else if(password_verify($password, $user['Password'])) {
-            $_SESSION['imsaid'] = $user['ID'];
-            header('location:dashboard.php');
-        } 
-        // For backward compatibility with md5 passwords
-        else if(md5($password) == $user['Password']) {
-            $_SESSION['imsaid'] = $user['ID'];
-            
-            // Optional: upgrade old MD5 password to new secure hash
-            $new_hash = password_hash($password, PASSWORD_DEFAULT);
-            $update_stmt = $con->prepare("UPDATE tbladmin SET Password=? WHERE ID=?");
-            $update_stmt->bind_param("si", $new_hash, $user['ID']);
-            $update_stmt->execute();
-            
-            header('location:dashboard.php');
-        }
         else {
-            echo '<script>alert("Mot de passe incorrect. Veuillez réessayer.")</script>';
+            // Only check password if account is active
+            // Verify password - if using password_hash, use password_verify
+            if(password_verify($password, $user['Password'])) {
+                $_SESSION['imsaid'] = $user['ID'];
+                header('location:dashboard.php');
+                exit(); // Add exit to stop further execution
+            } 
+            // For backward compatibility with md5 passwords
+            else if(md5($password) == $user['Password']) {
+                $_SESSION['imsaid'] = $user['ID'];
+                
+                // Optional: upgrade old MD5 password to new secure hash
+                $new_hash = password_hash($password, PASSWORD_DEFAULT);
+                $update_stmt = $con->prepare("UPDATE tbladmin SET Password=? WHERE ID=?");
+                $update_stmt->bind_param("si", $new_hash, $user['ID']);
+                $update_stmt->execute();
+                
+                header('location:dashboard.php');
+                exit(); // Add exit to stop further execution
+            }
+            else {
+                echo '<script>alert("Mot de passe incorrect. Veuillez réessayer.")</script>';
+            }
         }
     } else {
         echo '<script>alert("Nom d\'utilisateur invalide. Veuillez réessayer.")</script>';
