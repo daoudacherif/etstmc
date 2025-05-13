@@ -192,11 +192,11 @@ if (strlen($_SESSION['imsaid']==0)) {
                 </td>
                 <td class="center">
                   <?php if($row['Status'] == 1) { ?>
-                    <a href="manage-users.php?action=deactivate&id=<?php echo $row['ID']; ?>" class="btn btn-warning btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir désactiver cet utilisateur?')">Désactiver</a>
+                    <a href="profile.php?action=deactivate&id=<?php echo $row['ID']; ?>" class="btn btn-warning btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir désactiver cet utilisateur?')">Désactiver</a>
                   <?php } else { ?>
-                    <a href="manage-users.php?action=activate&id=<?php echo $row['ID']; ?>" class="btn btn-success btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir activer cet utilisateur?')">Activer</a>
+                    <a href="profile.php?action=activate&id=<?php echo $row['ID']; ?>" class="btn btn-success btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir activer cet utilisateur?')">Activer</a>
                   <?php } ?>
-                  <a href="manage-users.php?action=delete&id=<?php echo $row['ID']; ?>" class="btn btn-danger btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur? Cette action est irréversible.')">Supprimer</a>
+                  <a href="profile.php?action=delete&id=<?php echo $row['ID']; ?>" class="btn btn-danger btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur? Cette action est irréversible.')">Supprimer</a>
                 </td>
               </tr>
               <?php 
