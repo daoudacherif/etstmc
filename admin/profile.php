@@ -5,6 +5,45 @@ include('includes/dbconnection.php');
 if (strlen($_SESSION['imsaid']==0)) {
   header('location:logout.php');
 } else {
+  
+  // Handle activation/deactivation/deletion
+  if(isset($_GET['action']) && isset($_GET['id'])) {
+    $id = intval($_GET['id']);
+    
+    // Activate user
+    if($_GET['action'] == 'activate') {
+      $stmt = $con->prepare("UPDATE tbladmin SET Status=1 WHERE ID=?");
+      $stmt->bind_param("i", $id);
+      $success = $stmt->execute();
+      if($success) {
+        echo "<script>alert('Utilisateur activé avec succès.');</script>";
+        echo "<script>window.location.href='manage-users.php'</script>";
+      }
+    }
+    
+    // Deactivate user
+    if($_GET['action'] == 'deactivate') {
+      $stmt = $con->prepare("UPDATE tbladmin SET Status=0 WHERE ID=?");
+      $stmt->bind_param("i", $id);
+      $success = $stmt->execute();
+      if($success) {
+        echo "<script>alert('Utilisateur désactivé avec succès.');</script>";
+        echo "<script>window.location.href='manage-users.php'</script>";
+      }
+    }
+    
+    // Delete user
+    if($_GET['action'] == 'delete') {
+      $stmt = $con->prepare("DELETE FROM tbladmin WHERE ID=?");
+      $stmt->bind_param("i", $id);
+      $success = $stmt->execute();
+      if($success) {
+        echo "<script>alert('Utilisateur supprimé avec succès.');</script>";
+        echo "<script>window.location.href='manage-users.php'</script>";
+      }
+    }
+  }
+  
   // Handle user creation
   if(isset($_POST['createUser'])) {
     $adminid = $_SESSION['imsaid'];
@@ -12,21 +51,29 @@ if (strlen($_SESSION['imsaid']==0)) {
     
     // Check if the username is "saler" as required
     if($username == 'saler') {
-      $password = md5($_POST['password']);
       $adminname = $_POST['adminname'];
+      $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Secure hashing
       $mobileno = $_POST['mobileno'];
       $email = $_POST['email'];
       $regdate = date('Y-m-d H:i:s');
+      $status = 1; // Default to active
       
-      // Vérifier seulement si l'email existe déjà pour éviter les doublons d'email
-      $check_email = mysqli_query($con, "SELECT ID FROM tbladmin WHERE Email='$email'");
-      if(mysqli_num_rows($check_email) > 0) {
+      // Check if email exists using prepared statement
+      $stmt = $con->prepare("SELECT ID FROM tbladmin WHERE Email=?");
+      $stmt->bind_param("s", $email);
+      $stmt->execute();
+      $result = $stmt->get_result();
+      
+      if($result->num_rows > 0) {
         echo '<script>alert("Cette adresse e-mail est déjà utilisée. Veuillez en utiliser une autre.")</script>';
       } else {
-        // Créer directement l'utilisateur saler sans vérifier si ce nom d'utilisateur existe déjà
-        $query = mysqli_query($con, "INSERT INTO tbladmin(AdminName, UserName, MobileNumber, Email, Password, AdminRegdate) 
-                                     VALUES('$adminname', '$username', '$mobileno', '$email', '$password', '$regdate')");
-        if($query) {
+        // Create user with prepared statement
+        $stmt = $con->prepare("INSERT INTO tbladmin(AdminName, UserName, MobileNumber, Email, Password, AdminRegdate, Status) 
+                              VALUES(?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssi", $adminname, $username, $mobileno, $email, $password, $regdate, $status);
+        $success = $stmt->execute();
+        
+        if($success) {
           echo '<script>alert("Nouvel utilisateur saler créé avec succès.")</script>';
         } else {
           echo '<script>alert("Échec de la création. Veuillez réessayer.")</script>';
@@ -70,6 +117,9 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <input type="text" class="span11" name="adminname" id="adminname" required='true' />
               </div>
             </div>
+            
+            <!-- Hidden username field set to "saler" -->
+            <input type="hidden" name="username" value="saler">
            
             <div class="control-group">
               <label class="control-label">Mot de passe :</label>
@@ -111,13 +161,18 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <th>Contact</th>
                 <th>Email</th>
                 <th>Date d'inscription</th>
+                <th>Statut</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               <?php
-              $ret=mysqli_query($con,"SELECT * FROM tbladmin");
+              // Use prepared statement for getting users
+              $stmt = $con->prepare("SELECT * FROM tbladmin");
+              $stmt->execute();
+              $result = $stmt->get_result();
               $cnt=1;
-              while ($row=mysqli_fetch_array($ret)) {
+              while ($row = $result->fetch_assoc()) {
               ?>
               <tr class="gradeX">
                 <td><?php echo $cnt;?></td>
@@ -126,6 +181,23 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <td><?php echo $row['MobileNumber'];?></td>
                 <td><?php echo $row['Email'];?></td>
                 <td><?php echo $row['AdminRegdate'];?></td>
+                <td>
+                  <?php 
+                  if($row['Status'] == 1) {
+                    echo '<span class="label label-success">Actif</span>';
+                  } else {
+                    echo '<span class="label label-important">Inactif</span>';
+                  }
+                  ?>
+                </td>
+                <td class="center">
+                  <?php if($row['Status'] == 1) { ?>
+                    <a href="manage-users.php?action=deactivate&id=<?php echo $row['ID']; ?>" class="btn btn-warning btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir désactiver cet utilisateur?')">Désactiver</a>
+                  <?php } else { ?>
+                    <a href="manage-users.php?action=activate&id=<?php echo $row['ID']; ?>" class="btn btn-success btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir activer cet utilisateur?')">Activer</a>
+                  <?php } ?>
+                  <a href="manage-users.php?action=delete&id=<?php echo $row['ID']; ?>" class="btn btn-danger btn-mini" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur? Cette action est irréversible.')">Supprimer</a>
+                </td>
               </tr>
               <?php 
               $cnt=$cnt+1;
