@@ -10,12 +10,17 @@ if (strlen($_SESSION['imsaid']) == 0) {
 }
 
 // Vérifier si l'ID de la facture est fourni
-if (!isset($_GET['id']) || empty($_GET['id'])) {
+if (!isset($_GET['id']) || empty($_GET['id']) || !isset($_GET['type'])) {
   header('location:facture.php');
   exit;
 }
 
 $billingId = intval($_GET['id']);
+$type = $_GET['type']; // 'cart' ou 'credit'
+
+// Table à utiliser selon le type
+$tableToUse = ($type == 'credit') ? 'tblcreditcart' : 'tblcart';
+$typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -39,7 +44,7 @@ $billingId = intval($_GET['id']);
       <a href="facture.php">Factures</a>
       <a href="#" class="current">Détails</a>
     </div>
-    <h1>Détails de la facture #<?php echo $billingId; ?></h1>
+    <h1>Détails de la facture <?php echo $typeLabel; ?> #<?php echo $billingId; ?></h1>
   </div>
 
   <div class="container-fluid">
@@ -51,7 +56,7 @@ $billingId = intval($_GET['id']);
         <div class="widget-box">
           <div class="widget-title">
             <span class="icon"><i class="icon-file"></i></span>
-            <h5>Informations de la facture</h5>
+            <h5>Informations de la facture <?php echo $typeLabel; ?></h5>
             <div class="buttons">
               <a href="facture.php" class="btn btn-primary">
                 <i class="icon-arrow-left"></i> Retour aux factures
@@ -70,7 +75,7 @@ $billingId = intval($_GET['id']);
                 BillingId,
                 SUM(Price * ProductQty) as Total,
                 COUNT(*) as ItemCount
-              FROM tblcart 
+              FROM $tableToUse 
               WHERE BillingId='$billingId' 
               GROUP BY BillingId, CartDate
             ";
@@ -87,6 +92,10 @@ $billingId = intval($_GET['id']);
                   <tr>
                     <th>Numéro de facture:</th>
                     <td><?php echo $factureInfo['BillingId']; ?></td>
+                  </tr>
+                  <tr>
+                    <th>Type:</th>
+                    <td><?php echo ucfirst($typeLabel); ?></td>
                   </tr>
                   <tr>
                     <th>Date:</th>
@@ -128,7 +137,7 @@ $billingId = intval($_GET['id']);
                     c.ProductQty,
                     c.Price,
                     p.ProductName
-                  FROM tblcart c
+                  FROM $tableToUse c
                   LEFT JOIN tblproducts p ON p.ID = c.ProductId
                   WHERE c.BillingId='$billingId'
                   ORDER BY c.ID ASC
@@ -156,7 +165,7 @@ $billingId = intval($_GET['id']);
               </tbody>
             </table>
             <div class="text-right">
-              <a href="facture.php?delete_id=<?php echo $billingId; ?>" 
+              <a href="facture.php?delete_id=<?php echo $billingId; ?>&type=<?php echo $type; ?>" 
                 class="btn btn-danger" 
                 onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
                 <i class="icon-trash"></i> Supprimer cette facture

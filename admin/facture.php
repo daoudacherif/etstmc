@@ -14,9 +14,13 @@ if (strlen($_SESSION['imsaid']) == 0) {
 // ==========================
 if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
   $billingId = intval($_GET['delete_id']);
+  $type = $_GET['type']; // 'cart' ou 'credit'
+  
+  // Table à utiliser selon le type
+  $tableToUse = ($type == 'credit') ? 'tblcreditcart' : 'tblcart';
   
   // 1. Récupérer les données de la facture pour mettre à jour le stock
-  $sqlCartItems = "SELECT ProductId, ProductQty FROM tblcart WHERE BillingId='$billingId'";
+  $sqlCartItems = "SELECT ProductId, ProductQty FROM $tableToUse WHERE BillingId='$billingId'";
   $cartQuery = mysqli_query($con, $sqlCartItems);
   
   // 2. Mettre à jour le stock pour chaque produit
@@ -35,13 +39,9 @@ if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
   
   // 3. Supprimer les données de la facture
   if ($updateSuccess) {
-    // Supprimer de tblcart
-    $deleteCart = "DELETE FROM tblcart WHERE BillingId='$billingId'";
-    mysqli_query($con, $deleteCart);
-    
-    // Supprimer de tblcreditcart si nécessaire
-    $deleteCredit = "DELETE FROM tblcreditcart WHERE BillingId='$billingId'";
-    mysqli_query($con, $deleteCredit);
+    // Supprimer de la table appropriée
+    $deleteQuery = "DELETE FROM $tableToUse WHERE BillingId='$billingId'";
+    mysqli_query($con, $deleteQuery);
     
     echo "<script>alert('Facture supprimée avec succès et stock mis à jour!');</script>";
   } else {
@@ -79,72 +79,144 @@ if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
   <div class="container-fluid">
     <hr>
 
-    <!-- =========== LISTE DES FACTURES =========== -->
-    <div class="row-fluid">
-      <div class="span12">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-th"></i></span>
-            <h5>Liste des factures</h5>
-          </div>
-          <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Numéro de facture</th>
-                  <th>Date</th>
-                  <th>Nombre d'articles</th>
-                  <th>Total</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php
-                // Récupérer la liste des factures uniques avec leurs totaux
-                $sqlFactures = "
-                  SELECT 
-                    BillingId, 
-                    CartDate,
-                    COUNT(*) as ItemCount,
-                    SUM(Price * ProductQty) as Total
-                  FROM tblcart 
-                  WHERE IsCheckOut = 1
-                  GROUP BY BillingId
-                  ORDER BY CartDate DESC
-                ";
-                $factureQuery = mysqli_query($con, $sqlFactures);
-                $cnt = 1;
-                while ($row = mysqli_fetch_assoc($factureQuery)) {
-                  ?>
-                  <tr>
-                    <td><?php echo $cnt; ?></td>
-                    <td><?php echo $row['BillingId']; ?></td>
-                    <td><?php echo $row['CartDate']; ?></td>
-                    <td><?php echo $row['ItemCount']; ?></td>
-                    <td><?php echo number_format($row['Total'], 2); ?> €</td>
-                    <td>
-                      <a href="facture-details.php?id=<?php echo $row['BillingId']; ?>" class="btn btn-info btn-mini">
-                        <i class="icon-eye-open"></i> Détails
-                      </a>
-                      <a href="facture.php?delete_id=<?php echo $row['BillingId']; ?>" 
-                        class="btn btn-danger btn-mini" 
-                        onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
-                        <i class="icon-trash"></i> Supprimer
-                      </a>
-                    </td>
-                  </tr>
-                  <?php
-                  $cnt++;
-                }
-                ?>
-              </tbody>
-            </table>
-          </div><!-- widget-content nopadding -->
-        </div><!-- widget-box -->
+    <!-- =========== ONGLETS POUR SÉPARER LES FACTURES =========== -->
+    <div class="widget-box">
+      <div class="widget-title">
+        <ul class="nav nav-tabs">
+          <li class="active"><a data-toggle="tab" href="#tab-comptant">Factures Comptant</a></li>
+          <li><a data-toggle="tab" href="#tab-credit">Factures à Terme</a></li>
+        </ul>
       </div>
-    </div><!-- row-fluid -->
-
+      <div class="widget-content tab-content">
+        <!-- ONGLET FACTURES COMPTANT -->
+        <div id="tab-comptant" class="tab-pane active">
+          <div class="widget-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-th"></i></span>
+              <h5>Liste des factures comptant</h5>
+            </div>
+            <div class="widget-content nopadding">
+              <table class="table table-bordered data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Numéro de facture</th>
+                    <th>Date</th>
+                    <th>Nombre d'articles</th>
+                    <th>Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  // Récupérer la liste des factures comptant
+                  $sqlFacturesComptant = "
+                    SELECT 
+                      BillingId, 
+                      CartDate,
+                      COUNT(*) as ItemCount,
+                      SUM(Price * ProductQty) as Total
+                    FROM tblcart 
+                    WHERE IsCheckOut = 1
+                    GROUP BY BillingId, CartDate
+                    ORDER BY CartDate DESC
+                  ";
+                  $factureComptantQuery = mysqli_query($con, $sqlFacturesComptant);
+                  $cnt = 1;
+                  while ($row = mysqli_fetch_assoc($factureComptantQuery)) {
+                    ?>
+                    <tr>
+                      <td><?php echo $cnt; ?></td>
+                      <td><?php echo $row['BillingId']; ?></td>
+                      <td><?php echo $row['CartDate']; ?></td>
+                      <td><?php echo $row['ItemCount']; ?></td>
+                      <td><?php echo number_format($row['Total'], 2); ?> €</td>
+                      <td>
+                        <a href="facture-details.php?id=<?php echo $row['BillingId']; ?>&type=cart" class="btn btn-info btn-mini">
+                          <i class="icon-eye-open"></i> Détails
+                        </a>
+                        <a href="facture.php?delete_id=<?php echo $row['BillingId']; ?>&type=cart" 
+                          class="btn btn-danger btn-mini" 
+                          onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
+                          <i class="icon-trash"></i> Supprimer
+                        </a>
+                      </td>
+                    </tr>
+                    <?php
+                    $cnt++;
+                  }
+                  ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ONGLET FACTURES À TERME -->
+        <div id="tab-credit" class="tab-pane">
+          <div class="widget-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-th"></i></span>
+              <h5>Liste des factures à terme</h5>
+            </div>
+            <div class="widget-content nopadding">
+              <table class="table table-bordered data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Numéro de facture</th>
+                    <th>Date</th>
+                    <th>Nombre d'articles</th>
+                    <th>Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  // Récupérer la liste des factures à crédit
+                  $sqlFacturesCredit = "
+                    SELECT 
+                      BillingId, 
+                      CartDate,
+                      COUNT(*) as ItemCount,
+                      SUM(Price * ProductQty) as Total
+                    FROM tblcreditcart 
+                    WHERE IsCheckOut = 1
+                    GROUP BY BillingId, CartDate
+                    ORDER BY CartDate DESC
+                  ";
+                  $factureCreditQuery = mysqli_query($con, $sqlFacturesCredit);
+                  $cnt = 1;
+                  while ($row = mysqli_fetch_assoc($factureCreditQuery)) {
+                    ?>
+                    <tr>
+                      <td><?php echo $cnt; ?></td>
+                      <td><?php echo $row['BillingId']; ?></td>
+                      <td><?php echo $row['CartDate']; ?></td>
+                      <td><?php echo $row['ItemCount']; ?></td>
+                      <td><?php echo number_format($row['Total'], 2); ?> €</td>
+                      <td>
+                        <a href="facture-details.php?id=<?php echo $row['BillingId']; ?>&type=credit" class="btn btn-info btn-mini">
+                          <i class="icon-eye-open"></i> Détails
+                        </a>
+                        <a href="facture.php?delete_id=<?php echo $row['BillingId']; ?>&type=credit" 
+                          class="btn btn-danger btn-mini" 
+                          onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
+                          <i class="icon-trash"></i> Supprimer
+                        </a>
+                      </td>
+                    </tr>
+                    <?php
+                    $cnt++;
+                  }
+                  ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div><!-- container-fluid -->
 </div><!-- content -->
 
