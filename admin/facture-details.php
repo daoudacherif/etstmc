@@ -1,7 +1,20 @@
 <?php
 session_start();
-error_reporting(0);
+// Change error reporting to show errors during development
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 include('includes/dbconnection.php');
+
+// Function to display database errors in a user-friendly way
+function displayError($message, $query = null) {
+  echo '<div class="alert alert-error">';
+  echo '<strong>Erreur:</strong> ' . $message;
+  if($query && $_SESSION['debug_mode'] === true) {
+    echo '<br><small>Requête: ' . htmlspecialchars($query) . '</small>';
+    echo '<br><small>MySQL Error: ' . mysqli_error($GLOBALS['con']) . '</small>';
+  }
+  echo '</div>';
+}
 
 // Vérifier si l'admin est connecté
 if (strlen($_SESSION['imsaid']) == 0) {
@@ -56,6 +69,27 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
       box-shadow: inset 0 -1px 0 rgba(0,0,0,.15);
       transition: width .6s ease;
     }
+    /* Style for system messages and errors */
+    .system-message {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .error-message {
+      background-color: #f2dede;
+      border: 1px solid #ebccd1;
+      color: #a94442;
+    }
+    .success-message {
+      background-color: #dff0d8;
+      border: 1px solid #d6e9c6;
+      color: #3c763d;
+    }
+    .warning-message {
+      background-color: #fcf8e3;
+      border: 1px solid #faebcc;
+      color: #8a6d3b;
+    }
   </style>
 </head>
 <body>
@@ -78,6 +112,21 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
 
   <div class="container-fluid">
     <hr>
+    
+    <!-- System messages and errors will be displayed here -->
+    <div id="system-messages">
+      <?php if(isset($_SESSION['error_message'])): ?>
+        <div class="system-message error-message">
+          <i class="icon-warning-sign"></i> <?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?>
+        </div>
+      <?php endif; ?>
+      
+      <?php if(isset($_SESSION['success_message'])): ?>
+        <div class="system-message success-message">
+          <i class="icon-ok"></i> <?php echo $_SESSION['success_message']; unset($_SESSION['success_message']); ?>
+        </div>
+      <?php endif; ?>
+    </div>
 
     <!-- =========== INFORMATIONS DE LA FACTURE =========== -->
     <div class="row-fluid">
@@ -109,20 +158,29 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
               GROUP BY BillingId, CartDate
             ";
             $factureInfoQuery = mysqli_query($con, $sqlFactureInfo);
-            $factureInfo = mysqli_fetch_assoc($factureInfoQuery);
             
-            if (!$factureInfo) {
-              echo "<div class='alert alert-error'>Facture introuvable!</div>";
+            // Check for database query errors
+            if(!$factureInfoQuery) {
+              displayError("Erreur lors de la récupération des informations de la facture.", $sqlFactureInfo);
             } else {
-              // Pour les factures à terme, récupérer les informations client et les montants payés/dus
-              $custInfo = null;
+              $factureInfo = mysqli_fetch_assoc($factureInfoQuery);
               
-              if($type == 'credit') {
-                $custQuery = mysqli_query($con, "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
-                if(mysqli_num_rows($custQuery) > 0) {
-                  $custInfo = mysqli_fetch_assoc($custQuery);
+              if (!$factureInfo) {
+                echo "<div class='alert alert-error'>Facture introuvable!</div>";
+              } else {
+                // Pour les factures à terme, récupérer les informations client et les montants payés/dus
+                $custInfo = null;
+                
+                if($type == 'credit') {
+                  $custQuery = mysqli_query($con, "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
+                  
+                  // Check for database query errors
+                  if(!$custQuery) {
+                    displayError("Erreur lors de la récupération des informations client.", "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
+                  } else if(mysqli_num_rows($custQuery) > 0) {
+                    $custInfo = mysqli_fetch_assoc($custQuery);
+                  }
                 }
-              }
             ?>
             
             <div class="row-fluid">
@@ -234,9 +292,15 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                   ORDER BY c.ID ASC
                 ";
                 $itemsQuery = mysqli_query($con, $sqlItems);
-                $cnt = 1;
-                while ($item = mysqli_fetch_assoc($itemsQuery)) {
-                  $subtotal = $item['Price'] * $item['ProductQty'];
+                
+                // Check for database query errors
+                if(!$itemsQuery) {
+                  displayError("Erreur lors de la récupération des articles de la facture.", $sqlItems);
+                } else {
+                  $cnt = 1;
+                  if(mysqli_num_rows($itemsQuery) > 0) {
+                    while ($item = mysqli_fetch_assoc($itemsQuery)) {
+                      $subtotal = $item['Price'] * $item['ProductQty'];
                 ?>
                 <tr>
                   <td><?php echo $cnt; ?></td>
@@ -246,13 +310,18 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                   <td><?php echo number_format($subtotal, 2); ?> €</td>
                 </tr>
                 <?php
-                  $cnt++;
-                }
+                      $cnt++;
+                    }
+                  } else {
+                    // No items found
+                    echo '<tr><td colspan="5" class="text-center">Aucun article trouvé pour cette facture.</td></tr>';
+                  }
                 ?>
                 <tr>
                   <td colspan="4" align="right"><strong>Total:</strong></td>
                   <td><strong><?php echo number_format($factureInfo['Total'], 2); ?> €</strong></td>
                 </tr>
+                <?php } ?>
               </tbody>
             </table>
             
@@ -286,7 +355,7 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                 <i class="icon-trash"></i> Supprimer cette facture
               </a>
             </div>
-            <?php } ?>
+            <?php } } ?>
           </div><!-- widget-content -->
         </div><!-- widget-box -->
       </div>
@@ -294,6 +363,20 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
 
   </div><!-- container-fluid -->
 </div><!-- content -->
+
+<!-- Error modal for AJAX errors -->
+<div id="errorModal" class="modal hide fade" tabindex="-1" role="dialog">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal">×</button>
+    <h3 id="errorModalLabel">Erreur système</h3>
+  </div>
+  <div class="modal-body">
+    <p id="errorModalContent">Une erreur s'est produite.</p>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary" data-dismiss="modal">Fermer</button>
+  </div>
+</div>
 
 <?php include_once('includes/footer.php'); ?>
 
@@ -303,5 +386,21 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
 <script src="js/bootstrap.min.js"></script>
 <script src="js/jquery.uniform.js"></script>
 <script src="js/matrix.js"></script>
+<script>
+// JavaScript error handling
+$(document).ready(function() {
+  // Global AJAX error handler
+  $(document).ajaxError(function(event, jqXHR, settings, thrownError) {
+    var errorMsg = "Une erreur s'est produite lors de la requête AJAX: " + thrownError;
+    $('#errorModalContent').text(errorMsg);
+    $('#errorModal').modal('show');
+  });
+  
+  // Automatically hide system messages after 5 seconds
+  setTimeout(function() {
+    $('.system-message').fadeOut('slow');
+  }, 5000);
+});
+</script>
 </body>
 </html>
