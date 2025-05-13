@@ -21,35 +21,6 @@ $type = $_GET['type']; // 'cart' ou 'credit'
 // Table à utiliser selon le type
 $tableToUse = ($type == 'credit') ? 'tblcreditcart' : 'tblcart';
 $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
-
-// Mise à jour des paiements pour les factures à terme
-if(isset($_POST['update_payment']) && $type == 'credit') {
-  $paidAmount = floatval($_POST['paid_amount']);
-  $totalAmount = floatval($_POST['total_amount']);
-  $duesAmount = $totalAmount - $paidAmount;
-  
-  // Vérifier si le montant payé est valide
-  if($paidAmount >= 0 && $paidAmount <= $totalAmount) {
-    // Mettre à jour les montants dans la table client
-    $paidStatus = ($paidAmount >= $totalAmount) ? 1 : 0;
-    $updatePayment = "UPDATE tblcustumer SET 
-                      Paid = '$paidAmount', 
-                      Dues = '$duesAmount',
-                      Paid = '$paidStatus'
-                      WHERE BillingNumber = '$billingId'";
-    
-    if(mysqli_query($con, $updatePayment)) {
-      echo "<script>alert('Informations de paiement mises à jour avec succès!');</script>";
-    } else {
-      echo "<script>alert('Erreur lors de la mise à jour des informations de paiement.');</script>";
-    }
-    
-    echo "<script>window.location.href='facture-details.php?id=$billingId&type=$type'</script>";
-    exit;
-  } else {
-    echo "<script>alert('Montant payé invalide. Veuillez vérifier.');</script>";
-  }
-}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -145,17 +116,11 @@ if(isset($_POST['update_payment']) && $type == 'credit') {
             } else {
               // Pour les factures à terme, récupérer les informations client et les montants payés/dus
               $custInfo = null;
-              $paidAmount = 0;
-              $duesAmount = $factureInfo['Total'];
-              $paidStatus = 0;
               
               if($type == 'credit') {
                 $custQuery = mysqli_query($con, "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
                 if(mysqli_num_rows($custQuery) > 0) {
                   $custInfo = mysqli_fetch_assoc($custQuery);
-                  $paidAmount = !empty($custInfo['Paid']) ? $custInfo['Paid'] : 0;
-                  $duesAmount = !empty($custInfo['Dues']) ? $custInfo['Dues'] : $factureInfo['Total'];
-                  $paidStatus = !empty($custInfo['Paid']) ? 1 : 0;
                 }
               }
             ?>
@@ -190,16 +155,16 @@ if(isset($_POST['update_payment']) && $type == 'credit') {
                   <?php if($type == 'credit' && !empty($custInfo)): ?>
                   <tr>
                     <th>Montant payé:</th>
-                    <td><?php echo number_format($paidAmount, 2); ?> €</td>
+                    <td><?php echo number_format($custInfo['Paid'], 2); ?> €</td>
                   </tr>
                   <tr>
                     <th>Reste à payer:</th>
-                    <td><?php echo number_format($duesAmount, 2); ?> €</td>
+                    <td><?php echo number_format($custInfo['Dues'], 2); ?> €</td>
                   </tr>
                   <tr>
                     <th>Statut:</th>
                     <td>
-                      <?php if($paidStatus == 1 || $duesAmount <= 0): ?>
+                      <?php if($custInfo['Paid'] == $custInfo['FinalAmount'] || $custInfo['Dues'] <= 0): ?>
                         <span class="label label-success">Payé</span>
                       <?php else: ?>
                         <span class="label label-important">En attente</span>
@@ -211,7 +176,7 @@ if(isset($_POST['update_payment']) && $type == 'credit') {
               </div>
             </div>
             
-            <?php if($type == 'credit'): ?>
+            <?php if($type == 'credit' && !empty($custInfo)): ?>
             <!-- Informations de paiement pour les factures à terme -->
             <div class="row-fluid">
               <div class="span12">
@@ -219,7 +184,7 @@ if(isset($_POST['update_payment']) && $type == 'credit') {
                   <h4>Suivi des paiements</h4>
                   
                   <?php 
-                  $progressPercent = ($factureInfo['Total'] > 0) ? ($paidAmount / $factureInfo['Total']) * 100 : 0;
+                  $progressPercent = ($custInfo['FinalAmount'] > 0) ? ($custInfo['Paid'] / $custInfo['FinalAmount']) * 100 : 0;
                   ?>
                   <div class="progress">
                     <div class="bar" style="width: <?php echo $progressPercent; ?>%;">
@@ -227,23 +192,17 @@ if(isset($_POST['update_payment']) && $type == 'credit') {
                     </div>
                   </div>
                   
-                  <!-- Formulaire de mise à jour des paiements -->
-                  <form method="post" class="form-horizontal">
-                    <div class="control-group">
-                      <label class="control-label">Montant payé:</label>
-                      <div class="controls">
-                        <div class="input-prepend">
-                          <span class="add-on">€</span>
-                          <input type="number" name="paid_amount" value="<?php echo $paidAmount; ?>" min="0" max="<?php echo $factureInfo['Total']; ?>" step="0.01" />
-                          <input type="hidden" name="total_amount" value="<?php echo $factureInfo['Total']; ?>" />
-                        </div>
-                        <span class="help-block">Entrez le montant total payé par le client</span>
-                      </div>
+                  <div class="row-fluid">
+                    <div class="span4">
+                      <p><strong>Total à payer:</strong> <?php echo number_format($custInfo['FinalAmount'], 2); ?> €</p>
                     </div>
-                    <div class="form-actions">
-                      <button type="submit" name="update_payment" class="btn btn-primary">Mettre à jour le paiement</button>
+                    <div class="span4">
+                      <p><strong>Déjà payé:</strong> <?php echo number_format($custInfo['Paid'], 2); ?> €</p>
                     </div>
-                  </form>
+                    <div class="span4">
+                      <p><strong>Reste à payer:</strong> <?php echo number_format($custInfo['Dues'], 2); ?> €</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
