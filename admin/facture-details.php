@@ -21,6 +21,35 @@ $type = $_GET['type']; // 'cart' ou 'credit'
 // Table à utiliser selon le type
 $tableToUse = ($type == 'credit') ? 'tblcreditcart' : 'tblcart';
 $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
+
+// Mise à jour des paiements pour les factures à terme
+if(isset($_POST['update_payment']) && $type == 'credit') {
+  $paidAmount = floatval($_POST['paid_amount']);
+  $totalAmount = floatval($_POST['total_amount']);
+  $duesAmount = $totalAmount - $paidAmount;
+  
+  // Vérifier si le montant payé est valide
+  if($paidAmount >= 0 && $paidAmount <= $totalAmount) {
+    // Mettre à jour les montants dans la table client
+    $paidStatus = ($paidAmount >= $totalAmount) ? 1 : 0;
+    $updatePayment = "UPDATE tblcustumer SET 
+                      Paid = '$paidAmount', 
+                      Dues = '$duesAmount',
+                      Paid = '$paidStatus'
+                      WHERE BillingNumber = '$billingId'";
+    
+    if(mysqli_query($con, $updatePayment)) {
+      echo "<script>alert('Informations de paiement mises à jour avec succès!');</script>";
+    } else {
+      echo "<script>alert('Erreur lors de la mise à jour des informations de paiement.');</script>";
+    }
+    
+    echo "<script>window.location.href='facture-details.php?id=$billingId&type=$type'</script>";
+    exit;
+  } else {
+    echo "<script>alert('Montant payé invalide. Veuillez vérifier.');</script>";
+  }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -28,6 +57,35 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
   <title>Gestion des stocks | Détails de la facture</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+  <style>
+    .payment-info {
+      background: #f9f9f9;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .progress {
+      height: 20px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+    }
+    .progress .bar {
+      float: left;
+      width: 0;
+      height: 100%;
+      font-size: 12px;
+      line-height: 20px;
+      color: #fff;
+      text-align: center;
+      background-color: #51a351;
+      box-shadow: inset 0 -1px 0 rgba(0,0,0,.15);
+      transition: width .6s ease;
+    }
+  </style>
 </head>
 <body>
 
@@ -85,7 +143,23 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
             if (!$factureInfo) {
               echo "<div class='alert alert-error'>Facture introuvable!</div>";
             } else {
+              // Pour les factures à terme, récupérer les informations client et les montants payés/dus
+              $custInfo = null;
+              $paidAmount = 0;
+              $duesAmount = $factureInfo['Total'];
+              $paidStatus = 0;
+              
+              if($type == 'credit') {
+                $custQuery = mysqli_query($con, "SELECT * FROM tblcustumer WHERE BillingNumber='$billingId'");
+                if(mysqli_num_rows($custQuery) > 0) {
+                  $custInfo = mysqli_fetch_assoc($custQuery);
+                  $paidAmount = !empty($custInfo['Paid']) ? $custInfo['Paid'] : 0;
+                  $duesAmount = !empty($custInfo['Dues']) ? $custInfo['Dues'] : $factureInfo['Total'];
+                  $paidStatus = !empty($custInfo['Paid']) ? 1 : 0;
+                }
+              }
             ?>
+            
             <div class="row-fluid">
               <div class="span6">
                 <table class="table table-bordered">
@@ -113,9 +187,67 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                     <th>Total:</th>
                     <td><strong><?php echo number_format($factureInfo['Total'], 2); ?> €</strong></td>
                   </tr>
+                  <?php if($type == 'credit' && !empty($custInfo)): ?>
+                  <tr>
+                    <th>Montant payé:</th>
+                    <td><?php echo number_format($paidAmount, 2); ?> €</td>
+                  </tr>
+                  <tr>
+                    <th>Reste à payer:</th>
+                    <td><?php echo number_format($duesAmount, 2); ?> €</td>
+                  </tr>
+                  <tr>
+                    <th>Statut:</th>
+                    <td>
+                      <?php if($paidStatus == 1 || $duesAmount <= 0): ?>
+                        <span class="label label-success">Payé</span>
+                      <?php else: ?>
+                        <span class="label label-important">En attente</span>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                  <?php endif; ?>
                 </table>
               </div>
             </div>
+            
+            <?php if($type == 'credit'): ?>
+            <!-- Informations de paiement pour les factures à terme -->
+            <div class="row-fluid">
+              <div class="span12">
+                <div class="payment-info">
+                  <h4>Suivi des paiements</h4>
+                  
+                  <?php 
+                  $progressPercent = ($factureInfo['Total'] > 0) ? ($paidAmount / $factureInfo['Total']) * 100 : 0;
+                  ?>
+                  <div class="progress">
+                    <div class="bar" style="width: <?php echo $progressPercent; ?>%;">
+                      <?php echo number_format($progressPercent, 1); ?>%
+                    </div>
+                  </div>
+                  
+                  <!-- Formulaire de mise à jour des paiements -->
+                  <form method="post" class="form-horizontal">
+                    <div class="control-group">
+                      <label class="control-label">Montant payé:</label>
+                      <div class="controls">
+                        <div class="input-prepend">
+                          <span class="add-on">€</span>
+                          <input type="number" name="paid_amount" value="<?php echo $paidAmount; ?>" min="0" max="<?php echo $factureInfo['Total']; ?>" step="0.01" />
+                          <input type="hidden" name="total_amount" value="<?php echo $factureInfo['Total']; ?>" />
+                        </div>
+                        <span class="help-block">Entrez le montant total payé par le client</span>
+                      </div>
+                    </div>
+                    <div class="form-actions">
+                      <button type="submit" name="update_payment" class="btn btn-primary">Mettre à jour le paiement</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+            <?php endif; ?>
             
             <h4>Articles de la facture</h4>
             <table class="table table-bordered table-striped">
@@ -164,6 +296,30 @@ $typeLabel = ($type == 'credit') ? 'à terme' : 'comptant';
                 </tr>
               </tbody>
             </table>
+            
+            <?php if($type == 'credit' && !empty($custInfo)): ?>
+            <!-- Informations client -->
+            <div class="row-fluid">
+              <div class="span12">
+                <h4>Informations client</h4>
+                <table class="table table-bordered">
+                  <tr>
+                    <th width="20%">Nom du client:</th>
+                    <td><?php echo $custInfo['CustomerName']; ?></td>
+                    <th width="20%">Téléphone:</th>
+                    <td><?php echo $custInfo['MobileNumber']; ?></td>
+                  </tr>
+                  <tr>
+                    <th>Mode de paiement:</th>
+                    <td><?php echo $custInfo['ModeofPayment']; ?></td>
+                    <th>Date de facturation:</th>
+                    <td><?php echo $custInfo['BillingDate']; ?></td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+            <?php endif; ?>
+            
             <div class="text-right">
               <a href="facture.php?delete_id=<?php echo $billingId; ?>&type=<?php echo $type; ?>" 
                 class="btn btn-danger" 
