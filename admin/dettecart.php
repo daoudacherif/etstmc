@@ -2,6 +2,9 @@
 session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 // Vérifie que l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
