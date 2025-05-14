@@ -3,6 +3,11 @@ session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
+// Affiche toutes les erreurs (à désactiver en production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Verify admin is logged in
 if (empty($_SESSION['imsaid'])) {
     header('Location: logout.php');
