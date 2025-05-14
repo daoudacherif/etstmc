@@ -53,7 +53,7 @@ if ($todysale > 0 || $todayCreditPayments > 0) {
     FROM tblcashtransactions
     WHERE TransType='IN'
       AND DATE(TransDate)=CURDATE()
-      AND Comments='Daily Sale'
+      AND Comments LIKE 'Daily Sale%'
     LIMIT 1
   ");
   if (mysqli_num_rows($checkToday) > 0) {
@@ -372,61 +372,6 @@ $outDisabled = ($currentBalance <= 0);
   </div><!-- row-fluid -->
 
   <hr>
-
-  <!-- ========== PAYMENTS ON CREDIT INVOICES LIST (NEW SECTION) ========== -->
-  <div class="row-fluid">
-    <div class="span12">
-    <div class="widget-box">
-      <div class="widget-title">
-      <span class="icon"><i class="icon-money"></i></span>
-      <h5>Paiements reçus sur factures à terme (aujourd'hui)</h5>
-      </div>
-      <div class="widget-content nopadding">
-      <table class="table table-bordered data-table">
-        <thead>
-        <tr>
-          <th>#</th>
-          <th>N° Facture</th>
-          <th>Client</th>
-          <th>Téléphone</th>
-          <th>Date</th>
-          <th>Montant Reçu</th>
-          <th>Reste à Payer</th>
-        </tr>
-        </thead>
-        <tbody>
-        <?php
-        $sqlPayments = "SELECT * FROM tblcustomer 
-                        WHERE DATE(BillingDate) = CURDATE() 
-                        AND ModeofPayment = 'Espèces' 
-                        AND Paid > 0
-                        ORDER BY ID DESC";
-        $resPayments = mysqli_query($con, $sqlPayments);
-        $cnt = 1;
-        while ($rowPay = mysqli_fetch_assoc($resPayments)) {
-          ?>
-          <tr>
-            <td><?php echo $cnt; ?></td>
-            <td><?php echo $rowPay['BillingNumber']; ?></td>
-            <td><?php echo $rowPay['CustomerName']; ?></td>
-            <td><?php echo $rowPay['MobileNumber']; ?></td>
-            <td><?php echo date('H:i', strtotime($rowPay['BillingDate'])); ?></td>
-            <td><?php echo number_format($rowPay['Paid'], 2); ?></td>
-            <td><?php echo number_format($rowPay['Dues'], 2); ?></td>
-          </tr>
-          <?php
-          $cnt++;
-        }
-        if (mysqli_num_rows($resPayments) == 0) {
-          echo '<tr><td colspan="7" style="text-align:center;">Aucun paiement reçu aujourd\'hui sur les factures à terme</td></tr>';
-        }
-        ?>
-        </tbody>
-      </table>
-      </div><!-- widget-content nopadding -->
-    </div><!-- widget-box -->
-    </div>
-  </div><!-- row-fluid -->
 
   <!-- ========== RECENT TRANSACTIONS LIST ========== -->
   <div class="row-fluid">
