@@ -2,9 +2,6 @@
 session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 // Vérifie que l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
@@ -12,10 +9,10 @@ if (empty($_SESSION['imsaid'])) {
     exit;
 }
 
-// Get the current admin ID from session
+// Get the current admin ID from session (for display purposes only)
 $currentAdminID = $_SESSION['imsaid'];
 
-// Get the current admin name (since it's not stored in session)
+// Get the current admin name (for display purposes only)
 $adminQuery = mysqli_query($con, "SELECT AdminName FROM tbladmin WHERE ID = '$currentAdminID'");
 $adminData = mysqli_fetch_assoc($adminQuery);
 $currentAdminName = $adminData['AdminName'];
@@ -166,8 +163,8 @@ if (isset($_POST['addtocart'])) {
         exit;
     }
 
-    // Vérifier si l'article est déjà dans le panier de cet admin
-    $existCheck = mysqli_query($con, "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId='$productId' AND IsCheckOut=0 AND AdminID='$currentAdminID' LIMIT 1");
+    // Vérifier si l'article est déjà dans le panier
+    $existCheck = mysqli_query($con, "SELECT ID, ProductQty FROM tblcreditcart WHERE ProductId='$productId' AND IsCheckOut=0 LIMIT 1");
     if (mysqli_num_rows($existCheck) > 0) {
         $c = mysqli_fetch_assoc($existCheck);
         $newQty = $c['ProductQty'] + $quantity;
@@ -178,7 +175,7 @@ if (isset($_POST['addtocart'])) {
         }
         mysqli_query($con, "UPDATE tblcreditcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
     } else {
-        mysqli_query($con, "INSERT INTO tblcreditcart(ProductId, ProductQty, Price, IsCheckOut, AdminID) VALUES('$productId', '$quantity', '$price', 0, '$currentAdminID')") or die(mysqli_error($con));
+        mysqli_query($con, "INSERT INTO tblcreditcart(ProductId, ProductQty, Price, IsCheckOut) VALUES('$productId', '$quantity', '$price', 0)") or die(mysqli_error($con));
     }
 
     header("Location: dettecart.php");
@@ -188,7 +185,7 @@ if (isset($_POST['addtocart'])) {
 // Supprimer un Article
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    mysqli_query($con, "DELETE FROM tblcreditcart WHERE ID='$delid' AND AdminID='$currentAdminID'") or die(mysqli_error($con));
+    mysqli_query($con, "DELETE FROM tblcreditcart WHERE ID='$delid'") or die(mysqli_error($con));
     header("Location: dettecart.php");
     exit;
 }
@@ -199,7 +196,7 @@ if (isset($_POST['applyDiscount'])) {
     
     // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0 AND AdminID='$currentAdminID'");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -250,7 +247,7 @@ if (isset($_POST['submit'])) {
 
     // Calcul total du panier
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0 AND AdminID='$currentAdminID'");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcreditcart WHERE IsCheckOut=0");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -263,7 +260,7 @@ if (isset($_POST['submit'])) {
         SELECT p.ProductName, p.Stock, c.ProductQty
         FROM tblcreditcart c
         JOIN tblproducts p ON p.ID = c.ProductId
-        WHERE c.IsCheckOut=0 AND c.AdminID='$currentAdminID'
+        WHERE c.IsCheckOut=0
     ");
     
     $stockErrors = [];
@@ -285,9 +282,9 @@ if (isset($_POST['submit'])) {
 
     $billingnum = mt_rand(100000000, 999999999);
 
-    // Validation du panier + Création facture - Suppression de ProcessedBy
+    // Validation du panier + Création facture
     $queries = "
-        UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND AdminID='$currentAdminID';
+        UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;
         INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
         VALUES('$billingnum', '$custname', '$custmobile', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues');
     ";
@@ -299,7 +296,8 @@ if (isset($_POST['submit'])) {
             UPDATE tblproducts p
             JOIN tblcreditcart c ON p.ID = c.ProductId
             SET p.Stock = p.Stock - c.ProductQty
-            WHERE c.BillingId='$billingnum' AND c.AdminID='$currentAdminID'
+            WHERE c.BillingId='$billingnum'
+              AND c.IsCheckOut = 1
         ") or die(mysqli_error($con));
 
         // SMS personnalisé avec vérification du statut d'envoi
@@ -338,12 +336,12 @@ if (isset($_POST['submit'])) {
     }
 }
 
-// Vérifier à nouveau les stocks pour l'affichage du panier - Filter by AdminID
+// Vérifier à nouveau les stocks pour l'affichage du panier
 $cartProducts = mysqli_query($con, "
     SELECT c.ID, c.ProductId, c.ProductQty, p.Stock, p.ProductName 
     FROM tblcreditcart c
     JOIN tblproducts p ON p.ID = c.ProductId
-    WHERE c.IsCheckOut=0 AND c.AdminID='$currentAdminID'
+    WHERE c.IsCheckOut=0
 ");
 
 while ($product = mysqli_fetch_assoc($cartProducts)) {
@@ -435,9 +433,10 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
         <div class="container-fluid">
             <hr>
             
-            <!-- Indicateur de panier utilisateur -->
+            <!-- Indicateur de panier utilisateur (visuel uniquement) -->
             <div class="user-cart-indicator">
                 <i class="icon-user"></i> <strong>Panier à terme géré par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
+                <p class="text-muted small">Note: Tous les utilisateurs partagent ce panier. Pour des paniers séparés par utilisateur, contactez l'administrateur système.</p>
             </div>
             
             <!-- Message d'alerte si problème de stock -->
@@ -670,7 +669,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                         tblproducts.Stock
                                       FROM tblcreditcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcreditcart.ProductId
-                                      WHERE tblcreditcart.IsCheckOut = 0 AND tblcreditcart.AdminID = '$currentAdminID'
+                                      WHERE tblcreditcart.IsCheckOut = 0
                                       ORDER BY tblcreditcart.ID ASC
                                     ");
                                     $cnt = 1;
