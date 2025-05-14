@@ -43,7 +43,7 @@ $offset = ($page - 1) * $recordsPerPage;
 $countSql = "SELECT COUNT(*) as total FROM (";
 $dataSql = "";
 
-// Base queries for regular invoices (tblcart)
+// Base queries for regular invoices (tblcart) - Added Paid & Dues columns to match credit query
 $regularInvoicesQuery = "
     SELECT DISTINCT 
         cust.BillingNumber, 
@@ -52,6 +52,8 @@ $regularInvoicesQuery = "
         cust.ModeofPayment,
         cust.BillingDate, 
         cust.FinalAmount,
+        cust.FinalAmount as Paid,   /* Standard invoices are fully paid */
+        0 as Dues,                  /* Standard invoices have no dues */
         a.AdminName,
         a.ID as AdminID,
         'standard' as InvoiceType
@@ -67,7 +69,7 @@ $creditInvoicesQuery = "
         cust.BillingNumber, 
         cust.CustomerName, 
         cust.MobileNumber, 
-        cust.ModeOfPayment as ModeofPayment,
+        cust.ModeofPayment,         /* Changed to match exactly the column name in tblcustomer */
         cust.BillingDate, 
         cust.FinalAmount,
         cust.Paid,
@@ -407,12 +409,13 @@ if (!$hasAdminID) {
                                     <?php
                                         // Get statistics on invoice counts by admin
                                         $adminStatsSql = "
-                                            SELECT a.AdminName, COUNT(*) as invoice_count
+                                            SELECT AdminName, COUNT(*) as invoice_count
                                             FROM (
-                                                $dataSql
+                                                SELECT AdminName FROM ($regularInvoicesQuery) AS reg
+                                                UNION ALL
+                                                SELECT AdminName FROM ($creditInvoicesQuery) AS cred
                                             ) as invoices
-                                            JOIN tbladmin a ON invoices.AdminID = a.ID
-                                            GROUP BY a.AdminName
+                                            GROUP BY AdminName
                                             ORDER BY invoice_count DESC
                                             LIMIT 5
                                         ";
@@ -438,14 +441,24 @@ if (!$hasAdminID) {
                                         // Get statistics on amounts by invoice type
                                         $typeStatsSql = "
                                             SELECT 
-                                                InvoiceType,
+                                                type_label,
                                                 COUNT(*) as count,
-                                                SUM(FinalAmount) as total_amount,
-                                                AVG(FinalAmount) as avg_amount
+                                                SUM(amount) as total_amount,
+                                                AVG(amount) as avg_amount
                                             FROM (
-                                                $dataSql
-                                            ) as invoices
-                                            GROUP BY InvoiceType
+                                                SELECT 
+                                                    CASE 
+                                                        WHEN InvoiceType = 'standard' THEN 'Standard'
+                                                        ELSE 'Crédit'
+                                                    END as type_label,
+                                                    FinalAmount as amount
+                                                FROM (
+                                                    $regularInvoicesQuery
+                                                    UNION
+                                                    $creditInvoicesQuery
+                                                ) as all_invoices
+                                            ) as summary
+                                            GROUP BY type_label
                                         ";
                                         
                                         $typeStatsResult = mysqli_query($con, $typeStatsSql);
@@ -454,9 +467,8 @@ if (!$hasAdminID) {
                                             echo '<thead><tr><th>Type</th><th>Nombre</th><th>Montant total</th><th>Montant moyen</th></tr></thead>';
                                             echo '<tbody>';
                                             while ($stat = mysqli_fetch_assoc($typeStatsResult)) {
-                                                $type = ($stat['InvoiceType'] == 'standard') ? 'Standard' : 'Crédit';
                                                 echo '<tr>';
-                                                echo '<td>' . $type . '</td>';
+                                                echo '<td>' . $stat['type_label'] . '</td>';
                                                 echo '<td>' . $stat['count'] . '</td>';
                                                 echo '<td>' . number_format($stat['total_amount'], 2) . ' GNF</td>';
                                                 echo '<td>' . number_format($stat['avg_amount'], 2) . ' GNF</td>';
