@@ -508,7 +508,7 @@ if ($productNamesQuery) {
                                         <td><?php echo $row['Price']; ?></td>
                                         <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                         <td>
-                                            <form method="post" action="dettecart.php" style="margin:0;">
+                                            <form method="post" action="cart.php" style="margin:0;">
                                                 <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
                                                 <input type="number" name="price" step="any" 
                                                        value="<?php echo $row['Price']; ?>" style="width:80px;" />
