@@ -25,7 +25,8 @@ $sqlPrevBalance = "
   SELECT 
     (
       (SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) FROM tblcart c WHERE c.IsCheckOut='1' AND c.CartDate < ?) +
-      (SELECT COALESCE(SUM(Amount), 0) FROM tblcashtransactions WHERE TransType='IN' AND TransDate < ?)
+      (SELECT COALESCE(SUM(Amount), 0) FROM tblcashtransactions WHERE TransType='IN' AND TransDate < ?) +
+      (SELECT COALESCE(SUM(Paid), 0) FROM tblcustomer WHERE ModeofPayment='Espèces' AND BillingDate < ?)
     ) -
     (
       (SELECT COALESCE(SUM(r.Quantity * p.Price), 0) FROM tblreturns r JOIN tblproducts p ON p.ID = r.ProductID WHERE r.ReturnDate < ?) +
@@ -33,7 +34,7 @@ $sqlPrevBalance = "
     ) AS balance
 ";
 $stmtPrevBalance = $con->prepare($sqlPrevBalance);
-$stmtPrevBalance->bind_param('ssss', $startDateTime, $startDateTime, $date, $startDateTime);
+$stmtPrevBalance->bind_param('sssss', $startDateTime, $startDateTime, $startDateTime, $date, $startDateTime);
 $stmtPrevBalance->execute();
 $resultPrevBalance = $stmtPrevBalance->get_result();
 $rowPrevBalance = $resultPrevBalance->fetch_assoc();
@@ -57,7 +58,7 @@ $rowCashSales = $resultCashSales->fetch_assoc();
 $totalCashSales = $rowCashSales['totalSales'];
 $stmtCashSales->close();
 
-// Credit Sales (these don't affect the cash balance)
+// Credit Sales (these don't affect the cash balance immediately)
 $sqlCreditSales = "
   SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalSales
   FROM tblcreditcart c
@@ -71,6 +72,20 @@ $resultCreditSales = $stmtCreditSales->get_result();
 $rowCreditSales = $resultCreditSales->fetch_assoc();
 $totalCreditSales = $rowCreditSales['totalSales'];
 $stmtCreditSales->close();
+
+// Credit payments received (important for cash reconciliation)
+$sqlCreditPayments = "
+  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
+  FROM tblcustomer
+  WHERE ModeofPayment='Espèces' AND BillingDate BETWEEN ? AND ?
+";
+$stmtCreditPayments = $con->prepare($sqlCreditPayments);
+$stmtCreditPayments->bind_param('ss', $startDateTime, $endDateTime);
+$stmtCreditPayments->execute();
+$resultCreditPayments = $stmtCreditPayments->get_result();
+$rowCreditPayments = $resultCreditPayments->fetch_assoc();
+$totalCreditPayments = $rowCreditPayments['totalPaid'];
+$stmtCreditPayments->close();
 
 // Cash transactions (deposits and withdrawals)
 $sqlTransactions = "
@@ -104,7 +119,7 @@ $totalReturns = $rowReturns['totalReturns'];
 $stmtReturns->close();
 
 // Calculate expected ending balance
-$expectedEndingBalance = $startingBalance + $totalCashSales + $totalDeposits - $totalWithdrawals - $totalReturns;
+$expectedEndingBalance = $startingBalance + $totalCashSales + $totalDeposits + $totalCreditPayments - $totalWithdrawals - $totalReturns;
 
 // Get detailed transactions for the day
 $sqlTransactionsList = "
@@ -115,6 +130,16 @@ $sqlTransactionsList = "
   JOIN tblproducts p ON p.ID = c.ProductId
   WHERE c.IsCheckOut='1' AND c.CartType='regular'
     AND c.CartDate BETWEEN ? AND ?
+  
+  UNION ALL
+  
+  -- Credit Payments
+  SELECT 'Remboursement' AS Type, cust.Paid AS Amount,
+       cust.BillingDate AS Date, 
+       CONCAT('Paiement sur facture ', cust.BillingNumber, ' - ', cust.CustomerName) AS Comment
+  FROM tblcustomer cust
+  WHERE cust.ModeofPayment='Espèces' AND cust.Paid > 0
+    AND cust.BillingDate BETWEEN ? AND ?
   
   UNION ALL
   
@@ -142,7 +167,7 @@ $sqlTransactionsList = "
   ORDER BY Date ASC
 ";
 $stmtTransactionsList = $con->prepare($sqlTransactionsList);
-$stmtTransactionsList->bind_param('sssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $date);
+$stmtTransactionsList->bind_param('sssssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $startDateTime, $endDateTime, $date);
 $stmtTransactionsList->execute();
 $resultTransactionsList = $stmtTransactionsList->get_result();
 
@@ -204,6 +229,9 @@ if (isset($_POST['submit_reconciliation'])) {
     }
     .transaction-sale {
       background-color: #dff0d8;
+    }
+    .transaction-payment {
+      background-color: #d8f0e8; /* Couleur spéciale pour les remboursements */
     }
     .transaction-deposit {
       background-color: #d9edf7;
@@ -298,6 +326,10 @@ if (isset($_POST['submit_reconciliation'])) {
                   <tr>
                     <th>Ventes en espèces</th>
                     <td class="text-right">+ <?php echo number_format($totalCashSales, 2); ?> GNF</td>
+                  </tr>
+                  <tr>
+                    <th>Remboursements sur factures à terme</th>
+                    <td class="text-right">+ <?php echo number_format($totalCreditPayments, 2); ?> GNF</td>
                   </tr>
                   <tr>
                     <th>Dépôts</th>
@@ -406,7 +438,7 @@ if (isset($_POST['submit_reconciliation'])) {
                 
                 while($row = $resultTransactionsList->fetch_assoc()) {
                   // Update running balance
-                  if ($row['Type'] == 'Vente en Espèces' || $row['Type'] == 'Dépôt') {
+                  if ($row['Type'] == 'Vente en Espèces' || $row['Type'] == 'Dépôt' || $row['Type'] == 'Remboursement') {
                     $runningBalance += $row['Amount'];
                     $effect = '+';
                   } else {
@@ -418,6 +450,7 @@ if (isset($_POST['submit_reconciliation'])) {
                   $typeClass = '';
                   switch($row['Type']) {
                     case 'Vente en Espèces': $typeClass = 'transaction-sale'; break;
+                    case 'Remboursement': $typeClass = 'transaction-payment'; break;
                     case 'Dépôt': $typeClass = 'transaction-deposit'; break;
                     case 'Retrait': $typeClass = 'transaction-withdrawal'; break;
                     case 'Retour': $typeClass = 'transaction-return'; break;
