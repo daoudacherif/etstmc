@@ -12,7 +12,7 @@ if (strlen($_SESSION['imsaid'] == 0)) {
 // 1) Handle partial payment submission
 if (isset($_POST['addPayment'])) {
     $cid       = intval($_POST['cid']);        // ID from tblcustomer
-    $payAmount = floatval($_POST['payAmount']); // The additional payment
+    $payAmount = intval($_POST['payAmount']); // The additional payment
 
     if ($payAmount <= 0) {
         echo "<script>alert('Invalid payment amount. Must be > 0.');</script>";
@@ -22,8 +22,8 @@ if (isset($_POST['addPayment'])) {
         $res = mysqli_query($con, $sql);
         if (mysqli_num_rows($res) > 0) {
             $row     = mysqli_fetch_assoc($res);
-            $oldPaid = floatval($row['Paid']);
-            $oldDues = floatval($row['Dues']);
+            $oldPaid = intval($row['Paid']);
+            $oldDues = intval($row['Dues']);
 
             // Calculate new amounts
             $newPaid = $oldPaid + $payAmount;
@@ -107,8 +107,8 @@ if (isset($_POST['addPayment'])) {
                 $cnt = 1;
                 while ($row = mysqli_fetch_array($ret)) {
                     // Accumulate for totals
-                    $totalPaid += floatval($row['Paid']);
-                    $totalDues += floatval($row['Dues']);
+                    $totalPaid += intval($row['Paid']);
+                    $totalDues += intval($row['Dues']);
                 ?>
                     <tr class="gradeX">
                       <td><?php echo $cnt; ?></td>
@@ -117,15 +117,15 @@ if (isset($_POST['addPayment'])) {
                       <td><?php echo $row['MobileNumber']; ?></td>
                       <td><?php echo $row['ModeofPayment']; ?></td>
                       <td><?php echo $row['BillingDate']; ?></td>
-                      <td><?php echo number_format($row['FinalAmount'], 2); ?></td>
-                      <td><?php echo number_format($row['Paid'], 2); ?></td>
-                      <td><?php echo number_format($row['Dues'], 2); ?></td>
+                      <td><?php echo number_format(intval($row['FinalAmount']), 0); ?></td>
+                      <td><?php echo number_format(intval($row['Paid']), 0); ?></td>
+                      <td><?php echo number_format(intval($row['Dues']), 0); ?></td>
                       <td>
                         <?php if ($row['Dues'] > 0) { ?>
                           <!-- Inline form to add partial payment -->
                           <form method="post" style="margin:0; display:inline;">
                             <input type="hidden" name="cid" value="<?php echo $row['ID']; ?>" />
-                            <input type="number" name="payAmount" step="any" placeholder="Pay" style="width:60px;" />
+                            <input type="number" name="payAmount" step="1" min="1" placeholder="Pay" style="width:60px;" />
                             <button type="submit" name="addPayment" class="btn btn-info btn-mini">
                               Add Payment
                             </button>
@@ -149,11 +149,11 @@ if (isset($_POST['addPayment'])) {
                   </th>
                   <!-- Display the total of the Paid column -->
                   <th style="font-weight: bold;">
-                    <?php echo number_format($totalPaid, 2); ?>
+                    <?php echo number_format($totalPaid, 0); ?>
                   </th>
                   <!-- Display the total of the Dues column -->
                   <th style="font-weight: bold;">
-                    <?php echo number_format($totalDues, 2); ?>
+                    <?php echo number_format($totalDues, 0); ?>
                   </th>
                   <th></th> <!-- Action column blank -->
                 </tr>
