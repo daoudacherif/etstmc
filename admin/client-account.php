@@ -95,9 +95,9 @@ $res = mysqli_query($con, $sql);
           while ($row = mysqli_fetch_assoc($res)) {
             $customerName = $row['CustomerName'];
             $mobile       = $row['MobileNumber'];
-            $billed       = floatval($row['totalBilled']);
-            $paid         = floatval($row['totalPaid']);
-            $due          = floatval($row['totalDue']);
+            $billed       = intval($row['totalBilled']);
+            $paid         = intval($row['totalPaid']);
+            $due          = intval($row['totalDue']);
 
             // Accumuler dans les variables globales
             $grandBilled += $billed;
@@ -108,9 +108,9 @@ $res = mysqli_query($con, $sql);
               <td><?php echo $cnt++; ?></td>
               <td><?php echo $customerName; ?></td>
               <td><?php echo $mobile; ?></td>
-              <td><?php echo number_format($billed,2); ?></td>
-              <td><?php echo number_format($paid,2); ?></td>
-              <td><?php echo number_format($due,2); ?></td>
+              <td><?php echo number_format($billed, 0); ?></td>
+              <td><?php echo number_format($paid, 0); ?></td>
+              <td><?php echo number_format($due, 0); ?></td>
               <td>
                 <a href="client-account-details.php?name=<?php echo urlencode($customerName); ?>&mobile=<?php echo urlencode($mobile); ?>" 
                   class="btn btn-info btn-small">Détails</a>
@@ -125,9 +125,9 @@ $res = mysqli_query($con, $sql);
           <tfoot>
             <tr style="font-weight: bold;">
               <td colspan="3" style="text-align: right;">TOTAL GÉNÉRAL</td>
-              <td><?php echo number_format($grandBilled,2); ?></td>
-              <td><?php echo number_format($grandPaid,2); ?></td>
-              <td><?php echo number_format($grandDue,2); ?></td>
+              <td><?php echo number_format($grandBilled, 0); ?></td>
+              <td><?php echo number_format($grandPaid, 0); ?></td>
+              <td><?php echo number_format($grandDue, 0); ?></td>
               <td></td>
             </tr>
           </tfoot>
