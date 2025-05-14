@@ -61,7 +61,7 @@ $mobile = mysqli_real_escape_string($con, $_GET['mobile']);
 
 // Traitement du paiement
 if (isset($_POST['payDues'])) {
-    $paymentAmount = floatval($_POST['paymentAmount']);
+    $paymentAmount = intval($_POST['paymentAmount']);
     $paymentMethod = mysqli_real_escape_string($con, $_POST['paymentMethod']);
     
     if ($paymentAmount <= 0) {
@@ -72,7 +72,7 @@ if (isset($_POST['payDues'])) {
                          WHERE CustomerName='$customerName' AND MobileNumber='$mobile'";
         $getDuesResult = mysqli_query($con, $getDuesQuery);
         $duesData = mysqli_fetch_assoc($getDuesResult);
-        $totalDues = floatval($duesData['totalDues']);
+        $totalDues = intval($duesData['totalDues']);
         
         // Vérifier que le montant à payer n'est pas supérieur aux dettes
         if ($paymentAmount > $totalDues) {
@@ -90,13 +90,35 @@ if (isset($_POST['payDues'])) {
         mysqli_begin_transaction($con);
         
         try {
+            $totalApplied = 0;
+            $billsToUpdate = array();
+            
+            // Première passe: calculer les montants à appliquer pour chaque facture
             while ($bill = mysqli_fetch_assoc($getBillsResult)) {
                 $billId = $bill['ID'];
-                $billDues = floatval($bill['Dues']);
+                $billDues = intval($bill['Dues']);
                 
-                // Calculer combien on paie pour cette facture
-                $billPayment = round($billDues * $paymentRatio, 2);
+                // Calculer combien on paie pour cette facture (arrondi à l'entier)
+                $billPayment = intval(round($billDues * $paymentRatio));
                 
+                // S'assurer que le montant n'est pas supérieur aux dettes de la facture
+                if ($billPayment > $billDues) {
+                    $billPayment = $billDues;
+                }
+                
+                $totalApplied += $billPayment;
+                $billsToUpdate[$billId] = $billPayment;
+            }
+            
+            // Ajuster le dernier paiement si nécessaire pour atteindre le montant exact
+            if ($totalApplied != $paymentAmount && !empty($billsToUpdate)) {
+                $difference = $paymentAmount - $totalApplied;
+                $lastBillId = array_key_last($billsToUpdate);
+                $billsToUpdate[$lastBillId] += $difference;
+            }
+            
+            // Deuxième passe: appliquer les paiements
+            foreach ($billsToUpdate as $billId => $billPayment) {
                 // Mettre à jour cette facture
                 $updateQuery = "UPDATE tblcustomer SET 
                                Paid = Paid + $billPayment, 
@@ -114,12 +136,12 @@ if (isset($_POST['payDues'])) {
                                WHERE CustomerName='$customerName' AND MobileNumber='$mobile'";
             $getNewDuesResult = mysqli_query($con, $getNewDuesQuery);
             $newDuesData = mysqli_fetch_assoc($getNewDuesResult);
-            $newTotalDues = floatval($newDuesData['totalDues']);
+            $newTotalDues = intval($newDuesData['totalDues']);
             
             // Envoyer un SMS au client
             if (isset($_POST['sendSms']) && !empty($mobile)) {
-                $formattedAmount = number_format($paymentAmount, 2);
-                $formattedDues = number_format($newTotalDues, 2);
+                $formattedAmount = number_format($paymentAmount, 0);
+                $formattedDues = number_format($newTotalDues, 0);
                 
                 $smsMessage = "Cher(e) $customerName, votre paiement de $formattedAmount a été reçu avec succès. ";
                 
@@ -132,7 +154,7 @@ if (isset($_POST['payDues'])) {
                 sendSmsNotification($mobile, $smsMessage);
             }
             
-            $msg = "Paiement de " . number_format($paymentAmount, 2) . " effectué avec succès.";
+            $msg = "Paiement de " . number_format($paymentAmount, 0) . " effectué avec succès.";
             
         } catch (Exception $e) {
             mysqli_rollback($con);
@@ -242,9 +264,9 @@ $res = mysqli_query($con, $sql);
 
       $cnt=1;
       while ($row = mysqli_fetch_assoc($res)) {
-        $finalAmt = floatval($row['FinalAmount']);
-        $paidAmt  = floatval($row['Paid']);
-        $dueAmt   = floatval($row['Dues']);
+        $finalAmt = intval($row['FinalAmount']);
+        $paidAmt  = intval($row['Paid']);
+        $dueAmt   = intval($row['Dues']);
 
         // On cumule
         $sumFinal += $finalAmt;
@@ -255,9 +277,9 @@ $res = mysqli_query($con, $sql);
           <td><?php echo $cnt++; ?></td>
           <td><?php echo $row['BillingNumber']; ?></td>
           <td><?php echo $row['BillingDate']; ?></td>
-          <td><?php echo number_format($finalAmt,2); ?></td>
-          <td><?php echo number_format($paidAmt,2); ?></td>
-          <td><?php echo number_format($dueAmt,2); ?></td>
+          <td><?php echo number_format($finalAmt, 0); ?></td>
+          <td><?php echo number_format($paidAmt, 0); ?></td>
+          <td><?php echo number_format($dueAmt, 0); ?></td>
         </tr>
         <?php
       }
@@ -266,9 +288,9 @@ $res = mysqli_query($con, $sql);
       <tfoot>
         <tr style="font-weight: bold;">
           <td colspan="3" style="text-align: right;">TOTAL</td>
-          <td><?php echo number_format($sumFinal,2); ?></td>
-          <td><?php echo number_format($sumPaid,2); ?></td>
-          <td><?php echo number_format($sumDues,2); ?></td>
+          <td><?php echo number_format($sumFinal, 0); ?></td>
+          <td><?php echo number_format($sumPaid, 0); ?></td>
+          <td><?php echo number_format($sumDues, 0); ?></td>
         </tr>
       </tfoot>
     </table>
@@ -278,12 +300,12 @@ $res = mysqli_query($con, $sql);
   <div class="container-fluid">
     <div class="payment-form">
       <h3>Règlement de votre solde</h3>
-      <p>Votre solde total à payer est de: <span class="dues-highlight"><?php echo number_format($sumDues,2); ?></span></p>
+      <p>Votre solde total à payer est de: <span class="dues-highlight"><?php echo number_format($sumDues, 0); ?></span></p>
       
       <form method="post" action="">
         <div class="form-group">
           <label for="paymentAmount"><strong>Montant à payer:</strong></label>
-          <input type="number" step="0.01" min="0.01" max="<?php echo $sumDues; ?>" class="form-control" id="paymentAmount" name="paymentAmount" value="<?php echo $sumDues; ?>" required>
+          <input type="number" step="1" min="1" max="<?php echo $sumDues; ?>" class="form-control" id="paymentAmount" name="paymentAmount" value="<?php echo $sumDues; ?>" required>
         </div>
         
         <div class="form-group">
