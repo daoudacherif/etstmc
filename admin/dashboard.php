@@ -17,8 +17,9 @@ if (strlen($_SESSION['imsaid']==0)) {
   <!-- Include external CSS (your responsive CSS should be linked here) -->
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
-</head>
-<body>
+  
+
+
   <!-- Main application container -->
   <div id="app-container">
     <?php include_once('includes/header.php'); ?>
@@ -85,11 +86,9 @@ if (strlen($_SESSION['imsaid']==0)) {
             <ul class="site-stats">
               <?php
               // Vente d'aujourd'hui
-              $query6 = mysqli_query($con,"select tblcart.ProductQty as ProductQty, tblproducts.Price, tblcustomer.Paid
-                from tblcart 
-                join tblproducts on tblproducts.ID=tblcart.ProductId 
-                join tblcustomer on tblcart.CustomerID=tblcustomer.ID
-                where date(CartDate)=CURDATE() and IsCheckOut='1' and tblcustomer.Paid='1'");
+              $query6 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
+                where date(CartDate)=CURDATE() and IsCheckOut='1'");
               while($row = mysqli_fetch_array($query6))
               {
                 $todays_sale = $row['ProductQty'] * $row['Price'];
@@ -98,15 +97,13 @@ if (strlen($_SESSION['imsaid']==0)) {
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($todysale,2); ?></strong>
-                <small>Ventes payées d'aujourd'hui</small>
+                <small>Ventes d'aujourd'hui</small>
               </li>
               <?php
               // Vente d'hier
-              $query7 = mysqli_query($con,"select tblcart.ProductQty as ProductQty, tblproducts.Price, tblcustomer.Paid
-                from tblcart 
-                join tblproducts on tblproducts.ID=tblcart.ProductId 
-                join tblcustomer on tblcart.CustomerID=tblcustomer.ID
-                where date(CartDate)=CURDATE()-1 and IsCheckOut='1' and tblcustomer.Paid='1'");
+              $query7 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
+                where date(CartDate)=CURDATE()-1 and IsCheckOut='1'");
               while($row = mysqli_fetch_array($query7))
               {
                 $yesterdays_sale = $row['ProductQty'] * $row['Price'];
@@ -115,15 +112,13 @@ if (strlen($_SESSION['imsaid']==0)) {
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($yesterdaysale,2); ?></strong>
-                <small>Ventes payées d'hier</small>
+                <small>Ventes d'hier</small>
               </li>
               <?php
               // Vente des sept derniers jours
-              $query8 = mysqli_query($con,"select tblcart.ProductQty as ProductQty, tblproducts.Price, tblcustomer.Paid
-                from tblcart 
-                join tblproducts on tblproducts.ID=tblcart.ProductId 
-                join tblcustomer on tblcart.CustomerID=tblcustomer.ID
-                where date(tblcart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcart.IsCheckOut='1' and tblcustomer.Paid='1'");
+              $query8 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
+                where date(tblcart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcart.IsCheckOut='1'");
               while($row = mysqli_fetch_array($query8))
               {
                 $sevendays_sale = $row['ProductQty'] * $row['Price'];
@@ -132,15 +127,12 @@ if (strlen($_SESSION['imsaid']==0)) {
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($tseven,2); ?></strong>
-                <small>Ventes payées des sept derniers jours</small>
+                <small>Ventes des sept derniers jours</small>
               </li>
               <?php
               // Vente totale
-              $query9 = mysqli_query($con,"select tblcart.ProductQty as ProductQty, tblproducts.Price, tblcustomer.Paid
-                from tblcart 
-                join tblproducts on tblproducts.ID=tblcart.ProductId 
-                join tblcustomer on tblcart.CustomerID=tblcustomer.ID
-                where IsCheckOut='1' and tblcustomer.Paid='1'");
+              $query9 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId where IsCheckOut='1'");
               while($row = mysqli_fetch_array($query9))
               {
                 $total_sale = $row['ProductQty'] * $row['Price'];
@@ -149,7 +141,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($totalsale,2); ?></strong>
-                <small>Ventes payées totales</small>
+                <small>Ventes totales</small>
               </li>
             </ul>
           </div>
