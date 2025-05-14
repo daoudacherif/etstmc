@@ -7,6 +7,20 @@ error_reporting(E_ALL);
 
 include('includes/dbconnection.php');
 
+// Check if user is logged in
+if (!isset($_SESSION['imsaid']) || empty($_SESSION['imsaid'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// Get the current admin ID from session
+$currentAdminID = $_SESSION['imsaid'];
+
+// Get the current admin name (since it's not stored in session)
+$adminQuery = mysqli_query($con, "SELECT AdminName FROM tbladmin WHERE ID = '$currentAdminID'");
+$adminData = mysqli_fetch_assoc($adminQuery);
+$currentAdminName = $adminData['AdminName'];
+
 /**
  * Function to obtain the OAuth2 access token from Nimba using cURL.
  */
@@ -133,7 +147,7 @@ if (isset($_POST['applyDiscount'])) {
     
     // Calculer le grand total avant d'appliquer la remise
     $grandTotal = 0;
-    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQuery = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND AdminID='$currentAdminID'");
     while ($row = mysqli_fetch_assoc($cartQuery)) {
         $grandTotal += $row['ProductQty'] * $row['Price'];
     }
@@ -168,7 +182,7 @@ $discountValue = $_SESSION['discountValue'] ?? 0;
 // Traitement de la suppression d'un élément du panier
 if (isset($_GET['delid'])) {
     $delid = intval($_GET['delid']);
-    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0");
+    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE ID = $delid AND IsCheckOut = 0 AND AdminID = '$currentAdminID'");
     if ($deleteQuery) {
         echo "<script>
                 alert('Article retiré du panier');
@@ -240,11 +254,11 @@ if (isset($_POST['addtocart'])) {
         exit;
     }
 
-    // 4) INSERT ou UPDATE dans tblcart
+    // 4) INSERT ou UPDATE dans tblcart - Ajout de AdminID
     $checkCart = mysqli_query($con, "
         SELECT ID, ProductQty 
         FROM tblcart 
-        WHERE ProductId='$productId' AND IsCheckOut=0 
+        WHERE ProductId='$productId' AND IsCheckOut=0 AND AdminID='$currentAdminID'
         LIMIT 1
     ");
     if (mysqli_num_rows($checkCart) > 0) {
@@ -267,8 +281,8 @@ if (isset($_POST['addtocart'])) {
         ");
     } else {
         mysqli_query($con, "
-            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut) 
-            VALUES('$productId','$quantity','$price','0')
+            INSERT INTO tblcart(ProductId, ProductQty, Price, IsCheckOut, AdminID) 
+            VALUES('$productId', '$quantity', '$price', '0', '$currentAdminID')
         ");
     }
 
@@ -290,7 +304,7 @@ if (isset($_POST['submit'])) {
     $discount     = $_SESSION['discount'] ?? 0;
 
     // Calcul du total
-    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0");
+    $cartQ = mysqli_query($con, "SELECT ProductQty, Price FROM tblcart WHERE IsCheckOut=0 AND AdminID='$currentAdminID'");
     $grand = 0;
     while ($r = mysqli_fetch_assoc($cartQ)) {
         $grand += $r['ProductQty'] * $r['Price'];
@@ -302,7 +316,7 @@ if (isset($_POST['submit'])) {
         SELECT c.ProductId, c.ProductQty, p.Stock, p.ProductName
         FROM tblcart c
         JOIN tblproducts p ON p.ID = c.ProductId
-        WHERE c.IsCheckOut = 0
+        WHERE c.IsCheckOut = 0 AND c.AdminID = '$currentAdminID'
     ");
     
     $stockError = false;
@@ -329,12 +343,15 @@ if (isset($_POST['submit'])) {
     // Générer un numéro de facture unique
     $billingnum = mt_rand(100000000, 999999999);
 
-    // Mise à jour du panier + insertion client
-    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;";
+    // Mise à jour du panier + insertion client - Ajout du AdminID
+    $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND AdminID='$currentAdminID';";
+    
+    // Ajouter ProcessedBy si la colonne n'existe pas encore
+    // Exécutez cette requête SQL au préalable: ALTER TABLE tblcustomer ADD COLUMN ProcessedBy VARCHAR(50);
     $query .= "INSERT INTO tblcustomer
-                 (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount)
+                 (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount, ProcessedBy)
                VALUES
-                 ('$billingnum','$custname','$custmobile','$modepayment','$netTotal');";
+                 ('$billingnum','$custname','$custmobile','$modepayment','$netTotal','$currentAdminName');";
     $result = mysqli_multi_query($con, $query);
 
     if ($result) {
@@ -388,6 +405,18 @@ if ($productNamesQuery) {
     <title>Système de gestion des stocks | Panier</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
+    <style>
+        .user-cart-indicator {
+            background-color: #f8f8f8;
+            border-left: 4px solid #27a9e3;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .user-cart-indicator i {
+            margin-right: 5px;
+            color: #27a9e3;
+        }
+    </style>
 </head>
 <body>
     <!-- Header + Sidebar -->
@@ -407,6 +436,11 @@ if ($productNamesQuery) {
 
         <div class="container-fluid">
             <hr>
+            <!-- Indicateur de panier utilisateur -->
+            <div class="user-cart-indicator">
+                <i class="icon-user"></i> <strong>Panier géré par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
+            </div>
+            
             <!-- ========== FORMULAIRE DE RECHERCHE (avec datalist) ========== -->
             <div class="row-fluid">
                 <div class="span12">
@@ -620,7 +654,7 @@ if ($productNamesQuery) {
                                         tblproducts.Price as basePrice
                                       FROM tblcart
                                       LEFT JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
-                                      WHERE tblcart.IsCheckOut = 0
+                                      WHERE tblcart.IsCheckOut = 0 AND tblcart.AdminID = '$currentAdminID'
                                       ORDER BY tblcart.ID ASC
                                     ");
                                     $cnt = 1;
