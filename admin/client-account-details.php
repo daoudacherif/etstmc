@@ -217,7 +217,7 @@ if(isset($_POST['payTotalDues'])) {
     }
     
     // Rediriger pour éviter les soumissions multiples
-    header("Location: client-details.php?name=$customerName&mobile=$mobile&msg=$msg");
+    header("Location: client-account-details.php?name=$customerName&mobile=$mobile&msg=$msg");
     exit;
     
   } catch(Exception $e) {
