@@ -132,99 +132,167 @@ function sendSmsNotification($to, $message) {
 $customerName = mysqli_real_escape_string($con, $_GET['name']);
 $mobile       = mysqli_real_escape_string($con, $_GET['mobile']);
 
+// Traitement du paiement par facture individuelle
+if (isset($_POST['addPayment'])) {
+    $billId = intval($_POST['billId']);
+    $payAmount = floatval($_POST['payAmount']);
+    $paymentMethod = mysqli_real_escape_string($con, $_POST['paymentMethod']);
+    $sendSms = isset($_POST['sendSms']) ? true : false;
+    
+    if ($payAmount <= 0) {
+        $error = "Le montant du paiement doit être supérieur à zéro.";
+    } else {
+        // Récupérer les montants actuels
+        $getBill = mysqli_query($con, "SELECT Paid, Dues, BillingNumber FROM tblcustomer WHERE ID='$billId' LIMIT 1");
+        
+        if (mysqli_num_rows($getBill) > 0) {
+            $billData = mysqli_fetch_assoc($getBill);
+            $oldPaid = floatval($billData['Paid']);
+            $oldDues = floatval($billData['Dues']);
+            $billNumber = $billData['BillingNumber'];
+            
+            // Calculer les nouveaux montants
+            $newPaid = $oldPaid + $payAmount;
+            $newDues = $oldDues - $payAmount;
+            
+            // S'assurer que les sommes dues ne sont pas négatives
+            if ($newDues < 0) {
+                $newDues = 0;
+            }
+            
+            // Mettre à jour la facture
+            mysqli_query($con, "UPDATE tblcustomer SET 
+                                Paid='$newPaid', 
+                                Dues='$newDues',
+                                ModeofPayment='$paymentMethod',
+                                LastUpdationDate=NOW()
+                                WHERE ID='$billId'");
+                                
+            // Enregistrer la transaction
+            mysqli_query($con, "INSERT INTO tblpayments (BillingId, PaymentAmount, PaymentMethod, PaymentDate) 
+                                VALUES ('$billId', '$payAmount', '$paymentMethod', NOW())");
+            
+            // Récupérer le solde total du client après paiement
+            $getTotalDues = mysqli_query($con, "SELECT SUM(Dues) as totalDues FROM tblcustomer 
+                                              WHERE CustomerName='$customerName' 
+                                              AND MobileNumber='$mobile'");
+            $duesData = mysqli_fetch_assoc($getTotalDues);
+            $totalDues = $duesData['totalDues'];
+            
+            // Envoyer un SMS si option cochée
+            if ($sendSms) {
+                $formattedAmount = number_format($payAmount, 2);
+                $formattedDues = number_format($totalDues, 2);
+                
+                $smsMessage = "Cher(e) $customerName, nous avons reçu votre paiement de $formattedAmount pour la facture #$billNumber. ";
+                
+                if ($totalDues > 0) {
+                    $smsMessage .= "Votre solde total restant est de $formattedDues.";
+                } else {
+                    $smsMessage .= "Toutes vos factures sont maintenant réglées. Merci!";
+                }
+                
+                sendSmsNotification($mobile, $smsMessage);
+            }
+            
+            $msg = "Paiement de " . number_format($payAmount, 2) . " pour la facture #$billNumber effectué avec succès.";
+        } else {
+            $error = "Facture introuvable.";
+        }
+    }
+}
+
 // Traitement du paiement total
 if(isset($_POST['payTotalDues'])) {
-  $paymentAmount = mysqli_real_escape_string($con, $_POST['paymentAmount']);
-  $paymentMethod = mysqli_real_escape_string($con, $_POST['paymentMethod']);
-  $sendSms = isset($_POST['sendSms']) ? true : false;
-  
-  // Récupérer toutes les factures avec des dettes
-  $getBillings = mysqli_query($con, "SELECT ID, Dues FROM tblcustomer 
+    $payAmount = floatval($_POST['payAmount']);
+    $paymentMethod = mysqli_real_escape_string($con, $_POST['paymentMethod']);
+    $sendSms = isset($_POST['sendSms']) ? true : false;
+    
+    if ($payAmount <= 0) {
+        $error = "Le montant du paiement doit être supérieur à zéro.";
+    } else {
+        // Récupérer toutes les factures avec des dettes
+        $getBillings = mysqli_query($con, "SELECT ID, Dues, BillingNumber FROM tblcustomer 
                                     WHERE CustomerName='$customerName' 
                                     AND MobileNumber='$mobile' 
                                     AND Dues > 0 
                                     ORDER BY BillingDate ASC");
-  
-  $remainingPayment = $paymentAmount;
-  $updatedBills = 0;
-  
-  // Commencer une transaction
-  mysqli_begin_transaction($con);
-  
-  try {
-    // Parcourir les factures pour appliquer le paiement, en commençant par les plus anciennes
-    while($bill = mysqli_fetch_assoc($getBillings) && $remainingPayment > 0) {
-      $billId = $bill['ID'];
-      $currentDues = $bill['Dues'];
-      
-      // Déterminer combien appliquer à cette facture
-      $amountToApply = min($remainingPayment, $currentDues);
-      
-      if($amountToApply > 0) {
-        // Mettre à jour cette facture
-        $updateQuery = "UPDATE tblcustomer SET 
-                        Paid = Paid + $amountToApply, 
-                        Dues = Dues - $amountToApply,
-                        ModeofPayment = '$paymentMethod',
-                        LastUpdationDate = NOW()
-                        WHERE ID = '$billId'";
-                        
-        mysqli_query($con, $updateQuery);
         
-        // Enregistrer cette transaction de paiement
-        $paymentRecord = "INSERT INTO tblpayments (BillingId, PaymentAmount, PaymentMethod, PaymentDate) 
-                          VALUES ('$billId', '$amountToApply', '$paymentMethod', NOW())";
-        mysqli_query($con, $paymentRecord);
+        $remainingPayment = $payAmount;
+        $updatedBills = 0;
+        $billNumbers = array();
         
-        $remainingPayment -= $amountToApply;
-        $updatedBills++;
-      }
+        // Commencer une transaction
+        mysqli_begin_transaction($con);
+        
+        try {
+            // Parcourir les factures pour appliquer le paiement, en commençant par les plus anciennes
+            while($bill = mysqli_fetch_assoc($getBillings) && $remainingPayment > 0) {
+                $billId = $bill['ID'];
+                $currentDues = $bill['Dues'];
+                $billNumber = $bill['BillingNumber'];
+                
+                // Déterminer combien appliquer à cette facture
+                $amountToApply = min($remainingPayment, $currentDues);
+                
+                if($amountToApply > 0) {
+                    // Mettre à jour cette facture
+                    $updateQuery = "UPDATE tblcustomer SET 
+                                    Paid = Paid + $amountToApply, 
+                                    Dues = Dues - $amountToApply,
+                                    ModeofPayment = '$paymentMethod',
+                                    LastUpdationDate = NOW()
+                                    WHERE ID = '$billId'";
+                                    
+                    mysqli_query($con, $updateQuery);
+                    
+                    // Enregistrer cette transaction de paiement
+                    $paymentRecord = "INSERT INTO tblpayments (BillingId, PaymentAmount, PaymentMethod, PaymentDate) 
+                                    VALUES ('$billId', '$amountToApply', '$paymentMethod', NOW())";
+                    mysqli_query($con, $paymentRecord);
+                    
+                    $remainingPayment -= $amountToApply;
+                    $updatedBills++;
+                    $billNumbers[] = $billNumber;
+                }
+            }
+            
+            // Valider la transaction
+            mysqli_commit($con);
+            
+            // Récupérer le solde restant après le paiement
+            $getRemainingDues = mysqli_query($con, "SELECT SUM(Dues) as totalDues FROM tblcustomer 
+                                                WHERE CustomerName='$customerName' 
+                                                AND MobileNumber='$mobile'");
+            $duesData = mysqli_fetch_assoc($getRemainingDues);
+            $remainingDues = $duesData['totalDues'];
+            
+            // Envoyer SMS de confirmation si option cochée
+            if ($sendSms && !empty($mobile)) {
+                $formattedAmount = number_format($payAmount, 2);
+                $formattedDues = number_format($remainingDues, 2);
+                
+                $billsList = implode(', ', $billNumbers);
+                $smsMessage = "Cher(e) $customerName, votre paiement de $formattedAmount a été reçu pour les factures: $billsList. ";
+                
+                if ($remainingDues > 0) {
+                    $smsMessage .= "Votre solde restant est de $formattedDues.";
+                } else {
+                    $smsMessage .= "Toutes vos factures sont maintenant réglées. Merci!";
+                }
+                
+                // Envoyer le SMS au client
+                sendSmsNotification($mobile, $smsMessage);
+            }
+            
+            $msg = "Paiement de " . number_format($payAmount, 2) . " effectué avec succès. $updatedBills facture(s) mise(s) à jour.";
+            
+        } catch(Exception $e) {
+            // Annuler la transaction en cas d'erreur
+            mysqli_rollback($con);
+            $error = "Erreur lors du paiement: " . $e->getMessage();
+        }
     }
-    
-    // Valider la transaction
-    mysqli_commit($con);
-    
-    // Récupérer le solde restant après le paiement
-    $getRemainingDues = mysqli_query($con, "SELECT SUM(Dues) as totalDues FROM tblcustomer 
-                                          WHERE CustomerName='$customerName' 
-                                          AND MobileNumber='$mobile'");
-    $duesData = mysqli_fetch_assoc($getRemainingDues);
-    $remainingDues = $duesData['totalDues'];
-    
-    // Envoyer SMS de confirmation si option cochée
-    if ($sendSms && !empty($mobile)) {
-      $formattedAmount = number_format($paymentAmount, 2);
-      $formattedDues = number_format($remainingDues, 2);
-      
-      $smsMessage = "Cher(e) $customerName, votre paiement de $formattedAmount a été reçu avec succès. ";
-      
-      if ($remainingDues > 0) {
-        $smsMessage .= "Votre solde restant est de $formattedDues.";
-      } else {
-        $smsMessage .= "Toutes vos factures sont maintenant réglées. Merci!";
-      }
-      
-      // Envoyer le SMS au client
-      $smsResult = sendSmsNotification($mobile, $smsMessage);
-      
-      if ($smsResult) {
-        $msg = "Paiement de " . number_format($paymentAmount, 2) . " effectué avec succès. SMS de confirmation envoyé.";
-      } else {
-        $msg = "Paiement de " . number_format($paymentAmount, 2) . " effectué avec succès. Échec de l'envoi du SMS.";
-      }
-    } else {
-      $msg = "Paiement de " . number_format($paymentAmount, 2) . " effectué avec succès. $updatedBills facture(s) mise(s) à jour.";
-    }
-    
-    // Rediriger pour éviter les soumissions multiples
-    header("Location: client-account-details.php?name=$customerName&mobile=$mobile&msg=$msg");
-    exit;
-    
-  } catch(Exception $e) {
-    // Annuler la transaction en cas d'erreur
-    mysqli_rollback($con);
-    $error = "Erreur lors du paiement: " . $e->getMessage();
-  }
 }
 
 // Requête : toutes les factures de ce client
@@ -284,6 +352,17 @@ $res = mysqli_query($con, $sql);
       background-color: #e8f4fb;
       border-radius: 5px;
     }
+    .pay-form {
+      display: inline-flex;
+      align-items: center;
+    }
+    .pay-form input[type="number"] {
+      width: 80px;
+      margin-right: 5px;
+    }
+    .pay-form button {
+      margin-left: 5px;
+    }
   </style>
 </head>
 <body>
@@ -297,9 +376,9 @@ $res = mysqli_query($con, $sql);
   <div class="container-fluid">
     <hr>
     
-    <?php if(isset($_GET['msg'])){ ?>
+    <?php if(isset($msg)){ ?>
     <div class="alert alert-success">
-      <?php echo htmlspecialchars($_GET['msg']); ?>
+      <?php echo htmlspecialchars($msg); ?>
     </div>
     <?php } ?>
     
@@ -324,6 +403,7 @@ $res = mysqli_query($con, $sql);
           <th>Montant Final</th>
           <th>Payé</th>
           <th>Reste</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -351,6 +431,27 @@ $res = mysqli_query($con, $sql);
           <td><?php echo number_format($finalAmt,2); ?></td>
           <td><?php echo number_format($paidAmt,2); ?></td>
           <td><?php echo number_format($dueAmt,2); ?></td>
+          <td>
+            <?php if ($dueAmt > 0) { ?>
+              <!-- Formulaire de paiement pour chaque facture -->
+              <form method="post" class="pay-form">
+                <input type="hidden" name="billId" value="<?php echo $row['ID']; ?>">
+                <input type="number" name="payAmount" step="0.01" min="0.01" max="<?php echo $dueAmt; ?>" placeholder="Montant" required>
+                <select name="paymentMethod" required>
+                  <option value="">Mode</option>
+                  <option value="Espèces">Espèces</option>
+                  <option value="Carte">Carte</option>
+                  <option value="Mobile Money">Mobile Money</option>
+                  <option value="Virement">Virement</option>
+                </select>
+                <input type="checkbox" name="sendSms" id="sendSms<?php echo $row['ID']; ?>" checked>
+                <label for="sendSms<?php echo $row['ID']; ?>" title="Envoyer SMS">SMS</label>
+                <button type="submit" name="addPayment" class="btn btn-info btn-mini">Payer</button>
+              </form>
+            <?php } else { ?>
+              <span style="color: green; font-weight: bold;">Payée</span>
+            <?php } ?>
+          </td>
         </tr>
         <?php
       }
@@ -362,6 +463,7 @@ $res = mysqli_query($con, $sql);
           <td><?php echo number_format($sumFinal,2); ?></td>
           <td><?php echo number_format($sumPaid,2); ?></td>
           <td><?php echo number_format($sumDues,2); ?></td>
+          <td></td>
         </tr>
       </tfoot>
     </table>
@@ -370,7 +472,7 @@ $res = mysqli_query($con, $sql);
   <?php if($sumDues > 0) { ?>
   <div class="container-fluid">
     <div class="payment-form">
-      <h3>Règlement de votre solde</h3>
+      <h3>Règlement de votre solde total</h3>
       <div class="payment-summary">
         Total des factures: <?php echo number_format($sumFinal,2); ?> <br>
         Total payé: <?php echo number_format($sumPaid,2); ?> <br>
@@ -379,8 +481,8 @@ $res = mysqli_query($con, $sql);
       
       <form method="post" action="">
         <div class="form-group">
-          <label for="paymentAmount"><strong>Montant à payer:</strong></label>
-          <input type="number" step="0.01" min="0.01" max="<?php echo $sumDues; ?>" class="form-control" id="paymentAmount" name="paymentAmount" value="<?php echo $sumDues; ?>" required>
+          <label for="payAmount"><strong>Montant à payer:</strong></label>
+          <input type="number" step="0.01" min="0.01" max="<?php echo $sumDues; ?>" class="form-control" id="payAmount" name="payAmount" value="<?php echo $sumDues; ?>" required>
           <small class="form-text text-muted">Le paiement sera appliqué aux factures les plus anciennes en premier.</small>
         </div>
         
@@ -411,8 +513,8 @@ $res = mysqli_query($con, $sql);
   <?php } else { ?>
   <div class="container-fluid">
     <div class="alert alert-success">
-      <h4>Félicitations! Toutes vos factures sont intégralement payées.</h4>
-      <p>Vous n'avez aucun solde dû actuellement.</p>
+      <h4>Félicitations! Toutes les factures sont intégralement payées.</h4>
+      <p>Le client n'a aucun solde dû actuellement.</p>
       
       <div class="sms-option" style="margin-top: 15px;">
         <form method="post" action="">
