@@ -101,8 +101,7 @@ if (isset($_POST['payDues'])) {
                 $updateQuery = "UPDATE tblcustomer SET 
                                Paid = Paid + $billPayment, 
                                Dues = Dues - $billPayment,
-                               ModeofPayment = '$paymentMethod',
-                               LastUpdationDate = NOW()
+                               ModeofPayment = '$paymentMethod'
                                WHERE ID = '$billId'";
                                
                 mysqli_query($con, $updateQuery);
@@ -313,9 +312,32 @@ $res = mysqli_query($con, $sql);
     <div class="alert alert-success">
       <h4>Félicitations! Toutes les factures sont intégralement payées.</h4>
       <p>Le client n'a aucun solde dû actuellement.</p>
+      
+      <div class="form-check" style="margin-top: 15px;">
+        <form method="post" action="">
+          <input type="hidden" name="sendThankYouSms" value="1">
+          <input type="checkbox" class="form-check-input" id="sendThanksSms" name="sendSms" checked>
+          <label class="form-check-label" for="sendThanksSms">Envoyer un SMS de remerciement au client</label>
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Envoyer SMS</button>
+        </form>
+      </div>
     </div>
   </div>
   <?php } ?>
+  
+  <!-- Traitement du SMS de remerciement -->
+  <?php
+  if(isset($_POST['sendThankYouSms']) && isset($_POST['sendSms'])) {
+    $thankYouMessage = "Cher(e) $customerName, nous vous remercions pour votre paiement. Toutes vos factures sont réglées. À bientôt!";
+    $smsResult = sendSmsNotification($mobile, $thankYouMessage);
+    
+    if($smsResult) {
+      echo '<script>alert("SMS de remerciement envoyé avec succès.");</script>';
+    } else {
+      echo '<script>alert("Échec de l\'envoi du SMS de remerciement.");</script>';
+    }
+  }
+  ?>
   
   <div class="container-fluid">
     <a href="client-account.php" class="btn btn-secondary" style="margin: 15px 0;">← Retour</a>
