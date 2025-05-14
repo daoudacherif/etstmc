@@ -444,7 +444,7 @@ $res = mysqli_query($con, $sql);
   ?>
   
   <div class="container-fluid">
-    <a href="client-account.php" class="btn btn-secondary" style="margin: 15px 0;">← Retour</a>
+    <a href="client-account-details.php" class="btn btn-secondary" style="margin: 15px 0;">← Retour</a>
   </div>
 </div><!-- content -->
 
