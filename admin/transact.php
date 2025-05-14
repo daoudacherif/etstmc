@@ -16,9 +16,8 @@ $todysale = 0;
 
 // Query: sum of ProductQty * Price for today's checked-out carts
 $query6 = mysqli_query($con, "
-  SELECT tblcart.ProductQty, tblproducts.Price
+  SELECT tblcart.ProductQty, tblcart.Price
   FROM tblcart
-  JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
   WHERE DATE(CartDate) = CURDATE()
     AND IsCheckOut = '1'
 ");
@@ -28,9 +27,27 @@ while ($row = mysqli_fetch_array($query6)) {
   $todysale += $todays_sale;
 }
 
-// Optional: check if we already inserted a "Daily Sale" transaction for today
+// ---------------------------------------------------------------------
+// B) Calculate today's credit payments received (NEW SECTION)
+// ---------------------------------------------------------------------
+$todayCreditPayments = 0;
+
+// Query: sum of Paid amounts for today's cash payments on credit invoices
+$queryCreditPayments = mysqli_query($con, "
+  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
+  FROM tblcustomer
+  WHERE DATE(BillingDate) = CURDATE()
+    AND ModeofPayment = 'Espèces'
+    AND Paid > 0
+");
+
+if ($rowCP = mysqli_fetch_array($queryCreditPayments)) {
+  $todayCreditPayments = floatval($rowCP['totalPaid']);
+}
+
+// Optional: check if we already inserted transactions for today's sale and payments
 $alreadyInserted = false;
-if ($todysale > 0) {
+if ($todysale > 0 || $todayCreditPayments > 0) {
   $checkToday = mysqli_query($con, "
     SELECT ID 
     FROM tblcashtransactions
@@ -44,8 +61,8 @@ if ($todysale > 0) {
   }
 }
 
-// If we have a positive sale and not inserted yet, insert a new "IN" transaction
-if ($todysale > 0 && !$alreadyInserted) {
+// If we have a positive sale or payments and not inserted yet, insert a new "IN" transaction
+if (($todysale > 0 || $todayCreditPayments > 0) && !$alreadyInserted) {
   // 1) Get the last BalanceAfter
   $sqlLast = "SELECT BalanceAfter FROM tblcashtransactions ORDER BY ID DESC LIMIT 1";
   $resLast = mysqli_query($con, $sqlLast);
@@ -56,19 +73,25 @@ if ($todysale > 0 && !$alreadyInserted) {
     $oldBal = 0;
   }
 
-  // 2) newBal = oldBal + $todysale
-  $newBal = $oldBal + $todysale;
+  // 2) newBal = oldBal + $todysale + $todayCreditPayments
+  $totalIncome = $todysale + $todayCreditPayments;
+  $newBal = $oldBal + $totalIncome;
 
   // 3) Insert row in tblcashtransactions
+  $comments = 'Daily Sale';
+  if ($todayCreditPayments > 0) {
+    $comments .= ' (dont '.number_format($todayCreditPayments, 2).' remboursements sur factures à terme)';
+  }
+  
   $sqlInsertSale = "
     INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
-    VALUES(NOW(), 'IN', '$todysale', '$newBal', 'Daily Sale')
+    VALUES(NOW(), 'IN', '$totalIncome', '$newBal', '$comments')
   ";
   mysqli_query($con, $sqlInsertSale);
 }
 
 // ---------------------------------------------------------------------
-// B) Calculate the daily balance BEFORE processing new transactions
+// C) Calculate the daily balance BEFORE processing new transactions
 // ---------------------------------------------------------------------
 
 // 1. Today's transaction totals
@@ -118,7 +141,7 @@ if (mysqli_num_rows($resPrevious) > 0) {
 $currentBalance = $previousBalance + $dailyBalance;
 
 // ---------------------------------------------------------------------
-// C) Handle manual transaction (Deposit/Withdrawal) from your form
+// D) Handle manual transaction (Deposit/Withdrawal) from your form
 // ---------------------------------------------------------------------
 $transactionError = ''; // Track any errors for display
 
@@ -197,7 +220,7 @@ if (isset($_POST['submit'])) {
 }
 
 // ---------------------------------------------------------------------
-// D) Recalculate today's transaction totals for display (in case we added a new one)
+// E) Recalculate today's transaction totals for display (in case we added a new one)
 // ---------------------------------------------------------------------
 $sqlToday = "
   SELECT
@@ -273,6 +296,11 @@ $outDisabled = ($currentBalance <= 0);
          echo " (déjà ajouté à la caisse)";
        }
       ?></p>
+      <p>Remboursements reçus sur factures à terme: <?php echo number_format($todayCreditPayments, 2); ?><?php
+       if ($alreadyInserted) {
+         echo " (déjà ajouté à la caisse)";
+       }
+      ?></p>
       <p>Retours du jour: <?php echo number_format($todayReturns, 2); ?></p>
       <p>Solde journalier: <strong><?php echo number_format($dailyBalance, 2); ?></strong> 
       <?php if ($dailyBalance <= 0): ?>
@@ -344,6 +372,61 @@ $outDisabled = ($currentBalance <= 0);
   </div><!-- row-fluid -->
 
   <hr>
+
+  <!-- ========== PAYMENTS ON CREDIT INVOICES LIST (NEW SECTION) ========== -->
+  <div class="row-fluid">
+    <div class="span12">
+    <div class="widget-box">
+      <div class="widget-title">
+      <span class="icon"><i class="icon-money"></i></span>
+      <h5>Paiements reçus sur factures à terme (aujourd'hui)</h5>
+      </div>
+      <div class="widget-content nopadding">
+      <table class="table table-bordered data-table">
+        <thead>
+        <tr>
+          <th>#</th>
+          <th>N° Facture</th>
+          <th>Client</th>
+          <th>Téléphone</th>
+          <th>Date</th>
+          <th>Montant Reçu</th>
+          <th>Reste à Payer</th>
+        </tr>
+        </thead>
+        <tbody>
+        <?php
+        $sqlPayments = "SELECT * FROM tblcustomer 
+                        WHERE DATE(BillingDate) = CURDATE() 
+                        AND ModeofPayment = 'Espèces' 
+                        AND Paid > 0
+                        ORDER BY ID DESC";
+        $resPayments = mysqli_query($con, $sqlPayments);
+        $cnt = 1;
+        while ($rowPay = mysqli_fetch_assoc($resPayments)) {
+          ?>
+          <tr>
+            <td><?php echo $cnt; ?></td>
+            <td><?php echo $rowPay['BillingNumber']; ?></td>
+            <td><?php echo $rowPay['CustomerName']; ?></td>
+            <td><?php echo $rowPay['MobileNumber']; ?></td>
+            <td><?php echo date('H:i', strtotime($rowPay['BillingDate'])); ?></td>
+            <td><?php echo number_format($rowPay['Paid'], 2); ?></td>
+            <td><?php echo number_format($rowPay['Dues'], 2); ?></td>
+          </tr>
+          <?php
+          $cnt++;
+        }
+        if (mysqli_num_rows($resPayments) == 0) {
+          echo '<tr><td colspan="7" style="text-align:center;">Aucun paiement reçu aujourd\'hui sur les factures à terme</td></tr>';
+        }
+        ?>
+        </tbody>
+      </table>
+      </div><!-- widget-content nopadding -->
+    </div><!-- widget-box -->
+    </div>
+  </div><!-- row-fluid -->
 
   <!-- ========== RECENT TRANSACTIONS LIST ========== -->
   <div class="row-fluid">
