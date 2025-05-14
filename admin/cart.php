@@ -343,15 +343,12 @@ if (isset($_POST['submit'])) {
     // Générer un numéro de facture unique
     $billingnum = mt_rand(100000000, 999999999);
 
-    // Mise à jour du panier + insertion client - Ajout du AdminID
+    // Mise à jour du panier + insertion client - Modification pour enlever ProcessedBy
     $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND AdminID='$currentAdminID';";
-    
-    // Ajouter ProcessedBy si la colonne n'existe pas encore
-    // Exécutez cette requête SQL au préalable: ALTER TABLE tblcustomer ADD COLUMN ProcessedBy VARCHAR(50);
     $query .= "INSERT INTO tblcustomer
-                 (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount, ProcessedBy)
+                 (BillingNumber, CustomerName, MobileNumber, ModeofPayment, FinalAmount)
                VALUES
-                 ('$billingnum','$custname','$custmobile','$modepayment','$netTotal','$currentAdminName');";
+                 ('$billingnum','$custname','$custmobile','$modepayment','$netTotal');";
     $result = mysqli_multi_query($con, $query);
 
     if ($result) {
@@ -366,7 +363,7 @@ if (isset($_POST['submit'])) {
             JOIN tblcart c ON p.ID = c.ProductId
             SET p.Stock = p.Stock - c.ProductQty
             WHERE c.BillingId = '$billingnum'
-              AND c.IsCheckOut  = 1
+              AND c.IsCheckOut = 1
         ";
         mysqli_query($con, $updateStockSql);
 
