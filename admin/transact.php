@@ -16,8 +16,9 @@ $todysale = 0;
 
 // Query: sum of ProductQty * Price for today's checked-out carts
 $query6 = mysqli_query($con, "
-  SELECT tblcart.ProductQty, tblcart.Price
+  SELECT tblcart.ProductQty, tblproducts.Price
   FROM tblcart
+  JOIN tblproducts ON tblproducts.ID = tblcart.ProductId
   WHERE DATE(CartDate) = CURDATE()
     AND IsCheckOut = '1'
 ");
@@ -27,33 +28,15 @@ while ($row = mysqli_fetch_array($query6)) {
   $todysale += $todays_sale;
 }
 
-// ---------------------------------------------------------------------
-// B) Calculate today's credit payments received (NEW SECTION)
-// ---------------------------------------------------------------------
-$todayCreditPayments = 0;
-
-// Query: sum of Paid amounts for today's cash payments on credit invoices
-$queryCreditPayments = mysqli_query($con, "
-  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
-  FROM tblcustomer
-  WHERE DATE(BillingDate) = CURDATE()
-    AND ModeofPayment = 'Espèces'
-    AND Paid > 0
-");
-
-if ($rowCP = mysqli_fetch_array($queryCreditPayments)) {
-  $todayCreditPayments = floatval($rowCP['totalPaid']);
-}
-
-// Optional: check if we already inserted transactions for today's sale and payments
+// Optional: check if we already inserted a "Daily Sale" transaction for today
 $alreadyInserted = false;
-if ($todysale > 0 || $todayCreditPayments > 0) {
+if ($todysale > 0) {
   $checkToday = mysqli_query($con, "
     SELECT ID 
     FROM tblcashtransactions
     WHERE TransType='IN'
       AND DATE(TransDate)=CURDATE()
-      AND Comments LIKE 'Daily Sale%'
+      AND Comments='Daily Sale'
     LIMIT 1
   ");
   if (mysqli_num_rows($checkToday) > 0) {
@@ -61,8 +44,8 @@ if ($todysale > 0 || $todayCreditPayments > 0) {
   }
 }
 
-// If we have a positive sale or payments and not inserted yet, insert a new "IN" transaction
-if (($todysale > 0 || $todayCreditPayments > 0) && !$alreadyInserted) {
+// If we have a positive sale and not inserted yet, insert a new "IN" transaction
+if ($todysale > 0 && !$alreadyInserted) {
   // 1) Get the last BalanceAfter
   $sqlLast = "SELECT BalanceAfter FROM tblcashtransactions ORDER BY ID DESC LIMIT 1";
   $resLast = mysqli_query($con, $sqlLast);
@@ -73,25 +56,19 @@ if (($todysale > 0 || $todayCreditPayments > 0) && !$alreadyInserted) {
     $oldBal = 0;
   }
 
-  // 2) newBal = oldBal + $todysale + $todayCreditPayments
-  $totalIncome = $todysale + $todayCreditPayments;
-  $newBal = $oldBal + $totalIncome;
+  // 2) newBal = oldBal + $todysale
+  $newBal = $oldBal + $todysale;
 
   // 3) Insert row in tblcashtransactions
-  $comments = 'Daily Sale';
-  if ($todayCreditPayments > 0) {
-    $comments .= ' (dont '.number_format($todayCreditPayments, 2).' remboursements sur factures à terme)';
-  }
-  
   $sqlInsertSale = "
     INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
-    VALUES(NOW(), 'IN', '$totalIncome', '$newBal', '$comments')
+    VALUES(NOW(), 'IN', '$todysale', '$newBal', 'Daily Sale')
   ";
   mysqli_query($con, $sqlInsertSale);
 }
 
 // ---------------------------------------------------------------------
-// C) Calculate the daily balance BEFORE processing new transactions
+// B) Calculate the daily balance BEFORE processing new transactions
 // ---------------------------------------------------------------------
 
 // 1. Today's transaction totals
@@ -141,7 +118,7 @@ if (mysqli_num_rows($resPrevious) > 0) {
 $currentBalance = $previousBalance + $dailyBalance;
 
 // ---------------------------------------------------------------------
-// D) Handle manual transaction (Deposit/Withdrawal) from your form
+// C) Handle manual transaction (Deposit/Withdrawal) from your form
 // ---------------------------------------------------------------------
 $transactionError = ''; // Track any errors for display
 
@@ -220,7 +197,7 @@ if (isset($_POST['submit'])) {
 }
 
 // ---------------------------------------------------------------------
-// E) Recalculate today's transaction totals for display (in case we added a new one)
+// D) Recalculate today's transaction totals for display (in case we added a new one)
 // ---------------------------------------------------------------------
 $sqlToday = "
   SELECT
@@ -292,11 +269,6 @@ $outDisabled = ($currentBalance <= 0);
        Aujourd'hui OUT: <?php echo number_format($todayOut, 2); ?>,
        Net: <?php echo number_format($todayNet, 2); ?></p>
       <p>Vente du jour: <?php echo number_format($todysale, 2); ?><?php
-       if ($alreadyInserted) {
-         echo " (déjà ajouté à la caisse)";
-       }
-      ?></p>
-      <p>Remboursements reçus sur factures à terme: <?php echo number_format($todayCreditPayments, 2); ?><?php
        if ($alreadyInserted) {
          echo " (déjà ajouté à la caisse)";
        }
