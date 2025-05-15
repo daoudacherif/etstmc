@@ -4,11 +4,11 @@
     <!-- Meta tags de base -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
+    
     <title>Gescometstmc - Commerce general</title>
     <meta name="description"
           content="Gescometstmc est une entreprise spécialisée dans l'importation et la vente de matériaux de construction en aluminium en République de Guinée." />
-
+     <link rel="icon" href="images/logo.jpg" type="image/png">
     <!-- Inter UI font -->
     <link href="https://rsms.me/inter/inter-ui.css" rel="stylesheet">
 
