@@ -19,11 +19,10 @@ if (strlen($_SESSION['imsaid']==0)) {
   <?php include_once('includes/responsive.php'); ?>
 </head>
 <body>
-      <?php include_once('includes/header.php'); ?>
-    <?php include_once('includes/sidebar.php'); ?>
   <!-- Main application container -->
   <div id="app-container">
-
+    <?php include_once('includes/header.php'); ?>
+    <?php include_once('includes/sidebar.php'); ?>
     <!--sidebar-menu-->
 
     <!-- main-container-part -->
@@ -44,6 +43,16 @@ if (strlen($_SESSION['imsaid']==0)) {
         <div class="widget-box widget-plain">
           <div class="center">
             <ul class="quick-actions">
+              <?php 
+              $query1 = mysqli_query($con,"Select * from tblbrand where Status='1'");
+              $brandcount = mysqli_num_rows($query1);
+              ?>
+              <li class="bg_lb">
+                <a href="manage-brand.php">
+                  <i class="fa fa-building-o fa-3x"></i><br />
+                  <span class="label label-important" style="margin-top:5%"><?php echo $brandcount; ?></span> Marques 
+                </a>
+              </li>
              
               <?php 
               $query2 = mysqli_query($con,"Select * from tblcategory where Status='1'");
@@ -53,6 +62,17 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <a href="manage-category.php">
                   <i class="icon-list fa-3x"></i>
                   <span class="label label-success" style="margin-top:7%"><?php echo $catcount; ?></span> Catégories 
+                </a>
+              </li>
+              
+              <?php 
+              $query3 = mysqli_query($con,"Select * from tblsubcategory where Status='1'");
+              $subcatcount = mysqli_num_rows($query3);
+              ?>
+              <li class="bg_lo">
+                <a href="manage-subcategory.php">
+                  <i class="icon-th"></i> 
+                  <span class="label label--success" style="margin-top:7%"><?php echo $subcatcount; ?></span>&nbsp; Sous-catégories
                 </a>
               </li>
              
@@ -66,6 +86,7 @@ if (strlen($_SESSION['imsaid']==0)) {
                   <span class="label label-success" style="margin-top:7%"><?php echo $productcount; ?></span> Articles
                 </a>
               </li>
+              
               <?php 
               $query5 = mysqli_query($con,"Select * from tblcustomer");
               $totuser = mysqli_num_rows($query5);
