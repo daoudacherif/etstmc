@@ -17,9 +17,9 @@ if (strlen($_SESSION['imsaid']==0)) {
   <!-- Include external CSS (your responsive CSS should be linked here) -->
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+  </head>
+<body>
   
-
-
   <!-- Main application container -->
   <div id="app-container">
     <?php include_once('includes/header.php'); ?>
