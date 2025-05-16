@@ -54,3 +54,38 @@ document.addEventListener('click', function (event) {
   }
 });
 </script>
+<!-- Script pour gérer le menu sidebar accordéon -->
+<script type="text/javascript">
+$(document).ready(function() {
+  // Gestionnaire pour les éléments .submenu
+  $('.submenu > a').on('click', function(e) {
+    e.preventDefault(); // Empêcher le comportement par défaut qui ajoute #
+    
+    var $li = $(this).parent('li');
+    var $ul = $(this).next('ul');
+    
+    if ($li.hasClass('open')) {
+      $ul.slideUp(350);
+      $li.removeClass('open');
+    } else {
+      // Fermer les autres sous-menus ouverts (optionnel)
+      $('.submenu > ul').slideUp(350);
+      $('.submenu').removeClass('open');
+      
+      // Ouvrir ce sous-menu
+      $ul.slideDown(350);
+      $li.addClass('open');
+    }
+  });
+  
+  // Empêcher la navigation vers # pour les liens de sous-menu parents
+  $('.submenu > a').click(function(e) {
+    // Déjà géré ci-dessus
+  });
+  
+  // Permettre à tous les autres liens de fonctionner normalement
+  $('#sidebar a:not(.submenu > a)').click(function(e) {
+    // Laisser le comportement par défaut pour ces liens
+  });
+});
+</script>
