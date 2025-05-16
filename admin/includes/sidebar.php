@@ -8,7 +8,6 @@ $username = $row['UserName'];
 // Compteur du panier avec gestion d'erreur
 try {
     // Essayez de déterminer le bon nom de colonne pour l'utilisateur dans la table tblcart
-    // Si vous connaissez le nom exact de la colonne, utilisez-le directement à la place de cette logique
     $cartcountcount = 0; // Valeur par défaut
     
     // Tentative avec différents noms de colonnes possibles
@@ -45,7 +44,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- Gestion des catégories -->
     <li class="submenu <?php echo in_array($current_page, ['add-category.php', 'manage-category.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon icon-th-list"></i> <span>Catégories</span></a>
+      <a href="#"><i class="icon icon-th-list"></i> <span>Catégories</span></a>
       <ul style="<?php echo in_array($current_page, ['add-category.php', 'manage-category.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'add-category.php' ? 'active' : ''; ?>"><a href="add-category.php">Ajouter une catégorie</a></li>
         <li class="<?php echo $current_page == 'manage-category.php' ? 'active' : ''; ?>"><a href="manage-category.php">Gérer les catégories</a></li>
@@ -54,7 +53,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- Articles -->
     <li class="submenu <?php echo in_array($current_page, ['add-product.php', 'manage-product.php', 'inventory.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon icon-info-sign"></i> <span>Articles</span></a>
+      <a href="#"><i class="icon icon-info-sign"></i> <span>Articles</span></a>
       <ul style="<?php echo in_array($current_page, ['add-product.php', 'manage-product.php', 'inventory.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'add-product.php' ? 'active' : ''; ?>"><a href="add-product.php">Ajouter un Article</a></li>
         <li class="<?php echo $current_page == 'manage-product.php' ? 'active' : ''; ?>"><a href="manage-product.php">Gérer les Articles</a></li>
@@ -66,7 +65,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <!-- PARTIE COMMUNE (VENTES) - visible pour tous les utilisateurs -->
     <!-- Ventes -->
     <li class="submenu <?php echo in_array($current_page, ['cart.php', 'dettecart.php', 'return.php', 'transact.php', 'facture.php', 'admin_invoices.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
+      <a href="#"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
       <ul style="<?php echo in_array($current_page, ['cart.php', 'dettecart.php', 'return.php', 'transact.php', 'facture.php', 'admin_invoices.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'cart.php' ? 'active' : ''; ?>"><a href="cart.php">Comptant <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
         <li class="<?php echo $current_page == 'dettecart.php' ? 'active' : ''; ?>"><a href="dettecart.php">Terme <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span></a></li>
@@ -81,7 +80,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
     
     <!-- Recherche -->
     <li class="submenu <?php echo in_array($current_page, ['search.php', 'invoice-search.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon-search"></i> <span>Recherche</span></a>
+      <a href="#"><i class="icon-search"></i> <span>Recherche</span></a>
       <ul style="<?php echo in_array($current_page, ['search.php', 'invoice-search.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'search.php' ? 'active' : ''; ?>"><a href="search.php">Rechercher</a></li>
         <li class="<?php echo $current_page == 'invoice-search.php' ? 'active' : ''; ?>"><a href="invoice-search.php">Factures</a></li>
@@ -90,7 +89,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- Fournisseurs -->
     <li class="submenu <?php echo in_array($current_page, ['arrival.php', 'supplier.php', 'supplier-payments.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon-group"></i> <span>Fournisseurs</span></a>
+      <a href="#"><i class="icon-group"></i> <span>Fournisseurs</span></a>
       <ul style="<?php echo in_array($current_page, ['arrival.php', 'supplier.php', 'supplier-payments.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'arrival.php' ? 'active' : ''; ?>"><a href="arrival.php">Arrivage</a></li>
         <li class="<?php echo $current_page == 'supplier.php' ? 'active' : ''; ?>"><a href="supplier.php">Liste des fournisseurs</a></li>
@@ -100,7 +99,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- Clients -->
     <li class="submenu <?php echo in_array($current_page, ['client-account.php', 'customer-details.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon-group"></i> <span>Clients</span></a>
+      <a href="#"><i class="icon-group"></i> <span>Clients</span></a>
       <ul style="<?php echo in_array($current_page, ['client-account.php', 'customer-details.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'client-account.php' ? 'active' : ''; ?>"><a href="client-account.php">Compte client</a></li>
         <li class="<?php echo $current_page == 'customer-details.php' ? 'active' : ''; ?>"><a href="customer-details.php">Détails client</a></li>
@@ -109,7 +108,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 
     <!-- Rapports -->
     <li class="submenu <?php echo in_array($current_page, ['stock-report.php', 'sales-report.php', 'daily-repport.php']) ? 'open active' : ''; ?>">
-      <a href="javascript:void(0);"><i class="icon icon-th-list"></i> <span>Rapports</span></a>
+      <a href="#"><i class="icon icon-th-list"></i> <span>Rapports</span></a>
       <ul style="<?php echo in_array($current_page, ['stock-report.php', 'sales-report.php', 'daily-repport.php']) ? 'display:block' : ''; ?>">
         <li class="<?php echo $current_page == 'stock-report.php' ? 'active' : ''; ?>"><a href="stock-report.php">Stock</a></li>
         <li class="<?php echo $current_page == 'sales-report.php' ? 'active' : ''; ?>"><a href="sales-report.php">Ventes</a></li>
