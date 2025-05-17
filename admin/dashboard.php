@@ -18,6 +18,8 @@ if (strlen($_SESSION['imsaid']==0)) {
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
   
+
+
   <!-- Main application container -->
   <div id="app-container">
     <?php include_once('includes/header.php'); ?>
@@ -71,7 +73,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               <li class="bg_lo span3">
                 <a href="profile.php">
                   <i class="icon-user"></i>
-                  <span class="label label-success" style="margin-top:5%"><?php echo $totuser; ?></span> Utilisateurs
+                  <span class="label label--success" style="margin-top:5%"><?php echo $totuser; ?></span> Utilisateurs
                 </a>
               </li>
             </ul>
@@ -84,8 +86,6 @@ if (strlen($_SESSION['imsaid']==0)) {
             <ul class="site-stats">
               <?php
               // Vente d'aujourd'hui
-              // 1. Ventes normales
-              $todysale = 0;
               $query6 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
                 where date(CartDate)=CURDATE() and IsCheckOut='1'");
@@ -94,26 +94,13 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $todays_sale = $row['ProductQty'] * $row['Price'];
                 $todysale += $todays_sale;
               }
-              
-              // 2. Ajout des ventes à crédit d'aujourd'hui
-              $query6credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
-                where date(CartDate)=CURDATE() and IsCheckOut='1'");
-              while($row = mysqli_fetch_array($query6credit))
-              {
-                $todays_credit_sale = $row['ProductQty'] * $row['Price'];
-                $todysale += $todays_credit_sale;
-              }
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($todysale,2); ?></strong>
                 <small>Ventes d'aujourd'hui</small>
               </li>
-              
               <?php
               // Vente d'hier
-              // 1. Ventes normales
-              $yesterdaysale = 0;
               $query7 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
                 where date(CartDate)=CURDATE()-1 and IsCheckOut='1'");
@@ -122,26 +109,13 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $yesterdays_sale = $row['ProductQty'] * $row['Price'];
                 $yesterdaysale += $yesterdays_sale;
               }
-              
-              // 2. Ajout des ventes à crédit d'hier
-              $query7credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
-                where date(CartDate)=CURDATE()-1 and IsCheckOut='1'");
-              while($row = mysqli_fetch_array($query7credit))
-              {
-                $yesterdays_credit_sale = $row['ProductQty'] * $row['Price'];
-                $yesterdaysale += $yesterdays_credit_sale;
-              }
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($yesterdaysale,2); ?></strong>
                 <small>Ventes d'hier</small>
               </li>
-              
               <?php
               // Vente des sept derniers jours
-              // 1. Ventes normales
-              $tseven = 0;
               $query8 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
                 where date(tblcart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcart.IsCheckOut='1'");
@@ -150,41 +124,19 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $sevendays_sale = $row['ProductQty'] * $row['Price'];
                 $tseven += $sevendays_sale;
               }
-              
-              // 2. Ajout des ventes à crédit des 7 derniers jours
-              $query8credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
-                where date(tblcreditscart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcreditscart.IsCheckOut='1'");
-              while($row = mysqli_fetch_array($query8credit))
-              {
-                $sevendays_credit_sale = $row['ProductQty'] * $row['Price'];
-                $tseven += $sevendays_credit_sale;
-              }
               ?>
               <li class="bg_lh">
                 <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($tseven,2); ?></strong>
                 <small>Ventes des sept derniers jours</small>
               </li>
-              
               <?php
               // Vente totale
-              // 1. Ventes normales
-              $totalsale = 0;
               $query9 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId where IsCheckOut='1'");
               while($row = mysqli_fetch_array($query9))
               {
                 $total_sale = $row['ProductQty'] * $row['Price'];
                 $totalsale += $total_sale;
-              }
-              
-              // 2. Ajout des ventes à crédit totales
-              $query9credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId where IsCheckOut='1'");
-              while($row = mysqli_fetch_array($query9credit))
-              {
-                $total_credit_sale = $row['ProductQty'] * $row['Price'];
-                $totalsale += $total_credit_sale;
               }
               ?>
               <li class="bg_lh">
