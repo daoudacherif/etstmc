@@ -1,6 +1,10 @@
 <?php
 session_start();
-error_reporting(0);
+// Affiche toutes les erreurs (à désactiver en production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 include('includes/dbconnection.php');
 if (strlen($_SESSION['imsaid']==0)) {
   header('location:logout.php');
