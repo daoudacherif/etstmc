@@ -10,11 +10,11 @@ if (strlen($_SESSION['imsaid'] == 0)) {
 }
 
 // ---------------------------------------------------------------------
-// A) Calculate today's sale from tblcart
+// A) Calculate today's sale from tblcart (UNIQUEMENT VENTES RÉGULIÈRES, PAS DE CRÉDIT)
 // ---------------------------------------------------------------------
 $todysale = 0;
 
-// Query: sum of ProductQty * Price for today's checked-out carts
+// Query: sum of ProductQty * Price for today's checked-out carts (REGULAR SALES ONLY)
 $query6 = mysqli_query($con, "
   SELECT tblcart.ProductQty, tblproducts.Price
   FROM tblcart
@@ -28,7 +28,20 @@ while ($row = mysqli_fetch_array($query6)) {
   $todysale += $todays_sale;
 }
 
-// Optional: check if we already inserted a "Daily Sale" transaction for today
+// ---------------------------------------------------------------------
+// A2) Calculate today's customer payments from tblcustomer
+// ---------------------------------------------------------------------
+$todayCustomerPayments = 0;
+$queryCustomerPayments = mysqli_query($con, "
+  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
+  FROM tblcustomer
+  WHERE DATE(BillingDate) = CURDATE()
+");
+if ($row = mysqli_fetch_array($queryCustomerPayments)) {
+  $todayCustomerPayments = floatval($row['totalPaid']);
+}
+
+// Optional: check if we already inserted "Daily Sale" and "Customer Payments" transactions for today
 $alreadyInserted = false;
 if ($todysale > 0) {
   $checkToday = mysqli_query($con, "
@@ -41,6 +54,21 @@ if ($todysale > 0) {
   ");
   if (mysqli_num_rows($checkToday) > 0) {
     $alreadyInserted = true;
+  }
+}
+
+$customerPaymentsInserted = false;
+if ($todayCustomerPayments > 0) {
+  $checkTodayPayments = mysqli_query($con, "
+    SELECT ID 
+    FROM tblcashtransactions
+    WHERE TransType='IN'
+      AND DATE(TransDate)=CURDATE()
+      AND Comments='Customer Payments'
+    LIMIT 1
+  ");
+  if (mysqli_num_rows($checkTodayPayments) > 0) {
+    $customerPaymentsInserted = true;
   }
 }
 
@@ -67,6 +95,29 @@ if ($todysale > 0 && !$alreadyInserted) {
   mysqli_query($con, $sqlInsertSale);
 }
 
+// If we have customer payments and not inserted yet, insert them
+if ($todayCustomerPayments > 0 && !$customerPaymentsInserted) {
+  // 1) Get the last BalanceAfter
+  $sqlLast = "SELECT BalanceAfter FROM tblcashtransactions ORDER BY ID DESC LIMIT 1";
+  $resLast = mysqli_query($con, $sqlLast);
+  if (mysqli_num_rows($resLast) > 0) {
+    $rowLast = mysqli_fetch_assoc($resLast);
+    $oldBal  = floatval($rowLast['BalanceAfter']);
+  } else {
+    $oldBal = 0;
+  }
+
+  // 2) newBal = oldBal + $todayCustomerPayments
+  $newBal = $oldBal + $todayCustomerPayments;
+
+  // 3) Insert row in tblcashtransactions
+  $sqlInsertPayments = "
+    INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
+    VALUES(NOW(), 'IN', '$todayCustomerPayments', '$newBal', 'Customer Payments')
+  ";
+  mysqli_query($con, $sqlInsertPayments);
+}
+
 // ---------------------------------------------------------------------
 // B) Calculate the daily balance BEFORE processing new transactions
 // ---------------------------------------------------------------------
@@ -87,9 +138,10 @@ $todayNet = $todayIn - $todayOut;
 
 // 2. Today's returns
 $sqlTodayReturns = "
-  SELECT COALESCE(SUM(ReturnPrice), 0) AS todayReturns
-  FROM tblreturns
-  WHERE DATE(ReturnDate) = CURDATE()
+  SELECT COALESCE(SUM(r.Quantity * p.Price), 0) AS todayReturns
+  FROM tblreturns r
+  JOIN tblproducts p ON p.ID = r.ProductID
+  WHERE DATE(r.ReturnDate) = CURDATE()
 ";
 $resTodayReturns = mysqli_query($con, $sqlTodayReturns);
 $rowTodayReturns = mysqli_fetch_assoc($resTodayReturns);
@@ -228,6 +280,19 @@ if (mysqli_num_rows($resBal) > 0) {
   $oldBalance = 0;
 }
 
+// ---------------------------------------------------------------------
+// E) Get info about credit sales (for display only, not included in balance)
+// ---------------------------------------------------------------------
+$sqlCreditSales = "
+  SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalCreditSales
+  FROM tblcreditcart c
+  WHERE c.IsCheckOut='1'
+    AND DATE(c.CartDate) = CURDATE()
+";
+$resCreditSales = mysqli_query($con, $sqlCreditSales);
+$rowCreditSales = mysqli_fetch_assoc($resCreditSales);
+$todayCreditSales = floatval($rowCreditSales['totalCreditSales']);
+
 // Determine the maximum amount that can be withdrawn (allow down to zero)
 $maxWithdrawal = $currentBalance > 0 ? $currentBalance : 0;
 
@@ -268,11 +333,17 @@ $outDisabled = ($currentBalance <= 0);
       <p>Aujourd'hui IN: <?php echo number_format($todayIn, 2); ?>,
        Aujourd'hui OUT: <?php echo number_format($todayOut, 2); ?>,
        Net: <?php echo number_format($todayNet, 2); ?></p>
-      <p>Vente du jour: <?php echo number_format($todysale, 2); ?><?php
+      <p>Vente régulière du jour: <?php echo number_format($todysale, 2); ?><?php
        if ($alreadyInserted) {
          echo " (déjà ajouté à la caisse)";
        }
       ?></p>
+      <p>Paiements clients du jour: <?php echo number_format($todayCustomerPayments, 2); ?><?php
+       if ($customerPaymentsInserted) {
+         echo " (déjà ajouté à la caisse)";
+       }
+      ?></p>
+      <p>Ventes à terme (non incluses dans le solde): <?php echo number_format($todayCreditSales, 2); ?></p>
       <p>Retours du jour: <?php echo number_format($todayReturns, 2); ?></p>
       <p>Solde journalier: <strong><?php echo number_format($dailyBalance, 2); ?></strong> 
       <?php if ($dailyBalance <= 0): ?>
@@ -377,8 +448,14 @@ $outDisabled = ($currentBalance <= 0);
           $amount      = floatval($row['Amount']);
           $balance     = floatval($row['BalanceAfter']);
           $comments    = $row['Comments'];
+          
+          // Style différent pour les ventes à terme (si existantes)
+          $rowClass = '';
+          if (strpos($comments, 'Credit Sale') !== false) {
+            $rowClass = 'style="color: orange;"';
+          }
           ?>
-          <tr>
+          <tr <?php echo $rowClass; ?>>
             <td><?php echo $cnt; ?></td>
             <td><?php echo $transDate; ?></td>
             <td><?php echo $transType; ?></td>
