@@ -10,70 +10,10 @@ if (strlen($_SESSION['imsaid'] == 0)) {
 }
 
 // ---------------------------------------------------------------------
-// 0) RESET/INITIALIZE DAILY BALANCE IF NEEDED
+// 1) CALCULER LE SOLDE DU JOUR UNIQUEMENT (Période de 24h)
 // ---------------------------------------------------------------------
 
-// Check if we've initialized today
-$todayInitialized = false;
-$sqlCheckInit = "SELECT ID FROM tblcashtransactions 
-                WHERE DATE(TransDate) = CURDATE() 
-                AND Comments = 'DAILY_INIT'
-                LIMIT 1";
-$resCheckInit = mysqli_query($con, $sqlCheckInit);
-if (mysqli_num_rows($resCheckInit) > 0) {
-  $todayInitialized = true;
-}
-
-// If not initialized, calculate previous day's balance and create init entry
-if (!$todayInitialized) {
-  // Get previous day's final balance
-  $sqlPrevBalance = "
-    SELECT 
-      (SELECT COALESCE(SUM(c.ProductQty * p.Price), 0)
-       FROM tblcart c 
-       JOIN tblproducts p ON p.ID = c.ProductId
-       WHERE c.IsCheckOut = '1' 
-       AND DATE(c.CartDate) < CURDATE()) +
-      
-      (SELECT COALESCE(SUM(Paid), 0)
-       FROM tblcustomer
-       WHERE DATE(BillingDate) < CURDATE()) +
-      
-      (SELECT COALESCE(SUM(CASE WHEN TransType='IN' AND Comments NOT IN ('Daily Sale', 'Customer Payments', 'DAILY_INIT') 
-                           THEN Amount ELSE 0 END), 0)
-       FROM tblcashtransactions
-       WHERE DATE(TransDate) < CURDATE()) -
-      
-      (SELECT COALESCE(SUM(CASE WHEN TransType='OUT' 
-                           THEN Amount ELSE 0 END), 0)
-       FROM tblcashtransactions
-       WHERE DATE(TransDate) < CURDATE()) -
-      
-      (SELECT COALESCE(SUM(r.Quantity * p.Price), 0)
-       FROM tblreturns r
-       JOIN tblproducts p ON p.ID = r.ProductID
-       WHERE DATE(r.ReturnDate) < CURDATE())
-       
-    AS yesterdayBalance
-  ";
-  
-  $resPrevBalance = mysqli_query($con, $sqlPrevBalance);
-  $rowPrevBalance = mysqli_fetch_assoc($resPrevBalance);
-  $yesterdayBalance = floatval($rowPrevBalance['yesterdayBalance']);
-  
-  // Insert initialization row
-  $sqlInit = "
-    INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
-    VALUES (NOW(), 'INIT', '$yesterdayBalance', '$yesterdayBalance', 'DAILY_INIT')
-  ";
-  mysqli_query($con, $sqlInit);
-}
-
-// ---------------------------------------------------------------------
-// 1) CALCULATE TODAY'S STATS
-// ---------------------------------------------------------------------
-
-// 1.1 Regular sales (from tblcart)
+// 1.1 Ventes régulières du jour (from tblcart)
 $sqlRegularSales = "
   SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
   FROM tblcart c
@@ -85,7 +25,7 @@ $resRegularSales = mysqli_query($con, $sqlRegularSales);
 $rowRegularSales = mysqli_fetch_assoc($resRegularSales);
 $todayRegularSales = floatval($rowRegularSales['totalSales']);
 
-// 1.2 Credit sales - for display only (from tblcreditcart)
+// 1.2 Ventes à crédit du jour - pour affichage uniquement (from tblcreditcart)
 $sqlCreditSales = "
   SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
   FROM tblcreditcart c
@@ -97,7 +37,7 @@ $resCreditSales = mysqli_query($con, $sqlCreditSales);
 $rowCreditSales = mysqli_fetch_assoc($resCreditSales);
 $todayCreditSales = floatval($rowCreditSales['totalSales']);
 
-// 1.3 Customer payments (from tblcustomer)
+// 1.3 Paiements clients du jour (from tblcustomer)
 $sqlCustomerPayments = "
   SELECT COALESCE(SUM(Paid), 0) AS totalPaid
   FROM tblcustomer
@@ -107,10 +47,10 @@ $resCustomerPayments = mysqli_query($con, $sqlCustomerPayments);
 $rowCustomerPayments = mysqli_fetch_assoc($resCustomerPayments);
 $todayCustomerPayments = floatval($rowCustomerPayments['totalPaid']);
 
-// 1.4 Manual deposits and withdrawals (from tblcashtransactions)
+// 1.4 Dépôts et retraits manuels du jour (from tblcashtransactions)
 $sqlManualTransactions = "
   SELECT
-    COALESCE(SUM(CASE WHEN TransType='IN' AND Comments NOT IN ('Daily Sale', 'Customer Payments', 'DAILY_INIT') 
+    COALESCE(SUM(CASE WHEN TransType='IN' AND Comments NOT IN ('Daily Sale', 'Customer Payments') 
                       THEN Amount ELSE 0 END), 0) AS manualDeposits,
     COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS withdrawals
   FROM tblcashtransactions
@@ -121,7 +61,7 @@ $rowManualTransactions = mysqli_fetch_assoc($resManualTransactions);
 $todayManualDeposits = floatval($rowManualTransactions['manualDeposits']);
 $todayWithdrawals = floatval($rowManualTransactions['withdrawals']);
 
-// 1.5 Returns (from tblreturns)
+// 1.5 Retours du jour (from tblreturns)
 $sqlReturns = "
   SELECT COALESCE(SUM(r.Quantity * p.Price), 0) AS totalReturns
   FROM tblreturns r
@@ -132,7 +72,12 @@ $resReturns = mysqli_query($con, $sqlReturns);
 $rowReturns = mysqli_fetch_assoc($resReturns);
 $todayReturns = floatval($rowReturns['totalReturns']);
 
-// 1.6 Check if sales and payments have been recorded in transactions
+// 1.6 Calcul du solde du jour uniquement (sans historique)
+$todayTotalIn = $todayRegularSales + $todayCustomerPayments + $todayManualDeposits;
+$todayTotalOut = $todayWithdrawals + $todayReturns;
+$todayBalance = $todayTotalIn - $todayTotalOut;
+
+// 1.7 Vérifier si les ventes et paiements ont déjà été enregistrés dans les transactions
 $salesRecorded = false;
 $sqlCheckSales = "
   SELECT ID FROM tblcashtransactions 
@@ -158,121 +103,97 @@ if (mysqli_num_rows($resCheckPayments) > 0) {
 }
 
 // ---------------------------------------------------------------------
-// 2) RECORD SALES AND PAYMENTS IF NOT ALREADY DONE
+// 2) ENREGISTRER LES VENTES ET PAIEMENTS DANS LES TRANSACTIONS SI PAS DÉJÀ FAIT
 // ---------------------------------------------------------------------
 
-// 2.1 Record regular sales
+// 2.1 Enregistrer les ventes régulières
 if ($todayRegularSales > 0 && !$salesRecorded) {
-  // Get current balance
-  $sqlCurrentBal = "SELECT BalanceAfter FROM tblcashtransactions 
-                    WHERE DATE(TransDate) = CURDATE() 
-                    ORDER BY ID DESC LIMIT 1";
+  // Calculer le nouveau solde après cette transaction
+  $sqlCurrentBal = "
+    SELECT COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) -
+           COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS currentBalance
+    FROM tblcashtransactions
+    WHERE DATE(TransDate) = CURDATE()
+  ";
   $resCurrentBal = mysqli_query($con, $sqlCurrentBal);
-  
-  if (mysqli_num_rows($resCurrentBal) > 0) {
-    $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
-    $currentBal = floatval($rowCurrentBal['BalanceAfter']);
-  } else {
-    $currentBal = 0; // Should not happen since we initialized
-  }
+  $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
+  $currentBal = floatval($rowCurrentBal['currentBalance']);
   
   $newBal = $currentBal + $todayRegularSales;
   
-  // Insert sales transaction
+  // Insérer la transaction de ventes
   $sqlInsertSales = "
     INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
     VALUES (NOW(), 'IN', '$todayRegularSales', '$newBal', 'Daily Sale')
   ";
   mysqli_query($con, $sqlInsertSales);
+  
+  // Actualiser la page pour refléter les changements
+  echo "<script>window.location.href='transact.php'</script>";
+  exit;
 }
 
-// 2.2 Record customer payments
+// 2.2 Enregistrer les paiements clients
 if ($todayCustomerPayments > 0 && !$paymentsRecorded) {
-  // Get current balance
-  $sqlCurrentBal = "SELECT BalanceAfter FROM tblcashtransactions 
-                    WHERE DATE(TransDate) = CURDATE() 
-                    ORDER BY ID DESC LIMIT 1";
+  // Calculer le nouveau solde après cette transaction
+  $sqlCurrentBal = "
+    SELECT COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) -
+           COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS currentBalance
+    FROM tblcashtransactions
+    WHERE DATE(TransDate) = CURDATE()
+  ";
   $resCurrentBal = mysqli_query($con, $sqlCurrentBal);
-  
-  if (mysqli_num_rows($resCurrentBal) > 0) {
-    $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
-    $currentBal = floatval($rowCurrentBal['BalanceAfter']);
-  } else {
-    $currentBal = 0; // Should not happen
-  }
+  $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
+  $currentBal = floatval($rowCurrentBal['currentBalance']);
   
   $newBal = $currentBal + $todayCustomerPayments;
   
-  // Insert payments transaction
+  // Insérer la transaction de paiements
   $sqlInsertPayments = "
     INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
     VALUES (NOW(), 'IN', '$todayCustomerPayments', '$newBal', 'Customer Payments')
   ";
   mysqli_query($con, $sqlInsertPayments);
+  
+  // Actualiser la page pour refléter les changements
+  echo "<script>window.location.href='transact.php'</script>";
+  exit;
 }
 
 // ---------------------------------------------------------------------
-// 3) CALCULATE CURRENT BALANCE
-// ---------------------------------------------------------------------
-
-// Get the most recent balance
-$sqlCurrentBalance = "
-  SELECT BalanceAfter 
-  FROM tblcashtransactions 
-  WHERE DATE(TransDate) = CURDATE()
-  ORDER BY ID DESC 
-  LIMIT 1
-";
-$resCurrentBalance = mysqli_query($con, $sqlCurrentBalance);
-
-if (mysqli_num_rows($resCurrentBalance) > 0) {
-  $rowCurrentBalance = mysqli_fetch_assoc($resCurrentBalance);
-  $currentBalance = floatval($rowCurrentBalance['BalanceAfter']);
-} else {
-  // Fallback - should not happen
-  $currentBalance = 0;
-}
-
-// ---------------------------------------------------------------------
-// 4) HANDLE NEW MANUAL TRANSACTION
+// 3) GÉRER UNE NOUVELLE TRANSACTION MANUELLE
 // ---------------------------------------------------------------------
 
 $transactionError = '';
 
 if (isset($_POST['submit'])) {
-  $transtype = $_POST['transtype']; // 'IN' or 'OUT'
+  $transtype = $_POST['transtype']; // 'IN' ou 'OUT'
   $amount = floatval($_POST['amount']);
   $comments = mysqli_real_escape_string($con, $_POST['comments']);
 
   if ($amount <= 0) {
     $transactionError = 'Montant invalide. Doit être > 0';
   } 
-  // Block withdrawal if balance is insufficient
-  else if ($transtype == 'OUT' && $amount > $currentBalance) {
-    $transactionError = 'Impossible d\'effectuer un retrait : montant supérieur au solde actuel';
+  // Bloquer le retrait si le solde du jour est insuffisant
+  else if ($transtype == 'OUT' && $amount > $todayBalance) {
+    $transactionError = 'Impossible d\'effectuer un retrait : montant supérieur au solde du jour';
   }
   else {
-    // Get current balance
+    // Calculer le solde actuel dans la table des transactions
     $sqlCurrentBal = "
-      SELECT BalanceAfter 
-      FROM tblcashtransactions 
+      SELECT COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) -
+             COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS currentBalance
+      FROM tblcashtransactions
       WHERE DATE(TransDate) = CURDATE()
-      ORDER BY ID DESC 
-      LIMIT 1
     ";
     $resCurrentBal = mysqli_query($con, $sqlCurrentBal);
-    
-    if (mysqli_num_rows($resCurrentBal) > 0) {
-      $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
-      $currentBal = floatval($rowCurrentBal['BalanceAfter']);
-    } else {
-      $currentBal = 0; // Should not happen
-    }
+    $rowCurrentBal = mysqli_fetch_assoc($resCurrentBal);
+    $currentBal = floatval($rowCurrentBal['currentBalance']);
 
-    // Calculate new balance
+    // Calculer le nouveau solde
     $newBal = ($transtype == 'IN') ? $currentBal + $amount : $currentBal - $amount;
     
-    // Insert transaction
+    // Insérer la transaction
     $sqlInsert = "
       INSERT INTO tblcashtransactions(TransDate, TransType, Amount, BalanceAfter, Comments)
       VALUES (NOW(), '$transtype', '$amount', '$newBal', '$comments')
@@ -293,35 +214,25 @@ if (isset($_POST['submit'])) {
 }
 
 // ---------------------------------------------------------------------
-// 5) PREPARE DATA FOR DISPLAY
+// 4) RÉCUPÉRER LES TRANSACTIONS RÉCENTES POUR L'AFFICHAGE
 // ---------------------------------------------------------------------
 
-// Today's totals
-$todayTotalIn = $todayRegularSales + $todayCustomerPayments + $todayManualDeposits;
-$todayTotalOut = $todayWithdrawals + $todayReturns;
-$todayNet = $todayTotalIn - $todayTotalOut;
-
-// Get yesterday's final balance (from initialization transaction)
-$sqlYesterdayBalance = "
-  SELECT Amount 
-  FROM tblcashtransactions 
-  WHERE DATE(TransDate) = CURDATE() 
-  AND Comments = 'DAILY_INIT'
-  LIMIT 1
+// Calculer le solde actuel en base pour l'affichage
+$sqlCurrentDbBalance = "
+  SELECT COALESCE(SUM(CASE WHEN TransType='IN' THEN Amount ELSE 0 END), 0) -
+         COALESCE(SUM(CASE WHEN TransType='OUT' THEN Amount ELSE 0 END), 0) AS currentBalance
+  FROM tblcashtransactions
+  WHERE DATE(TransDate) = CURDATE()
 ";
-$resYesterdayBalance = mysqli_query($con, $sqlYesterdayBalance);
-if (mysqli_num_rows($resYesterdayBalance) > 0) {
-  $rowYesterdayBalance = mysqli_fetch_assoc($resYesterdayBalance);
-  $yesterdayBalance = floatval($rowYesterdayBalance['Amount']);
-} else {
-  $yesterdayBalance = 0;
-}
+$resCurrentDbBalance = mysqli_query($con, $sqlCurrentDbBalance);
+$rowCurrentDbBalance = mysqli_fetch_assoc($resCurrentDbBalance);
+$currentDbBalance = floatval($rowCurrentDbBalance['currentBalance']);
 
-// Determine if OUT transactions should be disabled
-$outDisabled = ($currentBalance <= 0);
+// Désactiver les retraits si le solde est insuffisant
+$outDisabled = ($todayBalance <= 0);
 
-// Maximum withdrawal amount
-$maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
+// Montant maximum retirable
+$maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
 
 ?>
 <!DOCTYPE html>
@@ -341,6 +252,10 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
     .text-error { color: #b94a48; }
     .text-warning { color: #c09853; }
     .text-info { color: #3a87ad; }
+    .highlight-daily {
+      background-color: #fffacd; 
+      font-weight: bold;
+    }
     
     .transaction-type {
       display: inline-block;
@@ -357,10 +272,6 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
     .type-out { 
       background-color: #f2dede; 
       color: #b94a48;
-    }
-    .type-init { 
-      background-color: #d9edf7; 
-      color: #3a87ad;
     }
     .comments-daily-sale,
     .comments-customer-payments {
@@ -379,28 +290,24 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
       <a href="dashboard.php" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
       <a href="transact.php" class="current">Transactions en espèces</a>
     </div>
-    <h1>Transactions en espèces</h1>
+    <h1>Transactions en espèces (PÉRIODE: AUJOURD'HUI UNIQUEMENT)</h1>
   </div>
 
   <div class="container-fluid">
     <hr>
 
-    <!-- Balance summary box -->
+    <!-- Résumé du solde -->
     <div class="row-fluid">
       <div class="span12">
         <div class="balance-box">
           <div class="row-fluid">
             <div class="span7">
-              <h3>Solde actuel: <span class="<?php echo ($currentBalance > 0) ? 'text-success' : 'text-error'; ?>">
-                <?php echo number_format($currentBalance, 2); ?>
+              <h3>Solde du jour: <span class="<?php echo ($todayBalance > 0) ? 'text-success' : 'text-error'; ?> highlight-daily">
+                <?php echo number_format($todayBalance, 2); ?>
               </span></h3>
               
               <h4>Détail du jour:</h4>
               <table class="table table-bordered table-striped" style="width: auto;">
-                <tr>
-                  <td>Solde initial (J-1):</td>
-                  <td style="text-align: right;"><?php echo number_format($yesterdayBalance, 2); ?></td>
-                </tr>
                 <tr>
                   <td>Ventes régulières:</td>
                   <td style="text-align: right;">
@@ -433,8 +340,8 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
                 </tr>
                 <tr>
                   <th>Solde du jour:</th>
-                  <th style="text-align: right;" class="<?php echo ($todayNet >= 0) ? 'text-success' : 'text-error'; ?>">
-                    <?php echo number_format($todayNet, 2); ?>
+                  <th style="text-align: right;" class="<?php echo ($todayBalance >= 0) ? 'text-success' : 'text-error'; ?> highlight-daily">
+                    <?php echo number_format($todayBalance, 2); ?>
                   </th>
                 </tr>
               </table>
@@ -442,19 +349,19 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
             
             <div class="span5">
               <div style="padding: 20px; background-color: #eee; border-radius: 5px;">
-                <h4>Informations supplémentaires:</h4>
+                <h4>Informations:</h4>
                 <p><strong>Ventes à terme (non incluses dans le solde):</strong><br>
                    <?php echo number_format($todayCreditSales, 2); ?></p>
                 
-                <?php if ($currentBalance <= 0): ?>
+                <?php if ($todayBalance <= 0): ?>
                   <p class="text-error"><strong>SOLDE INSUFFISANT:</strong><br>
                      Les retraits sont désactivés.</p>
                 <?php else: ?>
-                  <p><strong>Montant max. retirable:</strong><br>
+                  <p><strong>Montant max. retirable aujourd'hui:</strong><br>
                      <?php echo number_format($maxWithdrawal, 2); ?></p>
                 <?php endif; ?>
                 
-                <p><small>Le solde est réinitialisé chaque jour, en reportant le solde final de la veille.</small></p>
+                <p class="text-warning"><strong>IMPORTANT:</strong> Le solde est calculé uniquement sur la période de 24h (aujourd'hui). Les transactions des jours précédents ne sont pas prises en compte.</p>
               </div>
             </div>
           </div>
@@ -462,7 +369,7 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
       </div>
     </div>
 
-    <!-- New transaction form -->
+    <!-- Formulaire de nouvelle transaction -->
     <div class="row-fluid">
       <div class="span12">
         <div class="widget-box">
@@ -482,7 +389,7 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
                     <?php endif; ?>
                   </select>
                   <?php if ($outDisabled): ?>
-                    <span class="help-inline text-error">Retraits désactivés (solde insuffisant)</span>
+                    <span class="help-inline text-error">Retraits désactivés (solde du jour insuffisant)</span>
                   <?php endif; ?>
                 </div>
               </div>
@@ -492,7 +399,7 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
                 <div class="controls">
                   <input type="number" name="amount" id="amount" step="0.01" min="0.01" required />
                   <span id="amount-warning" class="help-inline text-error" style="display: none;">
-                    Le montant doit être inférieur au solde actuel
+                    Le montant doit être inférieur au solde du jour (<?php echo number_format($todayBalance, 2); ?>)
                   </span>
                 </div>
               </div>
@@ -517,13 +424,13 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
 
     <hr>
 
-    <!-- Recent transactions list -->
+    <!-- Liste des transactions récentes -->
     <div class="row-fluid">
       <div class="span12">
         <div class="widget-box">
           <div class="widget-title">
             <span class="icon"><i class="icon-th"></i></span>
-            <h5>Transactions récentes</h5>
+            <h5>Transactions d'aujourd'hui</h5>
           </div>
           <div class="widget-content nopadding">
             <table class="table table-bordered data-table">
@@ -539,68 +446,144 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
               </thead>
               <tbody>
                 <?php
-                $sqlList = "SELECT * FROM tblcashtransactions ORDER BY ID DESC LIMIT 50";
+                // Afficher uniquement les transactions d'aujourd'hui
+                $sqlList = "SELECT * FROM tblcashtransactions 
+                           WHERE DATE(TransDate) = CURDATE() 
+                           ORDER BY ID DESC";
                 $resList = mysqli_query($con, $sqlList);
                 $cnt = 1;
                 
-                while ($row = mysqli_fetch_assoc($resList)) {
-                  $id = $row['ID'];
-                  $transDate = $row['TransDate'];
-                  $transType = $row['TransType'];
-                  $amount = floatval($row['Amount']);
-                  $balance = floatval($row['BalanceAfter']);
-                  $comments = $row['Comments'];
-                  
-                  // Determine CSS classes for types
-                  $typeClass = '';
-                  if ($transType == 'IN') {
-                    $typeClass = 'type-in';
-                    $transTypeLabel = 'IN';
-                  } elseif ($transType == 'OUT') {
-                    $typeClass = 'type-out';
-                    $transTypeLabel = 'OUT';
-                  } elseif ($transType == 'INIT') {
-                    $typeClass = 'type-init';
-                    $transTypeLabel = 'INIT';
+                if (mysqli_num_rows($resList) > 0) {
+                  while ($row = mysqli_fetch_assoc($resList)) {
+                    $id = $row['ID'];
+                    $transDate = $row['TransDate'];
+                    $transType = $row['TransType'];
+                    $amount = floatval($row['Amount']);
+                    $balance = floatval($row['BalanceAfter']);
+                    $comments = $row['Comments'];
+                    
+                    // Déterminer la classe CSS pour le type
+                    $typeClass = '';
+                    if ($transType == 'IN') {
+                      $typeClass = 'type-in';
+                      $transTypeLabel = 'IN';
+                    } elseif ($transType == 'OUT') {
+                      $typeClass = 'type-out';
+                      $transTypeLabel = 'OUT';
+                    }
+                    
+                    // Déterminer la classe CSS pour les commentaires
+                    $commentsClass = '';
+                    if ($comments == 'Daily Sale') {
+                      $commentsClass = 'comments-daily-sale';
+                    } elseif ($comments == 'Customer Payments') {
+                      $commentsClass = 'comments-customer-payments';
+                    }
+                  ?>
+                  <tr>
+                    <td><?php echo $cnt; ?></td>
+                    <td><?php echo date('d/m/Y H:i', strtotime($transDate)); ?></td>
+                    <td>
+                      <span class="transaction-type <?php echo $typeClass; ?>">
+                        <?php echo $transTypeLabel; ?>
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <?php echo number_format($amount, 2); ?>
+                    </td>
+                    <td style="text-align: right;">
+                      <?php echo number_format($balance, 2); ?>
+                    </td>
+                    <td class="<?php echo $commentsClass; ?>">
+                      <?php echo $comments; ?>
+                    </td>
+                  </tr>
+                  <?php
+                    $cnt++;
                   }
-                  
-                  // Determine CSS class for comments
-                  $commentsClass = '';
-                  if ($comments == 'Daily Sale') {
-                    $commentsClass = 'comments-daily-sale';
-                  } elseif ($comments == 'Customer Payments') {
-                    $commentsClass = 'comments-customer-payments';
-                  }
-                  
-                  // Hide initialization rows unless viewing full history
-                  $rowClass = '';
-                  if ($comments == 'DAILY_INIT') {
-                    $rowClass = 'style="background-color: #f9f9f9;"';
-                    $commentsDisplay = 'Solde initial';
-                  } else {
-                    $commentsDisplay = $comments;
-                  }
+                } else {
+                  echo '<tr><td colspan="6" style="text-align: center;">Aucune transaction aujourd\'hui</td></tr>';
+                }
                 ?>
-                <tr <?php echo $rowClass; ?>>
-                  <td><?php echo $cnt; ?></td>
-                  <td><?php echo date('d/m/Y H:i', strtotime($transDate)); ?></td>
-                  <td>
-                    <span class="transaction-type <?php echo $typeClass; ?>">
-                      <?php echo $transTypeLabel; ?>
-                    </span>
-                  </td>
-                  <td style="text-align: right;">
-                    <?php echo number_format($amount, 2); ?>
-                  </td>
-                  <td style="text-align: right;">
-                    <?php echo number_format($balance, 2); ?>
-                  </td>
-                  <td class="<?php echo $commentsClass; ?>">
-                    <?php echo $commentsDisplay; ?>
-                  </td>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Historique des transactions -->
+    <div class="row-fluid">
+      <div class="span12">
+        <div class="widget-box">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-time"></i></span>
+            <h5>Historique des transactions (30 derniers jours)</h5>
+          </div>
+          <div class="widget-content nopadding">
+            <table class="table table-bordered data-table">
+              <thead>
+                <tr>
+                  <th width="5%">#</th>
+                  <th width="10%">Date</th>
+                  <th width="10%">Type</th>
+                  <th width="15%">Montant</th>
+                  <th width="15%">Solde après</th>
+                  <th width="45%">Commentaires</th>
                 </tr>
+              </thead>
+              <tbody>
                 <?php
-                  $cnt++;
+                // Afficher l'historique des transactions (sauf aujourd'hui)
+                $sqlHistory = "SELECT * FROM tblcashtransactions 
+                              WHERE DATE(TransDate) < CURDATE() 
+                              ORDER BY TransDate DESC, ID DESC 
+                              LIMIT 100";
+                $resHistory = mysqli_query($con, $sqlHistory);
+                $cnt = 1;
+                
+                if (mysqli_num_rows($resHistory) > 0) {
+                  while ($row = mysqli_fetch_assoc($resHistory)) {
+                    $id = $row['ID'];
+                    $transDate = $row['TransDate'];
+                    $transType = $row['TransType'];
+                    $amount = floatval($row['Amount']);
+                    $balance = floatval($row['BalanceAfter']);
+                    $comments = $row['Comments'];
+                    
+                    // Déterminer la classe CSS pour le type
+                    $typeClass = '';
+                    if ($transType == 'IN') {
+                      $typeClass = 'type-in';
+                      $transTypeLabel = 'IN';
+                    } elseif ($transType == 'OUT') {
+                      $typeClass = 'type-out';
+                      $transTypeLabel = 'OUT';
+                    }
+                  ?>
+                  <tr>
+                    <td><?php echo $cnt; ?></td>
+                    <td><?php echo date('d/m/Y', strtotime($transDate)); ?></td>
+                    <td>
+                      <span class="transaction-type <?php echo $typeClass; ?>">
+                        <?php echo $transTypeLabel; ?>
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <?php echo number_format($amount, 2); ?>
+                    </td>
+                    <td style="text-align: right;">
+                      <?php echo number_format($balance, 2); ?>
+                    </td>
+                    <td>
+                      <?php echo $comments; ?>
+                    </td>
+                  </tr>
+                  <?php
+                    $cnt++;
+                  }
+                } else {
+                  echo '<tr><td colspan="6" style="text-align: center;">Pas d\'historique disponible</td></tr>';
                 }
                 ?>
               </tbody>
@@ -627,14 +610,14 @@ $maxWithdrawal = ($currentBalance > 0) ? $currentBalance : 0;
 
 <script>
 $(document).ready(function() {
-  // Dynamic amount validation for withdrawals
+  // Validation dynamique du montant pour les retraits
   $('#transtype, #amount').on('change input', function() {
     var transType = $('#transtype').val();
     var amount = parseFloat($('#amount').val()) || 0;
-    var maxWithdrawal = <?php echo $maxWithdrawal; ?>;
+    var todayBalance = <?php echo $todayBalance; ?>;
     
     if (transType === 'OUT') {
-      if (amount > maxWithdrawal) {
+      if (amount > todayBalance) {
         $('#amount-warning').show();
         $('#amount').addClass('error');
       } else {
@@ -647,15 +630,15 @@ $(document).ready(function() {
     }
   });
   
-  // Form submission validation
+  // Validation du formulaire avant soumission
   $('form').on('submit', function(e) {
     var transType = $('#transtype').val();
     var amount = parseFloat($('#amount').val()) || 0;
-    var maxWithdrawal = <?php echo $maxWithdrawal; ?>;
+    var todayBalance = <?php echo $todayBalance; ?>;
     
-    if (transType === 'OUT' && amount > maxWithdrawal) {
+    if (transType === 'OUT' && amount > todayBalance) {
       e.preventDefault();
-      alert('Impossible d\'effectuer un retrait de ce montant. Maximum: ' + maxWithdrawal.toFixed(2));
+      alert('Impossible d\'effectuer un retrait supérieur au solde du jour (' + todayBalance.toFixed(2) + ')');
       return false;
     }
     
