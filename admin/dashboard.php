@@ -5,6 +5,14 @@ include('includes/dbconnection.php');
 if (strlen($_SESSION['imsaid']==0)) {
   header('location:logout.php');
 } else{
+
+    // Récupérer le type d'utilisateur connecté
+    $adminid = $_SESSION['imsaid'];
+    $ret = mysqli_query($con, "SELECT AdminName, UserName FROM tbladmin WHERE ID='$adminid'");
+    $row = mysqli_fetch_array($ret);
+    $name = $row['AdminName'];
+    $username = $row['UserName'];
+
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -42,8 +50,9 @@ if (strlen($_SESSION['imsaid']==0)) {
         <div class="widget-box widget-plain">
           <div class="center">
             <ul class="quick-actions">
-             
+              <?php if($username != 'saler'): ?>
               <?php 
+              
               $query2 = mysqli_query($con,"Select * from tblcategory where Status='1'");
               $catcount = mysqli_num_rows($query2);
               ?>
@@ -68,13 +77,16 @@ if (strlen($_SESSION['imsaid']==0)) {
               $query5 = mysqli_query($con,"Select * from tblcustomer");
               $totuser = mysqli_num_rows($query5);
               ?>
+              
               <li class="bg_lo span3">
                 <a href="profile.php">
                   <i class="icon-user"></i>
                   <span class="label label-success" style="margin-top:5%"><?php echo $totuser; ?></span> Utilisateurs
                 </a>
               </li>
+              
             </ul>
+            <?php endif; ?>
           </div>
         </div>
         <div class="widget-box widget-plain" style="margin-top:12%">
