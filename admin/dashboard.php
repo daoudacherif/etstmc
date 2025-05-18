@@ -1,10 +1,6 @@
 <?php
 session_start();
-// Affiche toutes les erreurs (à désactiver en production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
+error_reporting(0);
 include('includes/dbconnection.php');
 if (strlen($_SESSION['imsaid']==0)) {
   header('location:logout.php');
@@ -22,8 +18,6 @@ if (strlen($_SESSION['imsaid']==0)) {
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
   
-
-
   <!-- Main application container -->
   <div id="app-container">
     <?php include_once('includes/header.php'); ?>
@@ -42,7 +36,7 @@ if (strlen($_SESSION['imsaid']==0)) {
       </div>
       <!--End-breadcrumbs-->
 
- <!--Action boxes-->
+      <!--Action boxes-->
       <br />
       <div class="container-fluid">
         <div class="widget-box widget-plain">
@@ -90,7 +84,6 @@ if (strlen($_SESSION['imsaid']==0)) {
             <ul class="site-stats">
               <?php
               // Vente d'aujourd'hui
-              // 1. Ventes normales
               $todysale = 0;
               $query6 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
@@ -101,9 +94,9 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $todysale += $todays_sale;
               }
               
-              // 2. Ajout des ventes à crédit d'aujourd'hui
-              $query6credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
+              // Ajout des ventes à crédit d'aujourd'hui
+              $query6credit = mysqli_query($con,"select tblcreditcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcreditcart join tblproducts on tblproducts.ID=tblcreditcart.ProductId 
                 where date(CartDate)=CURDATE() and IsCheckOut='1'");
               while($row = mysqli_fetch_array($query6credit))
               {
@@ -118,7 +111,6 @@ if (strlen($_SESSION['imsaid']==0)) {
               
               <?php
               // Vente d'hier
-              // 1. Ventes normales
               $yesterdaysale = 0;
               $query7 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
@@ -129,9 +121,9 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $yesterdaysale += $yesterdays_sale;
               }
               
-              // 2. Ajout des ventes à crédit d'hier
-              $query7credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
+              // Ajout des ventes à crédit d'hier
+              $query7credit = mysqli_query($con,"select tblcreditcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcreditcart join tblproducts on tblproducts.ID=tblcreditcart.ProductId 
                 where date(CartDate)=CURDATE()-1 and IsCheckOut='1'");
               while($row = mysqli_fetch_array($query7credit))
               {
@@ -146,7 +138,6 @@ if (strlen($_SESSION['imsaid']==0)) {
               
               <?php
               // Vente des sept derniers jours
-              // 1. Ventes normales
               $tseven = 0;
               $query8 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId 
@@ -157,10 +148,10 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $tseven += $sevendays_sale;
               }
               
-              // 2. Ajout des ventes à crédit des 7 derniers jours
-              $query8credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId 
-                where date(tblcreditscart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcreditscart.IsCheckOut='1'");
+              // Ajout des ventes à crédit des 7 derniers jours
+              $query8credit = mysqli_query($con,"select tblcreditcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcreditcart join tblproducts on tblproducts.ID=tblcreditcart.ProductId 
+                where date(tblcreditcart.CartDate)>=(DATE(NOW()) - INTERVAL 7 DAY) and tblcreditcart.IsCheckOut='1'");
               while($row = mysqli_fetch_array($query8credit))
               {
                 $sevendays_credit_sale = $row['ProductQty'] * $row['Price'];
@@ -174,7 +165,6 @@ if (strlen($_SESSION['imsaid']==0)) {
               
               <?php
               // Vente totale
-              // 1. Ventes normales
               $totalsale = 0;
               $query9 = mysqli_query($con,"select tblcart.ProductQty as ProductQty,tblproducts.Price
                 from tblcart join tblproducts on tblproducts.ID=tblcart.ProductId where IsCheckOut='1'");
@@ -184,9 +174,9 @@ if (strlen($_SESSION['imsaid']==0)) {
                 $totalsale += $total_sale;
               }
               
-              // 2. Ajout des ventes à crédit totales
-              $query9credit = mysqli_query($con,"select tblcreditscart.ProductQty as ProductQty,tblproducts.Price
-                from tblcreditscart join tblproducts on tblproducts.ID=tblcreditscart.ProductId where IsCheckOut='1'");
+              // Ajout des ventes à crédit totales
+              $query9credit = mysqli_query($con,"select tblcreditcart.ProductQty as ProductQty,tblproducts.Price
+                from tblcreditcart join tblproducts on tblproducts.ID=tblcreditcart.ProductId where IsCheckOut='1'");
               while($row = mysqli_fetch_array($query9credit))
               {
                 $total_credit_sale = $row['ProductQty'] * $row['Price'];
@@ -224,17 +214,3 @@ if (strlen($_SESSION['imsaid']==0)) {
 </body>
 </html>
 <?php } ?>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
