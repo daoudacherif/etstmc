@@ -62,8 +62,19 @@ $rowSalesCredit = $resultSalesCredit->fetch_assoc();
 $totalSalesCredit = $rowSalesCredit['totalSales'];
 $stmtSalesCredit->close();
 
-// Total des ventes (régulières + crédit)
-$totalSales = $totalSalesRegular + $totalSalesCredit;
+// Montants réellement payés par les clients
+$sqlPaidAmounts = "
+  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
+  FROM tblcustomer
+  WHERE BillingDate BETWEEN ? AND ?
+";
+$stmtPaidAmounts = $con->prepare($sqlPaidAmounts);
+$stmtPaidAmounts->bind_param('ss', $startDateTime, $endDateTime);
+$stmtPaidAmounts->execute();
+$resultPaidAmounts = $stmtPaidAmounts->get_result();
+$rowPaidAmounts = $resultPaidAmounts->fetch_assoc();
+$totalPaid = $rowPaidAmounts['totalPaid'];
+$stmtPaidAmounts->close();
 
 // Dépôts/Retraits
 $sqlTransactions = "
@@ -97,8 +108,8 @@ $rowReturns = $resultReturns->fetch_assoc();
 $totalReturns = $rowReturns['totalReturns'];
 $stmtReturns->close();
 
-// Solde final
-$netBalance = ($totalSales + $totalDeposits) - ($totalWithdrawals + $totalReturns);
+// Solde final (SANS les ventes à crédit, uniquement montants payés)
+$netBalance = ($totalSalesRegular + $totalPaid + $totalDeposits) - ($totalWithdrawals + $totalReturns);
 
 // --- 3) Récupérer la liste unifiée pour l'affichage / export ---
 $sqlList = "
@@ -119,6 +130,15 @@ $sqlList = "
   JOIN tblproducts p ON p.ID = c.ProductId
   WHERE c.IsCheckOut='1'
     AND c.CartDate BETWEEN ? AND ?
+  
+  UNION ALL
+  
+  -- Paiements clients
+  SELECT 'Paiement Client' AS Type, Paid AS Amount,
+       BillingDate AS Date, CustomerName AS Comment
+  FROM tblcustomer
+  WHERE Paid > 0
+    AND BillingDate BETWEEN ? AND ?
   
   UNION ALL
   
@@ -145,7 +165,7 @@ $sqlList = "
   ORDER BY Date DESC
 ";
 $stmtList = $con->prepare($sqlList);
-$stmtList->bind_param('ssssssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $startDateTime, $endDateTime, $start, $end);
+$stmtList->bind_param('ssssssssss', $startDateTime, $endDateTime, $startDateTime, $endDateTime, $startDateTime, $endDateTime, $startDateTime, $endDateTime, $start, $end);
 $stmtList->execute();
 $resultList = $stmtList->get_result();
 
@@ -204,11 +224,14 @@ if ($export === 'pdf' && $dompdf_available) {
   <div class="summary">
     <h3>Résumé</h3>
     <table>
-      <tr><th>Ventes (Régulières + Crédit)</th><td class="text-right"><?php echo number_format($totalSales, 2); ?></td></tr>
+      <tr><th>Ventes Régulières</th><td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td></tr>
+      <tr><th>Paiements reçus des clients</th><td class="text-right"><?php echo number_format($totalPaid, 2); ?></td></tr>
+      <tr><th>Total Encaissé (Ventes+Paiements)</th><td class="text-right"><strong><?php echo number_format($totalSalesRegular + $totalPaid, 2); ?></strong></td></tr>
+      <tr><th>Ventes à terme (non incluses dans le solde)</th><td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td></tr>
       <tr><th>Dépôts</th><td class="text-right"><?php echo number_format($totalDeposits, 2); ?></td></tr>
       <tr><th>Retraits</th><td class="text-right"><?php echo number_format($totalWithdrawals, 2); ?></td></tr>
       <tr><th>Retours</th><td class="text-right"><?php echo number_format($totalReturns, 2); ?></td></tr>
-      <tr><th>Solde Final</th><td class="text-right"><strong><?php echo number_format($netBalance, 2); ?></strong></td></tr>
+      <tr><th>Solde Final (En caisse)</th><td class="text-right"><strong><?php echo number_format($netBalance, 2); ?></strong></td></tr>
     </table>
   </div>
 
@@ -304,11 +327,14 @@ if ($export === 'excel') {
   
   echo "<h3>Résumé</h3>";
   echo "<table border='1'>";
-  echo "<tr><th>Ventes (Régulières + Crédit)</th><td class='text-right'>".number_format($totalSales, 2)."</td></tr>";
+  echo "<tr><th>Ventes Régulières</th><td class='text-right'>".number_format($totalSalesRegular, 2)."</td></tr>";
+  echo "<tr><th>Paiements reçus des clients</th><td class='text-right'>".number_format($totalPaid, 2)."</td></tr>";
+  echo "<tr><th>Total Encaissé (Ventes+Paiements)</th><td class='text-right'><strong>".number_format($totalSalesRegular + $totalPaid, 2)."</strong></td></tr>";
+  echo "<tr><th>Ventes à terme (non incluses dans le solde)</th><td class='text-right'>".number_format($totalSalesCredit, 2)."</td></tr>";
   echo "<tr><th>Dépôts</th><td class='text-right'>".number_format($totalDeposits, 2)."</td></tr>";
   echo "<tr><th>Retraits</th><td class='text-right'>".number_format($totalWithdrawals, 2)."</td></tr>";
   echo "<tr><th>Retours</th><td class='text-right'>".number_format($totalReturns, 2)."</td></tr>";
-  echo "<tr><th>Solde Final</th><td class='text-right'><strong>".number_format($netBalance, 2)."</strong></td></tr>";
+  echo "<tr><th>Solde Final (En caisse)</th><td class='text-right'><strong>".number_format($netBalance, 2)."</strong></td></tr>";
   echo "</table>";
   
   echo "<h3>Transactions détaillées</h3>";
@@ -525,6 +551,11 @@ if ($export === 'excel') {
     .label-credit {
       background-color: #f0ad4e;
     }
+    
+    /* Style pour les paiements clients */
+    .label-payment {
+      background-color: #5bc0de;
+    }
   </style>
 </head>
 <body>
@@ -574,8 +605,12 @@ if ($export === 'excel') {
                 <button type="button" class="btn btn-primary btn-print" onclick="window.print();">
                   <i class="icon-print"></i> Imprimer
                 </button>
-                
-               
+                <a href="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=pdf" class="btn btn-danger">
+                  <i class="icon-file"></i> Exporter PDF
+                </a>
+                <a href="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=excel" class="btn btn-info">
+                  <i class="icon-table"></i> Exporter Excel
+                </a>
               </div>
             </form>
           </div>
@@ -610,12 +645,16 @@ if ($export === 'excel') {
                       <td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td>
                     </tr>
                     <tr>
-                      <th>Ventes à terme</th>
-                      <td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td>
+                      <th>Paiements reçus des clients</th>
+                      <td class="text-right"><?php echo number_format($totalPaid, 2); ?></td>
                     </tr>
                     <tr>
-                      <th>Total des ventes</th>
-                      <td class="text-right"><strong><?php echo number_format($totalSales, 2); ?></strong></td>
+                      <th>Total Encaissé (Ventes+Paiements)</th>
+                      <td class="text-right"><strong><?php echo number_format($totalSalesRegular + $totalPaid, 2); ?></strong></td>
+                    </tr>
+                    <tr>
+                      <th>Ventes à terme (non incluses dans le solde)</th>
+                      <td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td>
                     </tr>
                     <tr>
                       <th>Dépôts</th>
@@ -630,7 +669,7 @@ if ($export === 'excel') {
                       <td class="text-right"><?php echo number_format($totalReturns, 2); ?></td>
                     </tr>
                     <tr>
-                      <th>Solde Final</th>
+                      <th>Solde Final (En caisse)</th>
                       <td class="text-right"><strong><?php echo number_format($netBalance, 2); ?></strong></td>
                     </tr>
                   </table>
@@ -720,6 +759,7 @@ if ($export === 'excel') {
                     switch($row['Type']) {
                       case 'Vente': $typeClass = 'label-success'; break;
                       case 'Vente à Terme': $typeClass = 'label-credit'; break;
+                      case 'Paiement Client': $typeClass = 'label-payment'; break;
                       case 'Dépôt': $typeClass = 'label-info'; break;
                       case 'Retrait': $typeClass = 'label-warning'; break;
                       case 'Retour': $typeClass = 'label-important'; break;
