@@ -370,7 +370,7 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
             <h5>Transactions d'aujourd'hui</h5>
           </div>
           <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
+            <table class="table table-bordered">
               <thead>
                 <tr>
                   <th width="5%">#</th>
@@ -450,7 +450,7 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
             <h5>Historique des transactions (30 derniers jours)</h5>
           </div>
           <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
+            <table class="table table-bordered">
               <thead>
                 <tr>
                   <th width="5%">#</th>
