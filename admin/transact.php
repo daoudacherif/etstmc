@@ -71,10 +71,9 @@ $resReturns = mysqli_query($con, $sqlReturns);
 $rowReturns = mysqli_fetch_assoc($resReturns);
 $todayReturns = floatval($rowReturns['totalReturns']);
 
-// 1.6 Calcul du solde du jour uniquement (sans historique)
-// IMPORTANT: Ce solde est uniquement basé sur les transactions dans tblcashtransactions
-// Les ventes et paiements clients n'y sont pas inclus automatiquement
-$todayBalance = $todayDeposits - ($todayWithdrawals + $todayReturns);
+// 1.6 Calcul du solde du jour incluant les ventes et paiements client
+// Ce solde prend en compte les transactions manuelles ET les ventes/paiements
+$todayBalance = $todayDeposits + $todayRegularSales + $todayCustomerPayments - ($todayWithdrawals + $todayReturns);
 
 // 1.7 Calcul du solde total théorique si toutes les ventes et paiements étaient inclus
 $todayTotalTheoretical = $todayBalance + $todayRegularSales + $todayCustomerPayments;
@@ -208,8 +207,8 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
     <hr>
     
     <div class="alert-info">
-      <strong>Information importante:</strong> Les ventes régulières et paiements clients ne sont PAS automatiquement ajoutés à la caisse. 
-      Vous devez les enregistrer manuellement en utilisant le formulaire ci-dessous.
+      <strong>Information importante:</strong> Les ventes régulières (<?php echo number_format($todayRegularSales, 2); ?>) et paiements clients (<?php echo number_format($todayCustomerPayments, 2); ?>) sont automatiquement inclus dans le calcul du solde de caisse. 
+      <br>Si vous devez faire un retrait, le système vérifie que vous ne dépassez pas le solde disponible total.
     </div>
 
     <!-- Résumé du solde -->
@@ -224,16 +223,16 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
               
               <h4>Détail du jour:</h4>
               <table class="table table-bordered table-striped" style="width: auto;">
-                <tr class="not-in-cash">
-                  <td>Ventes régulières (non incluses en caisse):</td>
+                <tr>
+                  <td>Ventes régulières (incluses dans le solde):</td>
                   <td style="text-align: right;">
-                    <?php echo number_format($todayRegularSales, 2); ?>
+                    <strong>+<?php echo number_format($todayRegularSales, 2); ?></strong>
                   </td>
                 </tr>
-                <tr class="not-in-cash">
-                  <td>Paiements clients (non inclus en caisse):</td>
+                <tr>
+                  <td>Paiements clients (inclus dans le solde):</td>
                   <td style="text-align: right;">
-                    <?php echo number_format($todayCustomerPayments, 2); ?>
+                    <strong>+<?php echo number_format($todayCustomerPayments, 2); ?></strong>
                   </td>
                 </tr>
                 <tr>
@@ -254,29 +253,24 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
                     <?php echo number_format($todayBalance, 2); ?>
                   </th>
                 </tr>
-                <tr class="not-in-cash">
-                  <td>Solde théorique (si tout était enregistré):</td>
-                  <td style="text-align: right;"><?php echo number_format($todayTotalTheoretical, 2); ?></td>
-                </tr>
               </table>
             </div>
             
             <div class="span5">
               <div style="padding: 20px; background-color: #eee; border-radius: 5px;">
                 <h4>Guide d'utilisation:</h4>
-                <p><strong>Pour enregistrer les ventes du jour en caisse:</strong>
-                <ol>
-                  <li>Sélectionnez "Dépôt (IN)" dans le type de transaction</li>
-                  <li>Saisissez le montant des ventes (<?php echo number_format($todayRegularSales, 2); ?>)</li>
-                  <li>Ajoutez "Ventes du jour" dans les commentaires</li>
-                </ol>
-                </p>
-                <p><strong>Pour enregistrer les paiements clients:</strong>
-                <ol>
-                  <li>Sélectionnez "Dépôt (IN)" dans le type de transaction</li>
-                  <li>Saisissez le montant des paiements (<?php echo number_format($todayCustomerPayments, 2); ?>)</li>
-                  <li>Ajoutez "Paiements clients" dans les commentaires</li>
-                </ol>
+                <p><strong>Calcul du solde de caisse:</strong><br>
+                Le solde inclut automatiquement:
+                <ul>
+                  <li>Les ventes régulières du jour: <?php echo number_format($todayRegularSales, 2); ?></li>
+                  <li>Les paiements clients du jour: <?php echo number_format($todayCustomerPayments, 2); ?></li>
+                  <li>Les dépôts manuels: <?php echo number_format($todayDeposits, 2); ?></li>
+                </ul>
+                Le solde exclut:
+                <ul>
+                  <li>Les ventes à crédit: <?php echo number_format($todayCreditSales, 2); ?></li>
+                  <li>Les retraits et retours: <?php echo number_format($todayWithdrawals + $todayReturns, 2); ?></li>
+                </ul>
                 </p>
                 
                 <?php if ($todayBalance <= 0): ?>
