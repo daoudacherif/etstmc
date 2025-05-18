@@ -15,7 +15,7 @@ if (isset($_POST['addPayment'])) {
     $payAmount = intval($_POST['payAmount']); // The additional payment
 
     if ($payAmount <= 0) {
-        echo "<script>alert('Invalid payment amount. Must be > 0.');</script>";
+        echo "<script>alert('Montant invalide. Doit être > 0.');</script>";
     } else {
         // Fetch current Paid & Dues for this row
         $sql = "SELECT Paid, Dues FROM tblcustomer WHERE ID='$cid' LIMIT 1";
@@ -38,9 +38,9 @@ if (isset($_POST['addPayment'])) {
                        WHERE ID='$cid'";
             mysqli_query($con, $update);
 
-            echo "<script>alert('Payment updated successfully!');</script>";
+            echo "<script>alert('Paiement mis à jour !');</script>";
         } else {
-            echo "<script>alert('Customer record not found.');</script>";
+            echo "<script>alert('Client non trouvé.');</script>";
         }
     }
     // Refresh the page
@@ -49,9 +49,9 @@ if (isset($_POST['addPayment'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
-    <title>Inventory Management System | Customer Details</title>
+    <title>Gestion des Stocks | Détails Client</title>
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
 
@@ -61,12 +61,12 @@ if (isset($_POST['addPayment'])) {
 <div id="content">
   <div id="content-header">
     <div id="breadcrumb">
-      <a href="dashboard.php" title="Go to Home" class="tip-bottom">
-        <i class="icon-home"></i> Home
+      <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
+        <i class="icon-home"></i> Accueil
       </a>
-      <a href="customer-details.php" class="current">Customer Details</a>
+      <a href="customer-details.php" class="current">Détails Client</a>
     </div>
-    <h1>Customer Details / Invoices</h1>
+    <h1>Clients / Factures</h1>
   </div>
 
   <div class="container-fluid">
@@ -77,22 +77,22 @@ if (isset($_POST['addPayment'])) {
         <div class="widget-box">
           <div class="widget-title">
             <span class="icon"><i class="icon-th"></i></span>
-            <h5>All Invoices</h5>
+            <h5>Factures</h5>
           </div>
           <div class="widget-content nopadding">
 
             <table class="table table-bordered data-table">
               <thead>
                 <tr>
-                  <th>S.NO</th>
-                  <th>Invoice #</th>
-                  <th>Customer Name</th>
-                  <th>Mobile Number</th>
-                  <th>Payment Mode</th>
-                  <th>Billing Date</th>
-                  <th>Final Amount</th>
-                  <th>Paid</th>
-                  <th>Dues</th>
+                  <th>N°</th>
+                  <th>Facture #</th>
+                  <th>Client</th>
+                  <th>Mobile</th>
+                  <th>Mode</th>
+                  <th>Date</th>
+                  <th>Montant</th>
+                  <th>Payé</th>
+                  <th>Dû</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -125,13 +125,13 @@ if (isset($_POST['addPayment'])) {
                           <!-- Inline form to add partial payment -->
                           <form method="post" style="margin:0; display:inline;">
                             <input type="hidden" name="cid" value="<?php echo $row['ID']; ?>" />
-                            <input type="number" name="payAmount" step="1" min="1" placeholder="Pay" style="width:60px;" />
+                            <input type="number" name="payAmount" step="1" min="1" placeholder="Montant" style="width:60px;" />
                             <button type="submit" name="addPayment" class="btn btn-info btn-mini">
-                              Add Payment
+                              Payer
                             </button>
                           </form>
                         <?php } else { ?>
-                          <span style="color: green; font-weight: bold;">Fully Paid</span>
+                          <span style="color: green; font-weight: bold;">Soldé</span>
                         <?php } ?>
                       </td>
                     </tr>
@@ -145,7 +145,7 @@ if (isset($_POST['addPayment'])) {
                 <tr>
                   <!-- We'll merge the first 7 columns -->
                   <th colspan="7" style="text-align: right; font-weight: bold;">
-                    Totals:
+                    Totaux:
                   </th>
                   <!-- Display the total of the Paid column -->
                   <th style="font-weight: bold;">
