@@ -1,8 +1,11 @@
 <?php
 session_start();
 // Enable error reporting temporarily for debugging
-error_reporting(E_ALL);
+// Affiche toutes les erreurs (à désactiver en production)
 ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 include('includes/dbconnection.php');
 
 // Fixed session check syntax
