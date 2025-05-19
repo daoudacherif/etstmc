@@ -62,11 +62,11 @@ $rowSalesCredit = $resultSalesCredit->fetch_assoc();
 $totalSalesCredit = $rowSalesCredit['totalSales'];
 $stmtSalesCredit->close();
 
-// Montants réellement payés par les clients
+// Montants réellement payés par les clients - MODIFIED to use tblpayments
 $sqlPaidAmounts = "
-  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
-  FROM tblcustomer
-  WHERE BillingDate BETWEEN ? AND ?
+  SELECT COALESCE(SUM(PaymentAmount), 0) AS totalPaid
+  FROM tblpayments
+  WHERE PaymentDate BETWEEN ? AND ?
 ";
 $stmtPaidAmounts = $con->prepare($sqlPaidAmounts);
 $stmtPaidAmounts->bind_param('ss', $startDateTime, $endDateTime);
@@ -75,6 +75,30 @@ $resultPaidAmounts = $stmtPaidAmounts->get_result();
 $rowPaidAmounts = $resultPaidAmounts->fetch_assoc();
 $totalPaid = $rowPaidAmounts['totalPaid'];
 $stmtPaidAmounts->close();
+
+// Statistiques par méthode de paiement - NEW
+$sqlPaymentMethods = "
+  SELECT 
+    PaymentMethod,
+    COUNT(*) as count,
+    SUM(PaymentAmount) as total
+  FROM tblpayments
+  WHERE PaymentDate BETWEEN ? AND ?
+  GROUP BY PaymentMethod
+  ORDER BY total DESC
+";
+$stmtPaymentMethods = $con->prepare($sqlPaymentMethods);
+$stmtPaymentMethods->bind_param('ss', $startDateTime, $endDateTime);
+$stmtPaymentMethods->execute();
+$resultPaymentMethods = $stmtPaymentMethods->get_result();
+$paymentMethods = [];
+while ($row = $resultPaymentMethods->fetch_assoc()) {
+  $paymentMethods[$row['PaymentMethod']] = [
+    'count' => $row['count'],
+    'total' => $row['total']
+  ];
+}
+$stmtPaymentMethods->close();
 
 // Dépôts/Retraits
 $sqlTransactions = "
@@ -111,7 +135,7 @@ $stmtReturns->close();
 // Solde final (SANS les ventes à crédit, uniquement montants payés)
 $netBalance = ($totalSalesRegular + $totalPaid + $totalDeposits) - ($totalWithdrawals + $totalReturns);
 
-// --- 3) Récupérer la liste unifiée pour l'affichage / export ---
+// --- 3) Récupérer la liste unifiée pour l'affichage / export --- MODIFIED
 $sqlList = "
   -- Ventes régulières
   SELECT 'Vente' AS Type, (c.ProductQty * c.Price) AS Amount,
@@ -133,12 +157,17 @@ $sqlList = "
   
   UNION ALL
   
-  -- Paiements clients
-  SELECT 'Paiement Client' AS Type, Paid AS Amount,
-       BillingDate AS Date, CustomerName AS Comment
-  FROM tblcustomer
-  WHERE Paid > 0
-    AND BillingDate BETWEEN ? AND ?
+  -- Paiements clients - MODIFIED to use tblpayments
+  SELECT 'Paiement Client' AS Type, p.PaymentAmount AS Amount,
+       p.PaymentDate AS Date, 
+       CONCAT(c.CustomerName, ' (', p.PaymentMethod, 
+          CASE WHEN p.ReferenceNumber IS NOT NULL AND p.ReferenceNumber != '' 
+               THEN CONCAT(', Réf: ', p.ReferenceNumber) 
+               ELSE '' 
+          END, ')') AS Comment
+  FROM tblpayments p
+  JOIN tblcustomer c ON p.CustomerID = c.ID
+  WHERE p.PaymentDate BETWEEN ? AND ?
   
   UNION ALL
   
@@ -232,6 +261,20 @@ if ($export === 'pdf' && $dompdf_available) {
       <tr><th>Retraits</th><td class="text-right"><?php echo number_format($totalWithdrawals, 2); ?></td></tr>
       <tr><th>Retours</th><td class="text-right"><?php echo number_format($totalReturns, 2); ?></td></tr>
       <tr><th>Solde Final (En caisse)</th><td class="text-right"><strong><?php echo number_format($netBalance, 2); ?></strong></td></tr>
+    </table>
+  </div>
+
+  <!-- AJOUT - Statistiques par méthode de paiement -->
+  <div class="summary">
+    <h3>Paiements par Méthode</h3>
+    <table>
+      <?php foreach ($paymentMethods as $method => $data): ?>
+      <tr>
+        <th><?php echo htmlspecialchars($method); ?></th>
+        <td class="text-right"><?php echo number_format($data['total'], 2); ?></td>
+        <td>(<?php echo $data['count']; ?> transactions)</td>
+      </tr>
+      <?php endforeach; ?>
     </table>
   </div>
 
@@ -335,6 +378,19 @@ if ($export === 'excel') {
   echo "<tr><th>Retraits</th><td class='text-right'>".number_format($totalWithdrawals, 2)."</td></tr>";
   echo "<tr><th>Retours</th><td class='text-right'>".number_format($totalReturns, 2)."</td></tr>";
   echo "<tr><th>Solde Final (En caisse)</th><td class='text-right'><strong>".number_format($netBalance, 2)."</strong></td></tr>";
+  echo "</table>";
+  
+  // AJOUT - Statistiques par méthode de paiement en Excel
+  echo "<h3>Paiements par Méthode</h3>";
+  echo "<table border='1'>";
+  echo "<tr><th>Méthode</th><th>Montant</th><th>Transactions</th></tr>";
+  foreach ($paymentMethods as $method => $data) {
+    echo "<tr>";
+    echo "<td>".htmlspecialchars($method)."</td>";
+    echo "<td class='text-right'>".number_format($data['total'], 2)."</td>";
+    echo "<td>".$data['count']."</td>";
+    echo "</tr>";
+  }
   echo "</table>";
   
   echo "<h3>Transactions détaillées</h3>";
@@ -556,6 +612,34 @@ if ($export === 'excel') {
     .label-payment {
       background-color: #5bc0de;
     }
+    
+    /* AJOUT - Styles pour les méthodes de paiement */
+    .payment-method-cash {
+      background-color: #dff0d8;
+    }
+    .payment-method-card {
+      background-color: #d9edf7;
+    }
+    .payment-method-transfer {
+      background-color: #fcf8e3;
+    }
+    .payment-method-mobile {
+      background-color: #f2dede;
+    }
+    
+    .payment-stats {
+      text-align: center;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+    .payment-stats h4 {
+      margin-top: 0;
+    }
+    .payment-stats h3 {
+      margin: 5px 0;
+      font-size: 24px;
+    }
   </style>
 </head>
 <body>
@@ -610,6 +694,10 @@ if ($export === 'excel') {
                 </a>
                 <a href="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>?start=<?php echo $start; ?>&end=<?php echo $end; ?>&export=excel" class="btn btn-info">
                   <i class="icon-table"></i> Exporter Excel
+                </a>
+                <!-- AJOUT - Lien vers l'historique des paiements avec les mêmes dates -->
+                <a href="payment-history.php?start=<?php echo $start; ?>&end=<?php echo $end; ?>" class="btn">
+                  <i class="icon-time"></i> Historique des paiements
                 </a>
               </div>
             </form>
@@ -679,6 +767,41 @@ if ($export === 'excel') {
           </div>
         </div>
       </div>
+
+      <!-- AJOUT - Statistiques par méthode de paiement -->
+      <?php if (count($paymentMethods) > 0): ?>
+      <div class="row-fluid">
+        <div class="span12">
+          <div class="widget-box">
+            <div class="widget-title">
+              <span class="icon"><i class="icon-money"></i></span>
+              <h5>Paiements par Méthode</h5>
+            </div>
+            <div class="widget-content">
+              <div class="row-fluid">
+                <?php foreach ($paymentMethods as $method => $data): 
+                  $methodClass = '';
+                  switch($method) {
+                    case 'Cash': $methodClass = 'payment-method-cash'; break;
+                    case 'Card': $methodClass = 'payment-method-card'; break;
+                    case 'Transfer': $methodClass = 'payment-method-transfer'; break;
+                    case 'Mobile': $methodClass = 'payment-method-mobile'; break;
+                  }
+                ?>
+                <div class="span3">
+                  <div class="payment-stats <?php echo $methodClass; ?>">
+                    <h4><?php echo htmlspecialchars($method); ?></h4>
+                    <h3><?php echo number_format($data['total'], 2); ?></h3>
+                    <p><?php echo $data['count']; ?> transaction(s)</p>
+                  </div>
+                </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <?php endif; ?>
 
       <!-- Top Produits Vendus -->
       <div class="row-fluid">

@@ -13,17 +13,21 @@ if (strlen($_SESSION['imsaid'] == 0)) {
 if (isset($_POST['addPayment'])) {
     $cid       = intval($_POST['cid']);        // ID from tblcustomer
     $payAmount = intval($_POST['payAmount']); // The additional payment
+    $paymentMethod = isset($_POST['paymentMethod']) ? $_POST['paymentMethod'] : 'Cash'; // Optional
+    $reference = isset($_POST['reference']) ? $_POST['reference'] : null; // Optional
+    $comments = isset($_POST['comments']) ? $_POST['comments'] : null; // Optional
 
     if ($payAmount <= 0) {
         echo "<script>alert('Montant invalide. Doit être > 0.');</script>";
     } else {
-        // Fetch current Paid & Dues for this row
-        $sql = "SELECT Paid, Dues FROM tblcustomer WHERE ID='$cid' LIMIT 1";
+        // Fetch current Paid & Dues for this row and billing number
+        $sql = "SELECT Paid, Dues, BillingNumber FROM tblcustomer WHERE ID='$cid' LIMIT 1";
         $res = mysqli_query($con, $sql);
         if (mysqli_num_rows($res) > 0) {
             $row     = mysqli_fetch_assoc($res);
             $oldPaid = intval($row['Paid']);
             $oldDues = intval($row['Dues']);
+            $billingNumber = $row['BillingNumber'];
 
             // Calculate new amounts
             $newPaid = $oldPaid + $payAmount;
@@ -32,13 +36,30 @@ if (isset($_POST['addPayment'])) {
                 $newDues = 0; // cannot go below zero
             }
 
-            // Update the record
-            $update = "UPDATE tblcustomer 
-                       SET Paid='$newPaid', Dues='$newDues'
-                       WHERE ID='$cid'";
-            mysqli_query($con, $update);
+            // Begin transaction
+            mysqli_begin_transaction($con);
+            try {
+                // 1. Update the tblcustomer record
+                $update = "UPDATE tblcustomer 
+                           SET Paid='$newPaid', Dues='$newDues'
+                           WHERE ID='$cid'";
+                mysqli_query($con, $update);
 
-            echo "<script>alert('Paiement mis à jour !');</script>";
+                // 2. Insert payment record into tblpayments
+                $insertPayment = "INSERT INTO tblpayments 
+                                 (CustomerID, BillingNumber, PaymentAmount, PaymentMethod, ReferenceNumber, Comments) 
+                                 VALUES 
+                                 ('$cid', '$billingNumber', '$payAmount', '$paymentMethod', '$reference', '$comments')";
+                mysqli_query($con, $insertPayment);
+
+                // Commit the transaction
+                mysqli_commit($con);
+                echo "<script>alert('Paiement mis à jour !');</script>";
+            } catch (Exception $e) {
+                // Rollback in case of error
+                mysqli_rollback($con);
+                echo "<script>alert('Erreur lors de l\'enregistrement du paiement: " . $e->getMessage() . "');</script>";
+            }
         } else {
             echo "<script>alert('Client non trouvé.');</script>";
         }
@@ -122,17 +143,34 @@ if (isset($_POST['addPayment'])) {
                       <td><?php echo number_format(intval($row['Dues']), 0); ?></td>
                       <td>
                         <?php if ($row['Dues'] > 0) { ?>
-                          <!-- Inline form to add partial payment -->
+                          <!-- Expanded form to add partial payment with more details -->
                           <form method="post" style="margin:0; display:inline;">
                             <input type="hidden" name="cid" value="<?php echo $row['ID']; ?>" />
-                            <input type="number" name="payAmount" step="1" min="1" placeholder="Montant" style="width:60px;" />
+                            <div class="input-group" style="display:flex; margin-bottom:5px;">
+                              <input type="number" name="payAmount" step="1" min="1" placeholder="Montant" style="width:70px;" required />
+                              <select name="paymentMethod" style="width:80px; margin-left:2px;">
+                                <option value="Cash">Espèces</option>
+                                <option value="Card">Carte</option>
+                                <option value="Transfer">Virement</option>
+                                <option value="Mobile">Mobile</option>
+                              </select>
+                            </div>
+                            <div class="input-group" style="display:flex; margin-bottom:5px;">
+                              <input type="text" name="reference" placeholder="Référence" style="width:120px;" />
+                            </div>
+                            <div class="input-group" style="display:flex; margin-bottom:5px;">
+                              <textarea name="comments" placeholder="Commentaire" style="width:150px; height:30px;"></textarea>
+                            </div>
                             <button type="submit" name="addPayment" class="btn btn-info btn-mini">
-                              Payer
+                              <i class="icon-money"></i> Payer
                             </button>
                           </form>
                         <?php } else { ?>
                           <span style="color: green; font-weight: bold;">Soldé</span>
                         <?php } ?>
+                        <a href="payment-history.php?cid=<?php echo $row['ID']; ?>" class="btn btn-mini btn-primary" title="Voir l'historique des paiements">
+                          <i class="icon-time"></i> Historique
+                        </a>
                       </td>
                     </tr>
                 <?php
