@@ -1,9 +1,12 @@
 <?php
 session_start();
-error_reporting(0);
+// Enable error reporting temporarily for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 include('includes/dbconnection.php');
 
-if (strlen($_SESSION['imsaid'] == 0)) {
+// Fixed session check syntax
+if (strlen($_SESSION['imsaid']) == 0) {
     header('location:logout.php');
     exit;
 }
@@ -50,14 +53,26 @@ if (isset($_POST['submit'])) {
             $queryInsert = mysqli_query($con, $sqlInsert);
             
             if ($queryInsert) {
-                // Update product stock
-                $sqlUpdate = "UPDATE tblproducts
-                              SET Stock = Stock + $quantity
-                              WHERE ID='$productID'";
-                mysqli_query($con, $sqlUpdate);
-                $successCount++;
+                // Update product stock - FIXED: added error checking
+                $sqlUpdate = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID=$productID";
+                $updateResult = mysqli_query($con, $sqlUpdate);
+                
+                if ($updateResult) {
+                    // Check if rows were actually updated
+                    if (mysqli_affected_rows($con) > 0) {
+                        $successCount++;
+                    } else {
+                        error_log("Stock update found product but didn't modify any rows for ID: $productID");
+                        $errorCount++;
+                    }
+                } else {
+                    // Log the error for debugging
+                    error_log("Stock update failed: " . mysqli_error($con) . " for product ID: $productID");
+                    $errorCount++;
+                }
             } else {
                 $errorCount++;
+                error_log("Arrival insert failed: " . mysqli_error($con));
             }
         }
         
@@ -65,10 +80,56 @@ if (isset($_POST['submit'])) {
         if ($successCount > 0) {
             echo "<script>alert('$successCount arrivages de produits enregistrés avec succès! $errorCount avec erreurs.');</script>";
         } else {
-            echo "<script>alert('Erreur lors de l\'enregistrement des arrivages de produits!');</script>";
+            echo "<script>alert('Erreur lors de l\\'enregistrement des arrivages de produits! " . mysqli_error($con) . "');</script>";
         }
     } else {
         echo "<script>alert('Aucun produit sélectionné!');</script>";
+    }
+    
+    echo "<script>window.location.href='arrival.php'</script>";
+    exit;
+}
+
+// FIX: Add handling for the single product form
+if (isset($_POST['submit_single'])) {
+    $arrivalDate = $_POST['arrivaldate'];
+    $supplierID = intval($_POST['supplierid']);
+    $productID = intval($_POST['productid']);
+    $quantity = intval($_POST['quantity']);
+    $comment = mysqli_real_escape_string($con, $_POST['comments'] ?? '');
+    $cost = floatval($_POST['cost']);
+    
+    // Validate data
+    if ($productID <= 0 || $quantity <= 0 || $supplierID <= 0) {
+        echo "<script>alert('Données invalides!');</script>";
+        echo "<script>window.location.href='arrival.php'</script>";
+        exit;
+    }
+    
+    // Insert into tblproductarrivals
+    $sqlInsert = "
+      INSERT INTO tblproductarrivals(ProductID, SupplierID, ArrivalDate, Quantity, Cost, Comments)
+      VALUES('$productID', '$supplierID', '$arrivalDate', '$quantity', '$cost', '$comment')
+    ";
+    $queryInsert = mysqli_query($con, $sqlInsert);
+    
+    if ($queryInsert) {
+        // Update product stock with debugging
+        $sqlUpdate = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID=$productID";
+        $updateResult = mysqli_query($con, $sqlUpdate);
+        
+        if ($updateResult) {
+            // Check if any rows were actually updated
+            if (mysqli_affected_rows($con) > 0) {
+                echo "<script>alert('Arrivage de produit enregistré avec succès!');</script>";
+            } else {
+                echo "<script>alert('Produit trouvé mais stock non modifié. Vérifiez que l\\'ID du produit est correct.');</script>";
+            }
+        } else {
+            echo "<script>alert('Erreur lors de la mise à jour du stock: " . mysqli_error($con) . "');</script>";
+        }
+    } else {
+        echo "<script>alert('Erreur lors de l\\'enregistrement de l\\'arrivage: " . mysqli_error($con) . "');</script>";
     }
     
     echo "<script>window.location.href='arrival.php'</script>";
@@ -446,6 +507,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
             <h5>Ajout Rapide d'Arrivage Produit Unique</h5>
           </div>
           <div class="widget-content nopadding">
+            <!-- FIXED: Changed submit name to submit_single -->
             <form method="post" class="form-horizontal" id="singleArrivalForm">
               <!-- Arrival Date -->
               <div class="control-group">
@@ -513,7 +575,8 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
               </div>
 
               <div class="form-actions">
-                <button type="submit" name="submit" class="btn btn-success">
+                <!-- FIXED: Changed submit name to submit_single -->
+                <button type="submit" name="submit_single" class="btn btn-success">
                   Enregistrer l'Arrivage Unique
                 </button>
               </div>
