@@ -149,12 +149,12 @@ if (strlen($_SESSION['imsaid'] == 0)) {
                   <th width="5%">N°</th>
                   <th width="10%">Facture #</th>
                   <th width="20%">Client</th>
-                  <th width="15%">Date</th>
+                  <th width="10%">Date</th>
                   <th width="10%">Montant</th>
                   <th width="10%">Payé</th>
                   <th width="10%">Dû</th>
                   <th width="10%">Statut</th>
-                  <th width="10%">Actions</th>
+                  <th width="15%">Actions</th>
                 </tr>
               </thead>
               <tbody>
