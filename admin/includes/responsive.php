@@ -39,6 +39,20 @@
       font-weight: bold;
       color: black;
     }
+    #sidebar {
+  position: fixed;
+  width: 100%;
+  height: auto; /* Or set a specific height */
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  background: #2E363F;
+}
+
+/* Add this to your main content to prevent overlap */
+#content {
+  margin-top: 60px; /* Adjust based on header height */
+}
     /* The rest of your responsive CSS code (as provided in the previous integration)
        can either be here or in your external responsive.css file included via cs.php */
   </style>

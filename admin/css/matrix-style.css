@@ -1348,20 +1348,17 @@ body, html {
 	  padding: 5px 10px;
 	}
   
+	/* Sidebar & Content */
 	#sidebar {
-  position: fixed;
-  width: 100%;
-  height: auto; /* Or set a specific height */
-  top: 0;
-  left: 0;
-  z-index: 1000;
-  background: brown;
-}
-
-/* Add this to your main content to prevent overlap */
-#content {
-  margin-top: 60px; /* Adjust based on header height */
-}
+	  position: fixed;
+	  width: 100% !important;
+	  float: none;
+	  top: 0;
+	  margin: 0 auto;
+	  display: block;
+	  background: #2E363F; /* or keep original color */
+	}
+  
 	#sidebar .content {
 	  display: none; /* Hide or collapse full sidebar content on phone */
 	}
