@@ -1,17 +1,35 @@
 <?php
 session_start();
-// Enable error reporting temporarily for debugging
-// Affiche toutes les erreurs (à désactiver en production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Activer le rapport d'erreurs pour le débogage
 error_reporting(E_ALL);
-
+ini_set('display_errors', 1);
 include('includes/dbconnection.php');
 
-// Fixed session check syntax
+// Vérifier la connexion
+if (!$con) {
+    die("Erreur de connexion à la base de données: " . mysqli_connect_error());
+}
+
+// Vérification de session
 if (strlen($_SESSION['imsaid']) == 0) {
     header('location:logout.php');
     exit;
+}
+
+// Obtenir la structure de tblproducts pour vérifier le nom exact de la colonne
+$tableCheck = mysqli_query($con, "DESCRIBE tblproducts");
+$stockColumnName = "Stock"; // Par défaut
+$stockColumnFound = false;
+
+if ($tableCheck) {
+    while ($col = mysqli_fetch_assoc($tableCheck)) {
+        // Rechercher la colonne de stock (peut avoir un nom différent ou une casse différente)
+        if (strtolower($col['Field']) === 'stock') {
+            $stockColumnName = $col['Field']; // Utiliser le nom exact avec la casse correcte
+            $stockColumnFound = true;
+            break;
+        }
+    }
 }
 
 // 1) Handle arrival submission (multiple products)
@@ -23,27 +41,42 @@ if (isset($_POST['submit'])) {
     if(isset($_POST['productid']) && is_array($_POST['productid'])) {
         $productIDs = $_POST['productid'];
         $quantities = $_POST['quantity'];
-        $comments = $_POST['comments'];
+        $comments = isset($_POST['comments']) ? $_POST['comments'] : array();
         
         $successCount = 0;
         $errorCount = 0;
+        $errorDetails = array();
         
         // Process each product
         foreach($productIDs as $index => $productID) {
             $productID = intval($productID);
             $quantity = intval($quantities[$index]);
-            $comment = mysqli_real_escape_string($con, $comments[$index]);
+            $comment = isset($comments[$index]) ? mysqli_real_escape_string($con, $comments[$index]) : '';
             
             // Validate data
             if ($productID <= 0 || $quantity <= 0) {
                 $errorCount++;
+                $errorDetails[] = "Produit ID $productID invalide ou quantité nulle";
                 continue;
             }
             
-            // Get product price
-            $priceQ = mysqli_query($con, "SELECT Price FROM tblproducts WHERE ID='$productID' LIMIT 1");
+            // Get product price and current stock
+            $priceQ = mysqli_query($con, "SELECT Price, $stockColumnName FROM tblproducts WHERE ID='$productID' LIMIT 1");
+            if (!$priceQ) {
+                $errorCount++;
+                $errorDetails[] = "Erreur de requête: " . mysqli_error($con);
+                continue;
+            }
+            
+            if (mysqli_num_rows($priceQ) == 0) {
+                $errorCount++;
+                $errorDetails[] = "Produit ID $productID non trouvé";
+                continue;
+            }
+            
             $priceR = mysqli_fetch_assoc($priceQ);
             $unitPrice = floatval($priceR['Price']);
+            $currentStock = isset($priceR[$stockColumnName]) ? intval($priceR[$stockColumnName]) : 0;
             
             // Calculate total cost
             $cost = $unitPrice * $quantity;
@@ -56,34 +89,37 @@ if (isset($_POST['submit'])) {
             $queryInsert = mysqli_query($con, $sqlInsert);
             
             if ($queryInsert) {
-                // Update product stock - FIXED: added error checking
-                $sqlUpdate = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID=$productID";
+                // Calcul du nouveau stock
+                $newStock = $currentStock + $quantity;
+                
+                // Mise à jour directe avec une nouvelle valeur plutôt qu'un incrément
+                $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock WHERE ID=$productID";
                 $updateResult = mysqli_query($con, $sqlUpdate);
                 
                 if ($updateResult) {
-                    // Check if rows were actually updated
                     if (mysqli_affected_rows($con) > 0) {
                         $successCount++;
                     } else {
-                        error_log("Stock update found product but didn't modify any rows for ID: $productID");
                         $errorCount++;
+                        $errorDetails[] = "Produit ID $productID trouvé mais aucun stock mis à jour. Stock actuel: $currentStock";
                     }
                 } else {
-                    // Log the error for debugging
-                    error_log("Stock update failed: " . mysqli_error($con) . " for product ID: $productID");
                     $errorCount++;
+                    $errorDetails[] = "Erreur mise à jour stock pour ID $productID: " . mysqli_error($con);
                 }
             } else {
                 $errorCount++;
-                error_log("Arrival insert failed: " . mysqli_error($con));
+                $errorDetails[] = "Erreur insertion arrivage pour ID $productID: " . mysqli_error($con);
             }
         }
         
-        // Display result message
+        // Display result message with details
         if ($successCount > 0) {
-            echo "<script>alert('$successCount arrivages de produits enregistrés avec succès! $errorCount avec erreurs.');</script>";
+            echo "<script>alert('$successCount arrivages de produits enregistrés avec succès! " . 
+                  ($errorCount > 0 ? "$errorCount avec erreurs." : "") . "');</script>";
         } else {
-            echo "<script>alert('Erreur lors de l\\'enregistrement des arrivages de produits! " . mysqli_error($con) . "');</script>";
+            $errorMsg = "Erreur lors de l\\'enregistrement des arrivages de produits!\\n" . implode("\\n", $errorDetails);
+            echo "<script>alert('$errorMsg');</script>";
         }
     } else {
         echo "<script>alert('Aucun produit sélectionné!');</script>";
@@ -109,6 +145,18 @@ if (isset($_POST['submit_single'])) {
         exit;
     }
     
+    // Get current stock
+    $stockQuery = mysqli_query($con, "SELECT $stockColumnName FROM tblproducts WHERE ID=$productID LIMIT 1");
+    if (!$stockQuery || mysqli_num_rows($stockQuery) == 0) {
+        echo "<script>alert('Produit non trouvé!');</script>";
+        echo "<script>window.location.href='arrival.php'</script>";
+        exit;
+    }
+    
+    $stockRow = mysqli_fetch_assoc($stockQuery);
+    $currentStock = isset($stockRow[$stockColumnName]) ? intval($stockRow[$stockColumnName]) : 0;
+    $newStock = $currentStock + $quantity;
+    
     // Insert into tblproductarrivals
     $sqlInsert = "
       INSERT INTO tblproductarrivals(ProductID, SupplierID, ArrivalDate, Quantity, Cost, Comments)
@@ -117,14 +165,14 @@ if (isset($_POST['submit_single'])) {
     $queryInsert = mysqli_query($con, $sqlInsert);
     
     if ($queryInsert) {
-        // Update product stock with debugging
-        $sqlUpdate = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID=$productID";
+        // Update product stock with direct value
+        $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock WHERE ID=$productID";
         $updateResult = mysqli_query($con, $sqlUpdate);
         
         if ($updateResult) {
             // Check if any rows were actually updated
             if (mysqli_affected_rows($con) > 0) {
-                echo "<script>alert('Arrivage de produit enregistré avec succès!');</script>";
+                echo "<script>alert('Arrivage de produit enregistré avec succès! Stock mis à jour: $currentStock -> $newStock');</script>";
             } else {
                 echo "<script>alert('Produit trouvé mais stock non modifié. Vérifiez que l\\'ID du produit est correct.');</script>";
             }
@@ -311,7 +359,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
             p.ID,
             p.ProductName,
             p.Price,
-            p.Stock,
+            p.$stockColumnName as Stock,
             c.CategoryName
         FROM tblproducts p
         LEFT JOIN tblcategory c ON c.ID = p.CatID
