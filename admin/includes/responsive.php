@@ -39,19 +39,45 @@
       font-weight: bold;
       color: black;
     }
-    #sidebar {
+   /* Fixed Header Styles */
+#header {
   position: fixed;
-  width: 100%;
-  height: auto; /* Or set a specific height */
-  
+  top: 0;
   left: 0;
+  width: 100%;
+  z-index: 1001;
+  background: #2E363F; /* Match your header background */
+}
+
+#user-nav {
+  position: fixed;
+  top: 60px; /* Adjust based on your #header height */
+  left: 0;
+  width: 100%;
   z-index: 1000;
+  background: #2E363F; /* Match your navbar background */
+}
+
+/* Adjust main content to prevent overlap with fixed header */
+#content {
+  margin-top: 120px; /* Adjust based on combined height of header + user-nav */
+}
+
+/* If you have a sidebar, adjust it too */
+#sidebar {
+  position: fixed;
+  top: 120px; /* Same as content margin-top */
+  left: 0;
+  height: calc(100vh - 120px); /* Viewport height minus header height */
+  width: 250px; /* Adjust as needed */
+  overflow-y: auto;
+  z-index: 999;
   background: #2E363F;
 }
 
-/* Add this to your main content to prevent overlap */
-#content {
-  margin-top: 60px; /* Adjust based on header height */
+/* If you have a sidebar, adjust the main content area */
+body:has(#sidebar) #content {
+  margin-left: 250px; /* Should match sidebar width */
 }
     /* The rest of your responsive CSS code (as provided in the previous integration)
        can either be here or in your external responsive.css file included via cs.php */
