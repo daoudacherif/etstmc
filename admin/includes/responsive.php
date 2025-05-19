@@ -60,13 +60,13 @@
 
 /* Adjust main content to prevent overlap with fixed header */
 #content {
-  margin-top: 120px; /* Adjust based on combined height of header + user-nav */
+  margin-top: 20px; /* Adjust based on combined height of header + user-nav */
 }
 
 /* If you have a sidebar, adjust it too */
 #sidebar {
   position: fixed;
-  top: 120px; /* Same as content margin-top */
+  top: 50px; /* Same as content margin-top */
   left: 0;
   height: calc(100vh - 120px); /* Viewport height minus header height */
   width: 250px; /* Adjust as needed */
