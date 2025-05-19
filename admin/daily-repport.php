@@ -1,11 +1,6 @@
 <?php
 session_start();
 error_reporting(E_ALL);
-// Affiche toutes les erreurs (à désactiver en production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 include('includes/dbconnection.php');
 use Dompdf\Dompdf;
 
@@ -140,11 +135,11 @@ $stmtReturns->close();
 // Solde final (SANS les ventes à crédit, uniquement montants payés)
 $netBalance = ($totalSalesRegular + $totalPaid + $totalDeposits) - ($totalWithdrawals + $totalReturns);
 
-// --- 3) Récupérer la liste unifiée pour l'affichage / export --- MODIFIED
+// --- 3) Récupérer la liste unifiée pour l'affichage / export --- MODIFIED with COLLATE fix
 $sqlList = "
   -- Ventes régulières
   SELECT 'Vente' AS Type, (c.ProductQty * c.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName AS Comment
+       c.CartDate AS Date, p.ProductName COLLATE utf8mb4_unicode_ci AS Comment
   FROM tblcart c
   JOIN tblproducts p ON p.ID = c.ProductId
   WHERE c.IsCheckOut='1'
@@ -154,7 +149,7 @@ $sqlList = "
   
   -- Ventes à crédit
   SELECT 'Vente à Terme' AS Type, (c.ProductQty * c.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName AS Comment
+       c.CartDate AS Date, p.ProductName COLLATE utf8mb4_unicode_ci AS Comment
   FROM tblcreditcart c
   JOIN tblproducts p ON p.ID = c.ProductId
   WHERE c.IsCheckOut='1'
@@ -169,7 +164,7 @@ $sqlList = "
           CASE WHEN p.ReferenceNumber IS NOT NULL AND p.ReferenceNumber != '' 
                THEN CONCAT(', Réf: ', p.ReferenceNumber) 
                ELSE '' 
-          END, ')') AS Comment
+          END, ')') COLLATE utf8mb4_unicode_ci AS Comment
   FROM tblpayments p
   JOIN tblcustomer c ON p.CustomerID = c.ID
   WHERE p.PaymentDate BETWEEN ? AND ?
@@ -183,7 +178,7 @@ $sqlList = "
       WHEN TransType='OUT' THEN 'Retrait'
       ELSE TransType 
     END AS Type, 
-    Amount, TransDate AS Date, Comments AS Comment
+    Amount, TransDate AS Date, Comments COLLATE utf8mb4_unicode_ci AS Comment
   FROM tblcashtransactions
   WHERE TransDate BETWEEN ? AND ?
   
@@ -191,7 +186,7 @@ $sqlList = "
   
   -- Retours
   SELECT 'Retour' AS Type, (r.Quantity * p.Price) AS Amount,
-       r.ReturnDate AS Date, r.Reason AS Comment
+       r.ReturnDate AS Date, r.Reason COLLATE utf8mb4_unicode_ci AS Comment
   FROM tblreturns r
   JOIN tblproducts p ON p.ID = r.ProductID
   WHERE r.ReturnDate BETWEEN ? AND ?
