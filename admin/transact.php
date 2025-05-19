@@ -37,15 +37,35 @@ $resCreditSales = mysqli_query($con, $sqlCreditSales);
 $rowCreditSales = mysqli_fetch_assoc($resCreditSales);
 $todayCreditSales = floatval($rowCreditSales['totalSales']);
 
-// 1.3 Paiements clients du jour (from tblcustomer) - POUR AFFICHAGE UNIQUEMENT
+// 1.3 Paiements clients du jour (from tblpayments) - FIXED - POUR AFFICHAGE UNIQUEMENT
 $sqlCustomerPayments = "
-  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
-  FROM tblcustomer
-  WHERE DATE(BillingDate) = CURDATE()
+  SELECT COALESCE(SUM(PaymentAmount), 0) AS totalPaid
+  FROM tblpayments
+  WHERE DATE(PaymentDate) = CURDATE()
 ";
 $resCustomerPayments = mysqli_query($con, $sqlCustomerPayments);
 $rowCustomerPayments = mysqli_fetch_assoc($resCustomerPayments);
 $todayCustomerPayments = floatval($rowCustomerPayments['totalPaid']);
+
+// 1.3.1 Récupérer les paiements par méthode pour analyse (NOUVEAU)
+$sqlPaymentMethods = "
+  SELECT 
+    PaymentMethod,
+    COUNT(*) as count,
+    SUM(PaymentAmount) as total
+  FROM tblpayments
+  WHERE DATE(PaymentDate) = CURDATE()
+  GROUP BY PaymentMethod
+";
+$resPaymentMethods = mysqli_query($con, $sqlPaymentMethods);
+$paymentsByMethod = [];
+$cashPayments = 0;
+while ($row = mysqli_fetch_assoc($resPaymentMethods)) {
+  $paymentsByMethod[$row['PaymentMethod']] = $row;
+  if ($row['PaymentMethod'] == 'Cash') {
+    $cashPayments = floatval($row['total']);
+  }
+}
 
 // 1.4 Dépôts et retraits manuels du jour (from tblcashtransactions)
 $sqlManualTransactions = "
@@ -72,11 +92,11 @@ $rowReturns = mysqli_fetch_assoc($resReturns);
 $todayReturns = floatval($rowReturns['totalReturns']);
 
 // 1.6 Calcul du solde du jour incluant les ventes et paiements client
-// Ce solde prend en compte les transactions manuelles ET les ventes/paiements
-$todayBalance = $todayDeposits + $todayRegularSales + $todayCustomerPayments - ($todayWithdrawals + $todayReturns);
+// FIXED: Utiliser seulement les paiements en espèces (Cash) pour le solde
+$todayBalance = $todayDeposits + $todayRegularSales + $cashPayments - ($todayWithdrawals + $todayReturns);
 
 // 1.7 Calcul du solde total théorique si toutes les ventes et paiements étaient inclus
-$todayTotalTheoretical = $todayBalance + $todayRegularSales + $todayCustomerPayments;
+$todayTotalTheoretical = $todayDeposits + $todayRegularSales + $todayCustomerPayments - ($todayWithdrawals + $todayReturns);
 
 // ---------------------------------------------------------------------
 // 2) GÉRER UNE NOUVELLE TRANSACTION MANUELLE
@@ -207,8 +227,11 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
     <hr>
     
     <div class="alert-info">
-      <strong>Information importante:</strong> Les ventes régulières (<?php echo number_format($todayRegularSales, 2); ?>) et paiements clients (<?php echo number_format($todayCustomerPayments, 2); ?>) sont automatiquement inclus dans le calcul du solde de caisse. 
+      <strong>Information importante:</strong> Les ventes régulières (<?php echo number_format($todayRegularSales, 2); ?>) et paiements clients en espèces (<?php echo number_format($cashPayments, 2); ?>) sont automatiquement inclus dans le calcul du solde de caisse. 
       <br>Si vous devez faire un retrait, le système vérifie que vous ne dépassez pas le solde disponible total.
+      <?php if ($todayCustomerPayments > $cashPayments): ?>
+      <br><strong>Note:</strong> Certains paiements clients (<?php echo number_format($todayCustomerPayments - $cashPayments, 2); ?>) ont été effectués par d'autres moyens que les espèces et ne sont pas inclus dans le solde de caisse.
+      <?php endif; ?>
     </div>
 
     <!-- Résumé du solde -->
@@ -230,11 +253,19 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
                   </td>
                 </tr>
                 <tr>
-                  <td>Paiements clients (inclus dans le solde):</td>
+                  <td>Paiements clients en espèces (inclus dans le solde):</td>
                   <td style="text-align: right;">
-                    <strong>+<?php echo number_format($todayCustomerPayments, 2); ?></strong>
+                    <strong>+<?php echo number_format($cashPayments, 2); ?></strong>
                   </td>
                 </tr>
+                <?php if ($todayCustomerPayments > $cashPayments): ?>
+                <tr class="not-in-cash">
+                  <td>Autres paiements clients (non inclus dans le solde):</td>
+                  <td style="text-align: right;">
+                    (+<?php echo number_format($todayCustomerPayments - $cashPayments, 2); ?>)
+                  </td>
+                </tr>
+                <?php endif; ?>
                 <tr>
                   <td>Dépôts enregistrés:</td>
                   <td style="text-align: right;">+<?php echo number_format($todayDeposits, 2); ?></td>
@@ -263,12 +294,13 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
                 Le solde inclut automatiquement:
                 <ul>
                   <li>Les ventes régulières du jour: <?php echo number_format($todayRegularSales, 2); ?></li>
-                  <li>Les paiements clients du jour: <?php echo number_format($todayCustomerPayments, 2); ?></li>
+                  <li>Les paiements clients en espèces: <?php echo number_format($cashPayments, 2); ?></li>
                   <li>Les dépôts manuels: <?php echo number_format($todayDeposits, 2); ?></li>
                 </ul>
                 Le solde exclut:
                 <ul>
                   <li>Les ventes à crédit: <?php echo number_format($todayCreditSales, 2); ?></li>
+                  <li>Les paiements par carte/virement/mobile: <?php echo number_format($todayCustomerPayments - $cashPayments, 2); ?></li>
                   <li>Les retraits et retours: <?php echo number_format($todayWithdrawals + $todayReturns, 2); ?></li>
                 </ul>
                 </p>
@@ -575,7 +607,7 @@ $(document).ready(function() {
       $('#amount').val(<?php echo $todayRegularSales; ?>);
       $('#transtype').val('IN');
     } else if (preset === 'Paiements clients') {
-      $('#amount').val(<?php echo $todayCustomerPayments; ?>);
+      $('#amount').val(<?php echo $cashPayments; ?>);  // Updated to use Cash payments only
       $('#transtype').val('IN');
     }
   });
