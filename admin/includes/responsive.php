@@ -39,19 +39,26 @@
       font-weight: bold;
       color: black;
     }
-    #sidebar {
-  position: fixed;
-  width: 100%;
-  height: auto; /* Or set a specific height */
-  
-  left: 0;
-  z-index: 1000;
+   /* Default sidebar styling for all screens */
+#sidebar {
   background: #2E363F;
+  /* Other base styles that apply to all screen sizes */
 }
 
-/* Add this to your main content to prevent overlap */
-#content {
-  margin-top: 10px; /* Adjust based on header height */
+/* Apply fixed positioning to sidebar only on larger screens (desktop/PC) */
+@media (min-width: 992px) {
+  #sidebar {
+    position: fixed;
+    width: 100%;
+    height: auto;
+    left: 0;
+    z-index: 1000;
+  }
+  
+  /* Add margin to content only on PC screens to prevent overlap with fixed sidebar */
+  #content {
+    margin-top: 10px; /* Adjust as needed */
+  }
 }
 
     /* The rest of your responsive CSS code (as provided in the previous integration)
