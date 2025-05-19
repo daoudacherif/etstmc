@@ -53,6 +53,9 @@
 #content {
   margin-top: 10px; /* Adjust based on header height */
 }
+#header {
+  position: fixed;
+}
     /* The rest of your responsive CSS code (as provided in the previous integration)
        can either be here or in your external responsive.css file included via cs.php */
   </style>
