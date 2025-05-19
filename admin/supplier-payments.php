@@ -23,15 +23,43 @@ $resRegularSales = mysqli_query($con, $sqlRegularSales);
 $rowRegularSales = mysqli_fetch_assoc($resRegularSales);
 $todayRegularSales = floatval($rowRegularSales['totalSales']);
 
-// 1.2 Paiements clients du jour
-$sqlCustomerPayments = "
-  SELECT COALESCE(SUM(Paid), 0) AS totalPaid
-  FROM tblcustomer
-  WHERE DATE(BillingDate) = CURDATE()
+// 1.2 Paiements clients du jour - UPDATED to use tblpayments
+// 1.2.1 Tous les paiements clients (pour l'affichage)
+$sqlAllCustomerPayments = "
+  SELECT COALESCE(SUM(PaymentAmount), 0) AS totalPaid
+  FROM tblpayments
+  WHERE DATE(PaymentDate) = CURDATE()
 ";
-$resCustomerPayments = mysqli_query($con, $sqlCustomerPayments);
-$rowCustomerPayments = mysqli_fetch_assoc($resCustomerPayments);
-$todayCustomerPayments = floatval($rowCustomerPayments['totalPaid']);
+$resAllCustomerPayments = mysqli_query($con, $sqlAllCustomerPayments);
+$rowAllCustomerPayments = mysqli_fetch_assoc($resAllCustomerPayments);
+$todayCustomerPaymentsAll = floatval($rowAllCustomerPayments['totalPaid']);
+
+// 1.2.2 Uniquement les paiements en espèces - NOUVEAU
+$sqlCashPayments = "
+  SELECT COALESCE(SUM(PaymentAmount), 0) AS totalPaid
+  FROM tblpayments
+  WHERE DATE(PaymentDate) = CURDATE()
+    AND PaymentMethod = 'Cash'
+";
+$resCashPayments = mysqli_query($con, $sqlCashPayments);
+$rowCashPayments = mysqli_fetch_assoc($resCashPayments);
+$todayCustomerPayments = floatval($rowCashPayments['totalPaid']);
+
+// 1.2.3 Paiements par méthode (pour l'affichage détaillé) - NOUVEAU
+$sqlPaymentMethods = "
+  SELECT 
+    PaymentMethod,
+    COUNT(*) as count,
+    SUM(PaymentAmount) as total
+  FROM tblpayments
+  WHERE DATE(PaymentDate) = CURDATE()
+  GROUP BY PaymentMethod
+";
+$resPaymentMethods = mysqli_query($con, $sqlPaymentMethods);
+$paymentsByMethod = [];
+while ($row = mysqli_fetch_assoc($resPaymentMethods)) {
+  $paymentsByMethod[$row['PaymentMethod']] = $row;
+}
 
 // 1.3 Dépôts et retraits manuels du jour
 $sqlManualTransactions = "
@@ -58,6 +86,7 @@ $rowReturns = mysqli_fetch_assoc($resReturns);
 $todayReturns = floatval($rowReturns['totalReturns']);
 
 // 1.5 Calcul du solde disponible en caisse
+// UPDATED: N'utilise que les paiements en espèces dans le calcul du solde
 $availableCash = $todayDeposits + $todayRegularSales + $todayCustomerPayments - ($todayWithdrawals + $todayReturns);
 
 // ==========================
@@ -266,6 +295,10 @@ $resList = mysqli_query($con, $sqlList);
       margin-top: 10px;
       font-size: 12px;
     }
+    .not-in-cash {
+      color: #888;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -290,13 +323,30 @@ $resList = mysqli_query($con, $sqlList);
               <?php if ($availableCash <= 0): ?>
                 <p><strong>Attention:</strong> Solde insuffisant pour effectuer des paiements.</p>
               <?php endif; ?>
+              
+              <?php if ($todayCustomerPaymentsAll > $todayCustomerPayments): ?>
+                <p class="not-in-cash">
+                  <i class="icon-info-sign"></i>
+                  <small>Note: Certains paiements clients (<?php echo number_format($todayCustomerPaymentsAll - $todayCustomerPayments, 2); ?>) 
+                  ont été effectués par d'autres moyens que les espèces et ne sont pas inclus dans le solde.</small>
+                </p>
+              <?php endif; ?>
             </div>
             <div class="span6">
               <div class="transaction-history">
                 <p><strong>Détail du jour:</strong></p>
                 <ul>
                   <li>Ventes régulières: +<?php echo number_format($todayRegularSales, 2); ?></li>
-                  <li>Paiements clients: +<?php echo number_format($todayCustomerPayments, 2); ?></li>
+                  <li>Paiements clients en espèces: +<?php echo number_format($todayCustomerPayments, 2); ?></li>
+                  <?php if (count($paymentsByMethod) > 0): ?>
+                    <li class="not-in-cash">Détail des paiements par méthode:
+                      <ul>
+                        <?php foreach ($paymentsByMethod as $method => $data): ?>
+                          <li><?php echo $method; ?>: <?php echo number_format($data['total'], 2); ?> (<?php echo $data['count']; ?> transaction(s))</li>
+                        <?php endforeach; ?>
+                      </ul>
+                    </li>
+                  <?php endif; ?>
                   <li>Dépôts: +<?php echo number_format($todayDeposits, 2); ?></li>
                   <li>Retraits: -<?php echo number_format($todayWithdrawals, 2); ?></li>
                   <li>Retours: -<?php echo number_format($todayReturns, 2); ?></li>
