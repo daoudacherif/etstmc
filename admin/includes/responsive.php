@@ -43,7 +43,7 @@
   position: fixed;
   width: 100%;
   height: auto; /* Or set a specific height */
-  top: 0;
+  
   left: 0;
   z-index: 1000;
   background: #2E363F;
