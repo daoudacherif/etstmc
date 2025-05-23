@@ -1,5 +1,5 @@
 <?php
-// ============== PAGE return.php COMPLÈTE ET AMÉLIORÉE ==============
+// ============== PAGE return-simple.php SANS DÉPENDANCES CSS ==============
 session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
@@ -11,7 +11,7 @@ if (strlen($_SESSION['imsaid']) == 0) {
 }
 
 // ==========================
-// Traitement du formulaire de retour avec VALIDATION SÉCURISÉE
+// Traitement du formulaire de retour
 // ==========================
 if (isset($_POST['submit'])) {
     // Nettoyage et validation des entrées
@@ -56,7 +56,7 @@ if (isset($_POST['submit'])) {
             }
             $stmt->close();
 
-            // Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
+            // Déterminer quelle table utiliser
             if (empty($errors)) {
                 $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
                 $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
@@ -170,7 +170,7 @@ if (isset($_POST['submit'])) {
             
             echo "<script>
                     alert('Retour enregistré avec succès!');
-                    window.location.href='return.php';
+                    window.location.href='return-simple.php';
                   </script>";
             exit;
             
@@ -211,444 +211,637 @@ $stats = mysqli_fetch_assoc($statsResult);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <?php include_once('includes/cs.php'); ?>
-    <?php include_once('includes/responsive.php'); ?>
-    
-    <!-- jQuery et plugins -->
-    <script src="js/jquery.min.js"></script>
-    
-    <!-- Styles personnalisés pour les retours -->
+    <!-- Styles intégrés pour éviter les dépendances externes -->
     <style>
-        /* ==================== STYLES POUR LA GESTION DES RETOURS ==================== */
-        .stats-card {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+        /* Reset et styles de base */
+        * { box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+            line-height: 1.6;
         }
-
-        .stats-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        
+        /* Layout principal */
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        .stats-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #007bff, #28a745, #ffc107);
-        }
-
-        .stats-card h4 {
-            color: #495057;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .stats-card p {
-            margin: 0;
-            font-size: 1.2em;
-        }
-
-        #billing-info {
-            border-radius: 6px;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-
-        #billing-info.alert-success {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-
-        #billing-info.alert-error {
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-        }
-
-        #billing-info.alert-warning {
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-            border-left: 4px solid #ffc107;
-            color: #856404;
-        }
-
-        #billing-info.alert-info {
-            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-            border-left: 4px solid #17a2b8;
-            color: #0c5460;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .icon-spinner.icon-spin {
-            animation: spin 1s linear infinite;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            font-size: 0.875em;
-            font-weight: bold;
-            line-height: 1;
+        
+        h1, h2, h3 { color: #333; margin-top: 0; }
+        
+        /* Cartes de statistiques */
+        .stats-row { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+        .stats-card { 
+            flex: 1; 
+            background: linear-gradient(135deg, #007bff, #0056b3); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 8px; 
             text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 4px;
+            min-width: 200px;
         }
-
-        .badge-success {
-            background-color: #28a745;
-            color: white;
+        .stats-card h4 { margin: 0 0 10px 0; font-size: 1.1em; }
+        .stats-card p { margin: 0; font-size: 1.5em; font-weight: bold; }
+        
+        /* Formulaire */
+        .form-section { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 30px; 
         }
-
-        .badge-warning {
-            background-color: #ffc107;
-            color: #212529;
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+            color: #333; 
         }
-
-        .badge-important {
-            background-color: #dc3545;
-            color: white;
+        .form-group input, .form-group select { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 16px;
         }
-
-        .badge-info {
-            background-color: #17a2b8;
-            color: white;
+        .form-group input:focus, .form-group select:focus { 
+            border-color: #007bff; 
+            outline: none; 
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.25); 
         }
-
-        .control-label span[style*="color:red"] {
-            color: #dc3545 !important;
-            font-weight: bold;
+        
+        .required { color: #dc3545; }
+        .help-text { font-size: 0.9em; color: #666; margin-top: 5px; }
+        
+        /* Boutons */
+        .btn { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
-
-        .btn {
-            transition: all 0.3s ease;
-            border-radius: 4px;
-            font-weight: 500;
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        /* Alertes */
+        .alert { 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 4px; 
+            border: 1px solid transparent; 
         }
-
-        .btn:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .alert-success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .alert-warning { background: #fff3cd; color: #856404; border-color: #ffeaa7; }
+        .alert-info { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+        
+        /* Tableaux */
+        .table-section { margin-top: 30px; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 15px;
+            background: white;
         }
-
-        .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            border: none;
+        th, td { 
+            padding: 12px 8px; 
+            text-align: left; 
+            border-bottom: 1px solid #ddd; 
         }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            border: none;
+        th { 
+            background: #f8f9fa; 
+            font-weight: bold; 
+            color: #333;
         }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        tr:hover { background: #f8f9fa; }
+        
+        /* Spinner */
+        .spinner { 
+            display: inline-block; 
+            width: 20px; 
+            height: 20px; 
+            border: 3px solid #f3f3f3; 
+            border-top: 3px solid #007bff; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
         }
-
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            min-width: 300px;
-            max-width: 500px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            border-radius: 6px;
-            animation: slideInRight 0.3s ease;
+        @keyframes spin { 
+            0% { transform: rotate(0deg); } 
+            100% { transform: rotate(360deg); } 
         }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
+        
+        /* Responsive */
         @media (max-width: 768px) {
-            .stats-card {
-                margin-bottom: 10px;
-                padding: 15px;
-            }
-            
-            .toast-notification {
-                left: 10px;
-                right: 10px;
-                min-width: auto;
-                max-width: none;
-            }
+            .stats-row { flex-direction: column; }
+            .container { padding: 10px; }
+            table { font-size: 14px; }
+            th, td { padding: 8px 4px; }
+        }
+        
+        /* Debug console */
+        .debug-console { 
+            background: #2d3748; 
+            color: #68d391; 
+            padding: 15px; 
+            border-radius: 4px; 
+            font-family: monospace; 
+            font-size: 12px; 
+            height: 200px; 
+            overflow-y: scroll; 
+            margin: 15px 0;
         }
     </style>
+    
+    <!-- jQuery depuis CDN fiable -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 
 <body>
-<?php include_once('includes/header.php'); ?>
-<?php include_once('includes/sidebar.php'); ?>
-
-<div id="content">
-    <div id="content-header">
-        <div id="breadcrumb">
-            <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
-                <i class="icon-home"></i> Accueil
-            </a>
-            <a href="return.php" class="current">Retours de Article</a>
+<div class="container">
+    <h1>🔄 Gestion des Retours de Articles</h1>
+    
+    <!-- Statistiques du jour -->
+    <div class="stats-row">
+        <div class="stats-card">
+            <h4>Retours aujourd'hui</h4>
+            <p><?php echo $stats['total_returns'] ?: 0; ?></p>
         </div>
-        <h1>Gérer les retours de Article</h1>
+        <div class="stats-card">
+            <h4>Quantité totale</h4>
+            <p><?php echo $stats['total_quantity'] ?: 0; ?></p>
+        </div>
+        <div class="stats-card">
+            <h4>Valeur totale</h4>
+            <p><?php echo number_format($stats['total_value'] ?: 0, 2); ?> GNF</p>
+        </div>
     </div>
-
-    <div class="container-fluid">
-        <!-- =========== STATISTIQUES DU JOUR =========== -->
-        <div class="row-fluid">
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-retweet"></i> Retours aujourd'hui</h4>
-                    <p><strong><?php echo $stats['total_returns'] ?: 0; ?></strong> retours</p>
-                </div>
+    
+    <!-- Formulaire de nouveau retour -->
+    <div class="form-section">
+        <h2>➕ Ajouter un nouveau retour</h2>
+        
+        <form method="post" id="returnForm">
+            <div class="form-group">
+                <label for="billingnumber">Numéro de facture <span class="required">*</span></label>
+                <input type="text" id="billingnumber" name="billingnumber" 
+                       placeholder="ex. 385973758" required maxlength="50" autocomplete="off">
+                <div id="billing-info" class="alert" style="display:none;"></div>
             </div>
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-shopping-cart"></i> Quantité totale</h4>
-                    <p><strong><?php echo $stats['total_quantity'] ?: 0; ?></strong> articles</p>
-                </div>
+            
+            <div class="form-group">
+                <label for="returndate">Date de retour <span class="required">*</span></label>
+                <input type="date" id="returndate" name="returndate" 
+                       value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" required>
+                <div class="help-text">La date ne peut pas être dans le futur</div>
             </div>
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-money"></i> Valeur totale</h4>
-                    <p><strong><?php echo number_format($stats['total_value'] ?: 0, 2); ?> GNF</strong></p>
-                </div>
+            
+            <div class="form-group">
+                <label for="productid">Produit <span class="required">*</span></label>
+                <select id="productid" name="productid" required disabled>
+                    <option value="">-- Entrez d'abord le numéro de facture --</option>
+                </select>
+                <div id="product-details" class="alert" style="display:none;"></div>
             </div>
-        </div>
-
-        <hr>
-
-        <!-- =========== FORMULAIRE DE NOUVEAU RETOUR =========== -->
-        <div class="row-fluid">
-            <div class="span12">
-                <div class="widget-box">
-                    <div class="widget-title">
-                        <span class="icon"><i class="icon-plus"></i></span>
-                        <h5>Ajouter un nouveau retour</h5>
-                    </div>
-                    <div class="widget-content nopadding">
-                        <form method="post" class="form-horizontal" id="returnForm">
-
-                            <!-- Numéro de facture -->
-                            <div class="control-group">
-                                <label class="control-label">Numéro de facture <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="text" id="billingnumber" name="billingnumber" 
-                                           placeholder="ex. 123456789" required maxlength="50" 
-                                           autocomplete="off" />
-                                    <div id="billing-info" class="alert" style="display:none; margin-top:10px;"></div>
-                                </div>
-                            </div>
-
-                            <!-- Date de retour -->
-                            <div class="control-group">
-                                <label class="control-label">Date de retour <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="date" name="returndate" value="<?php echo date('Y-m-d'); ?>" 
-                                           max="<?php echo date('Y-m-d'); ?>" required />
-                                    <span class="help-inline">La date ne peut pas être dans le futur</span>
-                                </div>
-                            </div>
-
-                            <!-- Sélection du produit -->
-                            <div class="control-group">
-                                <label class="control-label">Produit <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <select id="productid" name="productid" required disabled>
-                                        <option value="">-- Entrez d'abord le numéro de facture --</option>
-                                    </select>
-                                    <div id="product-details" class="alert alert-info" style="display:none; margin-top:10px;"></div>
-                                </div>
-                            </div>
-
-                            <!-- Quantité -->
-                            <div class="control-group">
-                                <label class="control-label">Quantité <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="number" id="quantity" name="quantity" min="1" value="1" required />
-                                    <span class="help-inline">Maximum basé sur la quantité disponible pour retour</span>
-                                </div>
-                            </div>
-
-                            <!-- Prix de retour -->
-                            <div class="control-group">
-                                <label class="control-label">Prix de retour <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="number" id="price" name="price" step="0.01" min="0" value="0" required />
-                                    <span class="help-inline">Prix maximum basé sur le prix de vente original</span>
-                                </div>
-                            </div>
-
-                            <!-- Raison -->
-                            <div class="control-group">
-                                <label class="control-label">Raison :</label>
-                                <div class="controls">
-                                    <select name="reason">
-                                        <option value="">-- Sélectionner une raison --</option>
-                                        <option value="Défaut produit">Défaut produit</option>
-                                        <option value="Mauvaise taille">Mauvaise taille</option>
-                                        <option value="Ne correspond pas à la description">Ne correspond pas à la description</option>
-                                        <option value="Changement d'avis">Changement d'avis</option>
-                                        <option value="Erreur de commande">Erreur de commande</option>
-                                        <option value="Autre">Autre</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" name="submit" class="btn btn-success" id="submitBtn">
-                                    <i class="icon-ok"></i> Enregistrer le retour
-                                </button>
-                                <button type="reset" class="btn btn-warning" onclick="resetForm()">
-                                    <i class="icon-refresh"></i> Réinitialiser
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            
+            <div class="form-group">
+                <label for="quantity">Quantité <span class="required">*</span></label>
+                <input type="number" id="quantity" name="quantity" min="1" value="1" required>
+                <div class="help-text">Maximum basé sur la quantité disponible pour retour</div>
             </div>
-        </div>
-
-        <hr>
-
-        <!-- =========== LISTE DES RETOURS RÉCENTS =========== -->
-        <div class="row-fluid">
-            <div class="span12">
-                <div class="widget-box">
-                    <div class="widget-title">
-                        <span class="icon"><i class="icon-th"></i></span>
-                        <h5>Retours récents</h5>
-                    </div>
-                    <div class="widget-content nopadding">
-                        <table class="table table-bordered table-striped data-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Numéro de facture</th>
-                                    <th>Date de retour</th>
-                                    <th>Produit</th>
-                                    <th>Quantité</th>
-                                    <th>Prix unitaire</th>
-                                    <th>Total</th>
-                                    <th>Raison</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $sqlReturns = "
-                                    SELECT r.ID as returnID,
-                                           r.BillingNumber,
-                                           r.ReturnDate,
-                                           r.Quantity,
-                                           r.Reason,
-                                           r.ReturnPrice,
-                                           r.CreatedAt,
-                                           p.ProductName
-                                    FROM tblreturns r
-                                    LEFT JOIN tblproducts p ON p.ID = r.ProductID
-                                    ORDER BY r.ID DESC
-                                    LIMIT 50
-                                ";
-                                $returnsQuery = mysqli_query($con, $sqlReturns);
-                                $cnt = 1;
-                                
-                                if (mysqli_num_rows($returnsQuery) > 0) {
-                                    while ($row = mysqli_fetch_assoc($returnsQuery)) {
-                                        $totalPrice = $row['ReturnPrice'] * $row['Quantity'];
-                                        ?>
-                                        <tr>
-                                            <td><?php echo $cnt; ?></td>
-                                            <td><?php echo htmlspecialchars($row['BillingNumber']); ?></td>
-                                            <td><?php echo date('d/m/Y', strtotime($row['ReturnDate'])); ?></td>
-                                            <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                                            <td><?php echo $row['Quantity']; ?></td>
-                                            <td><?php echo number_format($row['ReturnPrice'], 2); ?> GNF</td>
-                                            <td><?php echo number_format($totalPrice, 2); ?> GNF</td>
-                                            <td><?php echo htmlspecialchars($row['Reason'] ?: 'Non spécifiée'); ?></td>
-                                            <td>
-                                                <a href="view-return.php?id=<?php echo $row['returnID']; ?>" 
-                                                   class="btn btn-mini btn-info" title="Voir détails">
-                                                    <i class="icon-eye-open"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        <?php
-                                        $cnt++;
-                                    }
-                                } else {
-                                    echo '<tr><td colspan="9" class="text-center">Aucun retour trouvé</td></tr>';
-                                }
-                                ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            
+            <div class="form-group">
+                <label for="price">Prix de retour <span class="required">*</span></label>
+                <input type="number" id="price" name="price" step="0.01" min="0" value="0" required>
+                <div class="help-text">Prix maximum basé sur le prix de vente original</div>
             </div>
-        </div>
+            
+            <div class="form-group">
+                <label for="reason">Raison</label>
+                <select id="reason" name="reason">
+                    <option value="">-- Sélectionner une raison --</option>
+                    <option value="Défaut produit">Défaut produit</option>
+                    <option value="Mauvaise taille">Mauvaise taille</option>
+                    <option value="Ne correspond pas à la description">Ne correspond pas à la description</option>
+                    <option value="Changement d'avis">Changement d'avis</option>
+                    <option value="Erreur de commande">Erreur de commande</option>
+                    <option value="Autre">Autre</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" name="submit" class="btn btn-success" id="submitBtn">
+                    ✅ Enregistrer le retour
+                </button>
+                <button type="reset" class="btn btn-warning" onclick="resetForm()">
+                    🔄 Réinitialiser
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Debug console -->
+    <div class="form-section">
+        <h3>🐛 Console de Debug</h3>
+        <div id="debug-console" class="debug-console"></div>
+        <button class="btn btn-primary" onclick="clearDebugConsole()">Effacer Console</button>
+        <button class="btn btn-primary" onclick="testSystem()">Test Système</button>
+    </div>
+    
+    <!-- Liste des retours récents -->
+    <div class="table-section">
+        <h2>📋 Retours récents</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Numéro de facture</th>
+                    <th>Date de retour</th>
+                    <th>Produit</th>
+                    <th>Quantité</th>
+                    <th>Prix unitaire</th>
+                    <th>Total</th>
+                    <th>Raison</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $sqlReturns = "
+                    SELECT r.ID as returnID,
+                           r.BillingNumber,
+                           r.ReturnDate,
+                           r.Quantity,
+                           r.Reason,
+                           r.ReturnPrice,
+                           r.CreatedAt,
+                           p.ProductName
+                    FROM tblreturns r
+                    LEFT JOIN tblproducts p ON p.ID = r.ProductID
+                    ORDER BY r.ID DESC
+                    LIMIT 20
+                ";
+                $returnsQuery = mysqli_query($con, $sqlReturns);
+                $cnt = 1;
+                
+                if (mysqli_num_rows($returnsQuery) > 0) {
+                    while ($row = mysqli_fetch_assoc($returnsQuery)) {
+                        $totalPrice = $row['ReturnPrice'] * $row['Quantity'];
+                        ?>
+                        <tr>
+                            <td><?php echo $cnt; ?></td>
+                            <td><?php echo htmlspecialchars($row['BillingNumber']); ?></td>
+                            <td><?php echo date('d/m/Y', strtotime($row['ReturnDate'])); ?></td>
+                            <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
+                            <td><?php echo $row['Quantity']; ?></td>
+                            <td><?php echo number_format($row['ReturnPrice'], 2); ?> GNF</td>
+                            <td><?php echo number_format($totalPrice, 2); ?> GNF</td>
+                            <td><?php echo htmlspecialchars($row['Reason'] ?: 'Non spécifiée'); ?></td>
+                        </tr>
+                        <?php
+                        $cnt++;
+                    }
+                } else {
+                    echo '<tr><td colspan="8" style="text-align: center;">Aucun retour trouvé</td></tr>';
+                }
+                ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
-<?php include_once('includes/footer.php'); ?>
-
-<!-- Scripts JavaScript -->
-<script src="js/jquery.ui.custom.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.uniform.js"></script>
-<script src="js/select2.min.js"></script>
-<script src="js/jquery.dataTables.min.js"></script>
-<script src="js/matrix.js"></script>
-<script src="js/matrix.tables.js"></script>
 <script>
-$(document).ready(function() {
-    $('#billingnumber').on('input', function() {
-        const billNum = $(this).val().trim();
-        if (billNum.length >= 3) {
-            $.post('ajax/validate-billing.php', {billingnumber: billNum}, function(data) {
-                if (data.valid) {
-                    $('#productid').html(data.productOptions).prop('disabled', false);
-                    $('#billing-info').html(data.customerInfo).show();
-                }
-            }, 'json');
+// Variables globales
+let currentBillingData = null;
+let currentProductData = null;
+let validationTimeout = null;
+
+// Console de debug
+function addDebugLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📝';
+    const logEntry = `[${timestamp}] ${prefix} ${message}\n`;
+    
+    $('#debug-console').append(logEntry);
+    $('#debug-console').scrollTop($('#debug-console')[0].scrollHeight);
+    console.log(logEntry);
+}
+
+function clearDebugConsole() {
+    $('#debug-console').empty();
+}
+
+// ========================================
+// Fonctions principales
+// ========================================
+
+function validateBilling() {
+    const billNum = $('#billingnumber').val().trim();
+    
+    addDebugLog(`validateBilling appelée avec: ${billNum}`);
+    
+    if (billNum.length === 0) {
+        resetBillingValidation();
+        return;
+    }
+    
+    if (billNum.length < 3) {
+        showBillingMessage('Numéro de facture trop court (minimum 3 caractères)', 'warning');
+        return;
+    }
+    
+    showBillingMessage('<div class="spinner"></div> Vérification de la facture en cours...', 'info');
+    $('#productid').prop('disabled', true).html('<option value="">-- Validation en cours --</option>');
+    
+    addDebugLog('Envoi requête AJAX vers validate-billing-simple.php');
+    
+    $.ajax({
+        url: 'ajax/validate-billing-simple.php',
+        type: 'POST',
+        data: { billingnumber: billNum },
+        timeout: 15000,
+        dataType: 'json',
+        success: function(response) {
+            addDebugLog(`Réponse AJAX reçue: ${JSON.stringify(response)}`, 'success');
+            
+            if (response.valid) {
+                addDebugLog('Validation réussie', 'success');
+                currentBillingData = response;
+                showBillingMessage(response.customerInfo, 'success');
+                updateProductDropdown(response.productOptions);
+            } else {
+                addDebugLog(`Validation échouée: ${response.message}`, 'error');
+                showBillingMessage(response.message, 'error');
+                resetProductSelection();
+            }
+        },
+        error: function(xhr, status, error) {
+            addDebugLog(`Erreur AJAX: ${status} - ${error}`, 'error');
+            
+            let errorMessage = 'Erreur de connexion: ' + status;
+            if (xhr.status === 404) {
+                errorMessage = 'Fichier AJAX non trouvé. Créez ajax/validate-billing-simple.php';
+            }
+            
+            showBillingMessage(errorMessage, 'error');
+            resetProductSelection();
+        }
+    });
+}
+
+function loadProductDetails() {
+    const productId = $('#productid').val();
+    const billNum = $('#billingnumber').val().trim();
+    
+    addDebugLog(`loadProductDetails appelée avec: produit=${productId}, facture=${billNum}`);
+    
+    if (!productId || !billNum) {
+        addDebugLog('Paramètres manquants pour loadProductDetails', 'warning');
+        resetProductDetails();
+        return;
+    }
+    
+    $('#product-details').html('<div class="spinner"></div> Chargement des détails...')
+                         .removeClass('alert-success alert-error')
+                         .addClass('alert-info')
+                         .show();
+    
+    addDebugLog('Envoi requête AJAX vers get-product-details-simple.php');
+    
+    $.ajax({
+        url: 'ajax/get-product-details-simple.php',
+        type: 'POST',
+        data: {
+            productid: productId,
+            billingnumber: billNum
+        },
+        timeout: 15000,
+        dataType: 'json',
+        success: function(response) {
+            addDebugLog(`Détails produit reçus: ${JSON.stringify(response)}`, 'success');
+            
+            if (response.success) {
+                addDebugLog('Détails chargés avec succès', 'success');
+                currentProductData = response.data;
+                $('#product-details').html(response.details)
+                                     .removeClass('alert-error alert-info')
+                                     .addClass('alert-success');
+                
+                updateFormConstraints(response.data);
+                toggleSubmitButton(response.data.canReturn);
+            } else {
+                addDebugLog(`Erreur détails: ${response.message}`, 'error');
+                $('#product-details').html('<strong>Erreur:</strong> ' + response.message)
+                                     .removeClass('alert-success alert-info')
+                                     .addClass('alert-error');
+            }
+        },
+        error: function(xhr, status, error) {
+            addDebugLog(`Erreur AJAX détails: ${status} - ${error}`, 'error');
+            
+            let errorMessage = 'Impossible de charger les détails du produit: ' + status;
+            if (xhr.status === 404) {
+                errorMessage = 'Fichier AJAX non trouvé. Créez ajax/get-product-details-simple.php';
+            }
+            
+            $('#product-details').html('<strong>Erreur:</strong> ' + errorMessage)
+                                 .removeClass('alert-success alert-info')
+                                 .addClass('alert-error');
+        }
+    });
+}
+
+function showBillingMessage(message, type) {
+    const $billingInfo = $('#billing-info');
+    $billingInfo.removeClass('alert-success alert-error alert-warning alert-info');
+    
+    switch (type) {
+        case 'success': $billingInfo.addClass('alert-success'); break;
+        case 'error': $billingInfo.addClass('alert-error'); break;
+        case 'warning': $billingInfo.addClass('alert-warning'); break;
+        default: $billingInfo.addClass('alert-info'); break;
+    }
+    
+    $billingInfo.html(message).show();
+}
+
+function updateProductDropdown(productOptions) {
+    addDebugLog('Mise à jour dropdown produits');
+    const $productSelect = $('#productid');
+    $productSelect.html(productOptions).prop('disabled', false);
+    
+    const returnableCount = $productSelect.find('option:not([disabled])').length - 1;
+    addDebugLog(`Produits retournables: ${returnableCount}`, returnableCount > 0 ? 'success' : 'warning');
+    
+    resetProductDetails();
+}
+
+function updateFormConstraints(productData) {
+    const $quantity = $('#quantity');
+    const $price = $('#price');
+    
+    $quantity.attr('max', productData.maxReturn).val(Math.min(1, productData.maxReturn));
+    $price.attr('max', productData.originalPrice).val(productData.originalPrice);
+    
+    if (productData.maxReturn <= 0) {
+        $quantity.prop('disabled', true);
+        $price.prop('disabled', true);
+    } else {
+        $quantity.prop('disabled', false);
+        $price.prop('disabled', false);
+    }
+    
+    addDebugLog(`Contraintes formulaire mises à jour: max_qty=${productData.maxReturn}, max_price=${productData.originalPrice}`);
+}
+
+function toggleSubmitButton(canReturn) {
+    const $submitBtn = $('#submitBtn');
+    
+    if (canReturn) {
+        $submitBtn.prop('disabled', false)
+                  .removeClass('btn-warning')
+                  .addClass('btn-success')
+                  .html('✅ Enregistrer le retour');
+    } else {
+        $submitBtn.prop('disabled', true)
+                  .removeClass('btn-success')
+                  .addClass('btn-warning')
+                  .html('🚫 Retour impossible');
+    }
+    
+    addDebugLog(`Bouton submit ${canReturn ? 'activé' : 'désactivé'}`);
+}
+
+function resetBillingValidation() {
+    currentBillingData = null;
+    $('#billing-info').hide();
+    resetProductSelection();
+}
+
+function resetProductSelection() {
+    $('#productid').prop('disabled', true)
+                   .html('<option value="">-- Entrez d\'abord le numéro de facture --</option>');
+    resetProductDetails();
+}
+
+function resetProductDetails() {
+    currentProductData = null;
+    $('#product-details').hide();
+    $('#quantity').val(1).removeAttr('max').prop('disabled', false);
+    $('#price').val(0).removeAttr('max').prop('disabled', false);
+    toggleSubmitButton(true);
+}
+
+function resetForm() {
+    resetBillingValidation();
+    $('#billingnumber').val('').focus();
+    $('#returnForm')[0].reset();
+    addDebugLog('Formulaire réinitialisé');
+}
+
+function testSystem() {
+    addDebugLog('🧪 Test du système démarré');
+    
+    // Test jQuery
+    if (typeof $ !== 'undefined') {
+        addDebugLog('✅ jQuery disponible, version: ' + $.fn.jquery, 'success');
+    } else {
+        addDebugLog('❌ jQuery non disponible', 'error');
+        return;
+    }
+    
+    // Test éléments DOM
+    const elements = ['#billingnumber', '#productid', '#billing-info', '#product-details'];
+    elements.forEach(function(selector) {
+        if ($(selector).length > 0) {
+            addDebugLog(`✅ Élément trouvé: ${selector}`, 'success');
+        } else {
+            addDebugLog(`❌ Élément manquant: ${selector}`, 'error');
         }
     });
     
-    $('#productid').on('change', function() {
-        const productId = $(this).val();
-        const billNum = $('#billingnumber').val();
-        if (productId && billNum) {
-            $.post('ajax/get-product-details.php', {
-                productid: productId, 
-                billingnumber: billNum
-            }, function(data) {
-                if (data.success) {
-                    $('#product-details').html(data.details).show();
-                }
-            }, 'json');
+    // Test accès fichiers AJAX
+    $.ajax({
+        url: 'ajax/validate-billing-simple.php',
+        type: 'HEAD',
+        success: function() {
+            addDebugLog('✅ ajax/validate-billing-simple.php accessible', 'success');
+        },
+        error: function() {
+            addDebugLog('❌ ajax/validate-billing-simple.php NON accessible', 'error');
         }
     });
+    
+    $.ajax({
+        url: 'ajax/get-product-details-simple.php',
+        type: 'HEAD',
+        success: function() {
+            addDebugLog('✅ ajax/get-product-details-simple.php accessible', 'success');
+        },
+        error: function() {
+            addDebugLog('❌ ajax/get-product-details-simple.php NON accessible', 'error');
+        }
+    });
+}
+
+// ========================================
+// Initialisation
+// ========================================
+$(document).ready(function() {
+    addDebugLog('🚀 Initialisation du système de retours');
+    
+    // Test système initial
+    testSystem();
+    
+    // Événements
+    $('#billingnumber').on('input', function() {
+        const value = $(this).val().trim();
+        addDebugLog(`Saisie facture: ${value}`);
+        
+        if (validationTimeout) {
+            clearTimeout(validationTimeout);
+        }
+        
+        if (value.length === 0) {
+            resetBillingValidation();
+            return;
+        }
+        
+        validationTimeout = setTimeout(() => {
+            if (value.length >= 3) {
+                addDebugLog('Déclenchement validation automatique');
+                validateBilling();
+            }
+        }, 800);
+    });
+    
+    $('#productid').on('change', function() {
+        const selectedValue = $(this).val();
+        const selectedText = $(this).find('option:selected').text();
+        addDebugLog(`Sélection produit changée: ${selectedValue} - ${selectedText}`);
+        
+        if (selectedValue) {
+            loadProductDetails();
+        } else {
+            resetProductDetails();
+        }
+    });
+    
+    // Focus initial
+    $('#billingnumber').focus();
+    
+    addDebugLog('🎉 Initialisation terminée');
 });
 </script>
 
