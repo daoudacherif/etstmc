@@ -1,7 +1,11 @@
 <?php
 // ============== PAGE return.php COMPLÈTE ET AMÉLIORÉE ==============
 session_start();
-error_reporting(0);
+
+// Affiche toutes les erreurs (à désactiver en production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
 // Vérification de la session admin
@@ -1275,9 +1279,11 @@ include('../includes/dbconnection.php');
 
 header('Content-Type: application/json; charset=utf-8');
 
-function jsonResponse($data) {
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
+if (!function_exists('jsonResponse')) {
+    function jsonResponse($data) {
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
 
 if (!isset($_SESSION['imsaid']) || strlen($_SESSION['imsaid']) == 0) {
