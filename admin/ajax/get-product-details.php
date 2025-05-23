@@ -1,5 +1,5 @@
 <?php
-// File: ajax/get-product-details.php - VERSION SÉCURISÉE ET AMÉLIORÉE
+// File: ajax/get-product-details.php - VERSION CORRIGÉE BASÉE SUR invoice-search.php
 session_start();
 include('../includes/dbconnection.php');
 
@@ -48,21 +48,46 @@ if (empty($billingNumber)) {
 
 try {
     // ========================================
-    // 1. Récupérer les détails du produit et de la vente originale
+    // 1. Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
+    // ========================================
+    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+    $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
+    
+    $creditItems = 0;
+    $regularItems = 0;
+    
+    if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+        $creditItems = $rowCredit['count'];
+    }
+    
+    if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+        $regularItems = $rowRegular['count'];
+    }
+    
+    // Déterminer quelle table utiliser
+    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+    $saleType = ($creditItems > 0) ? 'Vente à Terme' : 'Vente Cash';
+    
+    // ========================================
+    // 2. Récupérer les détails du produit et de la vente originale
     // ========================================
     $stmt = $con->prepare("
         SELECT 
             p.ProductName,
             p.CompanyName,
+            p.ModelNumber,
             p.Stock as CurrentStock,
-            c.ProductQty as OriginalQty,
-            c.Price as OriginalPrice,
+            cart.ProductQty as OriginalQty,
+            COALESCE(cart.Price, p.Price) as OriginalPrice,
             cust.CustomerName,
-            cust.PostingDate as SaleDate
-        FROM tblcart c
-        INNER JOIN tblproducts p ON p.ID = c.ProductId
-        INNER JOIN tblcustomer cust ON cust.BillingNumber = c.BillingId
-        WHERE c.BillingId = ? AND c.ProductId = ? AND c.IsCheckOut = 1
+            cust.BillingDate as SaleDate,
+            cust.ModeofPayment,
+            cust.Dues,
+            cust.Paid
+        FROM {$useTable} cart
+        INNER JOIN tblproducts p ON p.ID = cart.ProductId
+        INNER JOIN tblcustomer cust ON cust.BillingNumber = cart.BillingId
+        WHERE cart.BillingId = ? AND cart.ProductId = ?
         LIMIT 1
     ");
     
@@ -74,7 +99,12 @@ try {
         $stmt->close();
         jsonResponse([
             'success' => false,
-            'message' => 'Ce produit n\'a pas été vendu dans cette facture ou la facture n\'existe pas.'
+            'message' => "Ce produit n'a pas été vendu dans cette facture (vérification dans {$useTable}).",
+            'debug' => [
+                'useTable' => $useTable,
+                'creditItems' => $creditItems,
+                'regularItems' => $regularItems
+            ]
         ]);
     }
     
@@ -82,7 +112,7 @@ try {
     $stmt->close();
     
     // ========================================
-    // 2. Calculer les quantités déjà retournées
+    // 3. Calculer les quantités déjà retournées
     // ========================================
     $stmt2 = $con->prepare("
         SELECT 
@@ -100,7 +130,7 @@ try {
     $stmt2->close();
     
     // ========================================
-    // 3. Calculer les quantités disponibles
+    // 4. Calculer les quantités disponibles
     // ========================================
     $originalQty = intval($saleData['OriginalQty']);
     $alreadyReturned = intval($returnData['TotalReturned']);
@@ -108,10 +138,14 @@ try {
     $originalPrice = floatval($saleData['OriginalPrice']);
     
     // ========================================
-    // 4. Construire l'affichage des détails
+    // 5. Construire l'affichage des détails
     // ========================================
     $badgeClass = $availableToReturn > 0 ? 'badge-success' : 'badge-important';
     $statusText = $availableToReturn > 0 ? 'Disponible' : 'Épuisé';
+    
+    // Déterminer si c'est une vente à crédit
+    $isCredit = ($saleData['Dues'] > 0 || $saleData['ModeofPayment'] == 'credit');
+    $creditInfo = $isCredit ? ' (Vente à Crédit)' : ' (Vente Cash)';
     
     $details = "
         <div style='padding: 10px; border-left: 4px solid #2c5aa0;'>
@@ -120,6 +154,7 @@ try {
             <div class='row-fluid'>
                 <div class='span6'>
                     <strong>📦 Marque:</strong> " . htmlspecialchars($saleData['CompanyName'] ?: 'Non spécifiée') . "<br>
+                    <strong>🔖 Référence:</strong> " . htmlspecialchars($saleData['ModelNumber'] ?: 'Non spécifiée') . "<br>
                     <strong>👤 Client:</strong> " . htmlspecialchars($saleData['CustomerName']) . "<br>
                     <strong>📅 Date de vente:</strong> " . date('d/m/Y', strtotime($saleData['SaleDate'])) . "<br>
                     <strong>💰 Prix unitaire:</strong> " . number_format($originalPrice, 2) . " GNF
@@ -128,7 +163,8 @@ try {
                     <strong>📊 Vendu:</strong> <span class='badge badge-info'>{$originalQty}</span><br>
                     <strong>↩️ Retourné:</strong> <span class='badge badge-warning'>{$alreadyReturned}</span><br>
                     <strong>✅ Disponible:</strong> <span class='badge {$badgeClass}'>{$availableToReturn}</span><br>
-                    <strong>📦 Stock actuel:</strong> <span class='badge'>" . intval($saleData['CurrentStock']) . "</span>
+                    <strong>📦 Stock actuel:</strong> <span class='badge'>" . intval($saleData['CurrentStock']) . "</span><br>
+                    <strong>💳 Type:</strong> {$saleType}
                 </div>
             </div>";
     
@@ -143,10 +179,22 @@ try {
             </div>";
     }
     
+    // Informations sur la vente à crédit si applicable
+    if ($isCredit) {
+        $details .= "
+            <div style='margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 3px; border: 1px solid #ffeeba;'>
+                <small>
+                    <strong>💳 Vente à Crédit:</strong> 
+                    Payé: " . number_format($saleData['Paid'], 2) . " GNF | 
+                    Reste dû: " . number_format($saleData['Dues'], 2) . " GNF
+                </small>
+            </div>";
+    }
+    
     $details .= "</div>";
     
     // ========================================
-    // 5. Vérifications et messages d'alerte
+    // 6. Vérifications et messages d'alerte
     // ========================================
     $warnings = [];
     
@@ -164,13 +212,18 @@ try {
         $warnings[] = "⏰ Vente ancienne (" . round($saleAge) . " jours). Vérifiez la politique de retour.";
     }
     
+    // Alerte pour vente à crédit avec solde
+    if ($isCredit && $saleData['Dues'] > 0) {
+        $warnings[] = "💳 Attention: Vente à crédit avec solde restant. Vérifiez les conditions de retour.";
+    }
+    
     if (!empty($warnings)) {
         $details .= "<div class='alert alert-warning' style='margin-top: 10px;'>" 
                  . implode("<br>", $warnings) . "</div>";
     }
     
     // ========================================
-    // 6. Retourner la réponse JSON
+    // 7. Retourner la réponse JSON
     // ========================================
     jsonResponse([
         'success' => true,
@@ -184,7 +237,12 @@ try {
             'currentStock' => intval($saleData['CurrentStock']),
             'saleDate' => $saleData['SaleDate'],
             'customerName' => $saleData['CustomerName'],
-            'canReturn' => $availableToReturn > 0
+            'canReturn' => $availableToReturn > 0,
+            'saleType' => $saleType,
+            'useTable' => $useTable,
+            'isCredit' => $isCredit,
+            'modelNumber' => $saleData['ModelNumber'],
+            'companyName' => $saleData['CompanyName']
         ]
     ]);
     
@@ -194,7 +252,8 @@ try {
     
     jsonResponse([
         'success' => false,
-        'message' => 'Erreur interne du serveur. Veuillez réessayer.'
+        'message' => 'Erreur interne du serveur. Veuillez réessayer.',
+        'debug' => $e->getMessage()
     ]);
 }
 

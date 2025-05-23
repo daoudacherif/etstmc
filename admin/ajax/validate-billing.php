@@ -1,5 +1,5 @@
 <?php
-// File: ajax/validate-billing.php - VERSION SÉCURISÉE ET AMÉLIORÉE
+// File: ajax/validate-billing.php - VERSION CORRIGÉE BASÉE SUR invoice-search.php
 session_start();
 include('../includes/dbconnection.php');
 
@@ -49,19 +49,26 @@ if (strlen($billingNumber) < 3 || strlen($billingNumber) > 50) {
 
 try {
     // ========================================
-    // 1. Vérifier l'existence de la facture et récupérer les infos client
+    // 1. Vérifier l'existence de la facture - MÊME LOGIQUE QUE invoice-search.php
     // ========================================
-    $stmt = $con->prepare("
-        SELECT 
-            CustomerName,
-            MobileNumber,
-            BillingNumber,
-            PostingDate,
-            ID as CustomerID
-        FROM tblcustomer 
-        WHERE BillingNumber = ?
-        LIMIT 1
-    ");
+    $stmt = $con->prepare("SELECT DISTINCT 
+                          tblcustomer.CustomerName,
+                          tblcustomer.MobileNumber,
+                          tblcustomer.ModeofPayment,
+                          tblcustomer.BillingDate,
+                          tblcustomer.BillingNumber,
+                          tblcustomer.FinalAmount,
+                          tblcustomer.Paid,
+                          tblcustomer.Dues
+                        FROM 
+                          tblcustomer
+                        LEFT JOIN 
+                          tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
+                        LEFT JOIN 
+                          tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
+                        WHERE 
+                          tblcustomer.BillingNumber = ?
+                        LIMIT 1");
     
     $stmt->bind_param("s", $billingNumber);
     $stmt->execute();
@@ -79,21 +86,42 @@ try {
     $stmt->close();
     
     // ========================================
-    // 2. Récupérer les produits vendus et calculer le montant total
+    // 2. Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
+    // ========================================
+    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+    $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
+    
+    $creditItems = 0;
+    $regularItems = 0;
+    
+    if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+        $creditItems = $rowCredit['count'];
+    }
+    
+    if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+        $regularItems = $rowRegular['count'];
+    }
+    
+    // Déterminer quelle table utiliser
+    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+    $saleType = ($creditItems > 0) ? 'Vente à Terme' : 'Vente Cash';
+    
+    // ========================================
+    // 3. Récupérer les produits selon la table appropriée
     // ========================================
     $stmt2 = $con->prepare("
         SELECT 
-            c.ProductId,
-            c.ProductQty,
-            c.Price,
+            p.ID as ProductId,
             p.ProductName,
             p.CompanyName,
+            p.ModelNumber,
             p.Stock as CurrentStock,
-            (c.ProductQty * c.Price) as LineTotal,
+            cart.ProductQty,
+            COALESCE(cart.Price, p.Price) as Price,
             COALESCE(r.returned_qty, 0) as ReturnedQty,
-            (c.ProductQty - COALESCE(r.returned_qty, 0)) as AvailableReturn
-        FROM tblcart c
-        INNER JOIN tblproducts p ON p.ID = c.ProductId
+            (cart.ProductQty - COALESCE(r.returned_qty, 0)) as AvailableReturn
+        FROM {$useTable} cart
+        INNER JOIN tblproducts p ON cart.ProductId = p.ID
         LEFT JOIN (
             SELECT 
                 ProductID, 
@@ -101,8 +129,8 @@ try {
             FROM tblreturns 
             WHERE BillingNumber = ? 
             GROUP BY ProductID
-        ) r ON r.ProductID = c.ProductId
-        WHERE c.BillingId = ? AND c.IsCheckOut = 1
+        ) r ON r.ProductID = cart.ProductId
+        WHERE cart.BillingId = ?
         ORDER BY p.ProductName ASC
     ");
     
@@ -111,7 +139,7 @@ try {
     $productsResult = $stmt2->get_result();
     
     // ========================================
-    // 3. Construire les options de produits et calculer les totaux
+    // 4. Construire les options de produits
     // ========================================
     $productOptions = '<option value="">-- Sélectionner un produit --</option>';
     $totalSaleAmount = 0;
@@ -120,32 +148,38 @@ try {
     
     if ($productsResult->num_rows > 0) {
         while ($product = $productsResult->fetch_assoc()) {
-            $totalSaleAmount += $product['LineTotal'];
+            $lineTotal = $product['ProductQty'] * $product['Price'];
+            $totalSaleAmount += $lineTotal;
             $totalProductCount++;
             
             $productName = htmlspecialchars($product['ProductName']);
             $brandInfo = $product['CompanyName'] ? ' - ' . htmlspecialchars($product['CompanyName']) : '';
+            $modelInfo = $product['ModelNumber'] ? ' (Ref: ' . htmlspecialchars($product['ModelNumber']) . ')' : '';
             $availableReturn = intval($product['AvailableReturn']);
             
             if ($availableReturn > 0) {
                 $returnableProductCount++;
                 $statusBadge = '✅';
                 $statusText = "Retournable: {$availableReturn}";
+                $disabled = '';
+                $style = '';
             } else {
                 $statusBadge = '❌';
                 $statusText = "Entièrement retourné";
+                $disabled = 'disabled';
+                $style = 'style="color: #999;"';
             }
             
-            $optionText = "{$statusBadge} {$productName}{$brandInfo} | " .
+            $optionText = "{$statusBadge} {$productName}{$brandInfo}{$modelInfo} | " .
                          "Vendu: {$product['ProductQty']} | " .
                          "Prix: " . number_format($product['Price'], 2) . " GNF | " .
                          $statusText;
             
-            // Ajouter l'option même si non retournable (pour information)
             $productOptions .= sprintf(
-                '<option value="%d" %s data-original-qty="%d" data-returned-qty="%d" data-available="%d" data-price="%.2f">%s</option>',
+                '<option value="%d" %s %s data-original-qty="%d" data-returned-qty="%d" data-available="%d" data-price="%.2f">%s</option>',
                 $product['ProductId'],
-                $availableReturn <= 0 ? 'disabled style="color: #999;"' : '',
+                $disabled,
+                $style,
                 $product['ProductQty'],
                 $product['ReturnedQty'],
                 $availableReturn,
@@ -158,10 +192,13 @@ try {
     $stmt2->close();
     
     // ========================================
-    // 4. Construire l'affichage des informations client
+    // 5. Construire l'affichage des informations client
     // ========================================
-    $saleDate = date('d/m/Y à H:i', strtotime($customer['PostingDate']));
-    $daysSinceSale = round((time() - strtotime($customer['PostingDate'])) / (24 * 3600));
+    $saleDate = date('d/m/Y à H:i', strtotime($customer['BillingDate']));
+    $daysSinceSale = round((time() - strtotime($customer['BillingDate'])) / (24 * 3600));
+    
+    // Déterminer si c'est une facture à terme
+    $isCredit = ($customer['Dues'] > 0 || $customer['ModeofPayment'] == 'credit');
     
     $customerInfo = "
         <div style='padding: 12px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #28a745;'>
@@ -173,23 +210,33 @@ try {
                 <div class='span6'>
                     <strong>👤 Client:</strong> " . htmlspecialchars($customer['CustomerName']) . "<br>
                     <strong>📞 Téléphone:</strong> " . htmlspecialchars($customer['MobileNumber']) . "<br>
-                    <strong>🧾 N° Facture:</strong> " . htmlspecialchars($customer['BillingNumber']) . "
+                    <strong>🧾 N° Facture:</strong> " . htmlspecialchars($customer['BillingNumber']) . "<br>
+                    <strong>💳 Type:</strong> {$saleType}
                 </div>
                 <div class='span6'>
                     <strong>📅 Date de vente:</strong> {$saleDate}<br>
                     <strong>⏰ Ancienneté:</strong> {$daysSinceSale} jour(s)<br>
-                    <strong>💰 Montant total:</strong> " . number_format($totalSaleAmount, 2) . " GNF
+                    <strong>💰 Montant total:</strong> " . number_format($customer['FinalAmount'] ?: $totalSaleAmount, 2) . " GNF";
+    
+    // Ajouter les informations de crédit si applicable
+    if ($isCredit) {
+        $customerInfo .= "<br><strong>💵 Payé:</strong> " . number_format($customer['Paid'], 2) . " GNF";
+        $customerInfo .= "<br><strong>🔴 Reste dû:</strong> " . number_format($customer['Dues'], 2) . " GNF";
+    }
+    
+    $customerInfo .= "
                 </div>
             </div>
             
             <div style='margin-top: 10px; padding: 8px; background: white; border-radius: 3px;'>
                 <strong>📊 Résumé:</strong> 
                 {$totalProductCount} produit(s) vendus • 
-                {$returnableProductCount} produit(s) retournable(s)
+                {$returnableProductCount} produit(s) retournable(s) • 
+                Table utilisée: {$useTable}
             </div>";
     
     // ========================================
-    // 5. Ajouter des alertes si nécessaire
+    // 6. Ajouter des alertes si nécessaire
     // ========================================
     $alerts = [];
     
@@ -201,6 +248,11 @@ try {
     // Vérifier s'il y a des produits retournables
     if ($returnableProductCount == 0 && $totalProductCount > 0) {
         $alerts[] = "ℹ️ Tous les produits de cette facture ont déjà été retournés.";
+    }
+    
+    // Alerter pour les ventes à crédit avec dues
+    if ($isCredit && $customer['Dues'] > 0) {
+        $alerts[] = "💳 Vente à crédit avec un solde restant de " . number_format($customer['Dues'], 2) . " GNF.";
     }
     
     // Ajouter les alertes s'il y en a
@@ -215,18 +267,23 @@ try {
     $customerInfo .= "</div>";
     
     // ========================================
-    // 6. Gérer le cas où aucun produit n'est trouvé
+    // 7. Gérer le cas où aucun produit n'est trouvé
     // ========================================
     if ($productsResult->num_rows == 0) {
         jsonResponse([
             'valid' => false,
-            'message' => 'Aucun produit trouvé pour cette facture. Elle pourrait être une vente crédit ou incomplète.',
-            'customerInfo' => $customerInfo
+            'message' => 'Aucun produit trouvé pour cette facture dans les tables tblcart et tblcreditcart.',
+            'customerInfo' => $customerInfo,
+            'debug' => [
+                'creditItems' => $creditItems,
+                'regularItems' => $regularItems,
+                'useTable' => $useTable
+            ]
         ]);
     }
     
     // ========================================
-    // 7. Retourner la réponse de succès
+    // 8. Retourner la réponse de succès
     // ========================================
     jsonResponse([
         'valid' => true,
@@ -235,19 +292,23 @@ try {
         'statistics' => [
             'totalProducts' => $totalProductCount,
             'returnableProducts' => $returnableProductCount,
-            'totalAmount' => $totalSaleAmount,
+            'totalAmount' => $customer['FinalAmount'] ?: $totalSaleAmount,
             'daysSinceSale' => $daysSinceSale,
-            'customerName' => $customer['CustomerName']
+            'customerName' => $customer['CustomerName'],
+            'saleType' => $saleType,
+            'useTable' => $useTable,
+            'isCredit' => $isCredit
         ]
     ]);
     
 } catch (Exception $e) {
-    // Log l'erreur pour debugging (adaptez selon votre système de logging)
+    // Log l'erreur pour debugging
     error_log("Erreur dans validate-billing.php: " . $e->getMessage() . " | Billing: " . $billingNumber);
     
     jsonResponse([
         'valid' => false,
-        'message' => 'Erreur interne du serveur. Veuillez réessayer ou contacter l\'administrateur.'
+        'message' => 'Erreur interne du serveur. Veuillez réessayer ou contacter l\'administrateur.',
+        'debug' => $e->getMessage()
     ]);
 }
 
