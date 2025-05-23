@@ -56,23 +56,53 @@ if (isset($_POST['submit'])) {
             }
             $stmt->close();
 
-            // Récupérer les détails de la vente originale
+            // Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
             if (empty($errors)) {
+                $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+                $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
+                
+                $creditItems = 0;
+                $regularItems = 0;
+                
+                if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+                    $creditItems = $rowCredit['count'];
+                }
+                
+                if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+                    $regularItems = $rowRegular['count'];
+                }
+                
+                // Déterminer quelle table utiliser
+                $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+                
+                // Récupérer les détails de la vente originale selon la table appropriée
                 $stmt = $con->prepare("
-                    SELECT ProductQty, Price 
-                    FROM tblcart 
-                    WHERE BillingId = ? AND ProductId = ? AND IsCheckOut = 1
+                    SELECT ProductQty, COALESCE(Price, 0) as Price 
+                    FROM {$useTable} 
+                    WHERE BillingId = ? AND ProductId = ?
                 ");
                 $stmt->bind_param("si", $billingNumber, $productID);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 
                 if ($result->num_rows == 0) {
-                    $errors[] = "Ce produit n'a pas été vendu dans cette facture.";
+                    $errors[] = "Ce produit n'a pas été vendu dans cette facture (table vérifiée: {$useTable}).";
                 } else {
                     $saleData = $result->fetch_assoc();
                     $originalQty = $saleData['ProductQty'];
                     $originalPrice = $saleData['Price'];
+                    
+                    // Si le prix n'est pas dans la table cart, récupérer depuis tblproducts
+                    if ($originalPrice == 0) {
+                        $priceStmt = $con->prepare("SELECT Price FROM tblproducts WHERE ID = ?");
+                        $priceStmt->bind_param("i", $productID);
+                        $priceStmt->execute();
+                        $priceResult = $priceStmt->get_result();
+                        if ($priceRow = $priceResult->fetch_assoc()) {
+                            $originalPrice = $priceRow['Price'];
+                        }
+                        $priceStmt->close();
+                    }
                     
                     // Vérifier les quantités déjà retournées
                     $stmt2 = $con->prepare("
@@ -90,7 +120,7 @@ if (isset($_POST['submit'])) {
                     
                     // Validation des quantités
                     if ($quantity > $availableToReturn) {
-                        $errors[] = "Quantité invalide. Vendu: $originalQty, Déjà retourné: $alreadyReturned, Maximum retournable: $availableToReturn";
+                        $errors[] = "Quantité invalide. Vendu: $originalQty, Déjà retourné: $alreadyReturned, Maximum retournable: $availableToReturn (Table: {$useTable})";
                     }
                     
                     // Validation du prix
