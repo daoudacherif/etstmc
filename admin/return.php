@@ -1,21 +1,403 @@
 <?php
-// ============================================
-// 1. MODIFICATIONS À AJOUTER DANS return.php
-// ============================================
+// ============== PAGE return.php COMPLÈTE ET AMÉLIORÉE ==============
+session_start();
+error_reporting(0);
+include('includes/dbconnection.php');
+
+// Vérification de la session admin
+if (strlen($_SESSION['imsaid']) == 0) {
+    header('location:logout.php');
+    exit;
+}
+
+// ==========================
+// Traitement du formulaire de retour avec VALIDATION SÉCURISÉE
+// ==========================
+if (isset($_POST['submit'])) {
+    // Nettoyage et validation des entrées
+    $billingNumber = trim($_POST['billingnumber']);
+    $productID     = intval($_POST['productid']);
+    $quantity      = intval($_POST['quantity']);
+    $returnPrice   = floatval($_POST['price']);
+    $returnDate    = $_POST['returndate'];
+    $reason        = trim($_POST['reason']);
+
+    // Tableau pour collecter les erreurs
+    $errors = [];
+
+    // Validation de base
+    if (empty($billingNumber)) {
+        $errors[] = "Le numéro de facture est requis.";
+    }
+    if ($productID <= 0) {
+        $errors[] = "Veuillez sélectionner un produit valide.";
+    }
+    if ($quantity <= 0) {
+        $errors[] = "La quantité doit être supérieure à zéro.";
+    }
+    if ($returnPrice < 0) {
+        $errors[] = "Le prix de retour ne peut pas être négatif.";
+    }
+    if (empty($returnDate)) {
+        $errors[] = "La date de retour est requise.";
+    }
+
+    // Validation avancée si pas d'erreurs de base
+    if (empty($errors)) {
+        try {
+            // Vérifier l'existence de la facture
+            $stmt = $con->prepare("SELECT ID FROM tblcustomer WHERE BillingNumber = ?");
+            $stmt->bind_param("s", $billingNumber);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows == 0) {
+                $errors[] = "Numéro de facture invalide. Cette facture n'existe pas.";
+            }
+            $stmt->close();
+
+            // Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
+            if (empty($errors)) {
+                $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+                $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
+                
+                $creditItems = 0;
+                $regularItems = 0;
+                
+                if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+                    $creditItems = $rowCredit['count'];
+                }
+                
+                if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+                    $regularItems = $rowRegular['count'];
+                }
+                
+                // Déterminer quelle table utiliser
+                $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+                
+                // Récupérer les détails de la vente originale selon la table appropriée
+                $stmt = $con->prepare("
+                    SELECT ProductQty, COALESCE(Price, 0) as Price 
+                    FROM {$useTable} 
+                    WHERE BillingId = ? AND ProductId = ?
+                ");
+                $stmt->bind_param("si", $billingNumber, $productID);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows == 0) {
+                    $errors[] = "Ce produit n'a pas été vendu dans cette facture (table vérifiée: {$useTable}).";
+                } else {
+                    $saleData = $result->fetch_assoc();
+                    $originalQty = $saleData['ProductQty'];
+                    $originalPrice = $saleData['Price'];
+                    
+                    // Si le prix n'est pas dans la table cart, récupérer depuis tblproducts
+                    if ($originalPrice == 0) {
+                        $priceStmt = $con->prepare("SELECT Price FROM tblproducts WHERE ID = ?");
+                        $priceStmt->bind_param("i", $productID);
+                        $priceStmt->execute();
+                        $priceResult = $priceStmt->get_result();
+                        if ($priceRow = $priceResult->fetch_assoc()) {
+                            $originalPrice = $priceRow['Price'];
+                        }
+                        $priceStmt->close();
+                    }
+                    
+                    // Vérifier les quantités déjà retournées
+                    $stmt2 = $con->prepare("
+                        SELECT COALESCE(SUM(Quantity), 0) as TotalReturned 
+                        FROM tblreturns 
+                        WHERE BillingNumber = ? AND ProductID = ?
+                    ");
+                    $stmt2->bind_param("si", $billingNumber, $productID);
+                    $stmt2->execute();
+                    $returnResult = $stmt2->get_result();
+                    $returnData = $returnResult->fetch_assoc();
+                    $alreadyReturned = $returnData['TotalReturned'];
+                    
+                    $availableToReturn = $originalQty - $alreadyReturned;
+                    
+                    // Validation des quantités
+                    if ($quantity > $availableToReturn) {
+                        $errors[] = "Quantité invalide. Vendu: $originalQty, Déjà retourné: $alreadyReturned, Maximum retournable: $availableToReturn (Table: {$useTable})";
+                    }
+                    
+                    // Validation du prix
+                    if ($returnPrice > $originalPrice) {
+                        $errors[] = "Le prix de retour ({$returnPrice}€) ne peut pas dépasser le prix de vente original ({$originalPrice}€).";
+                    }
+                    
+                    $stmt2->close();
+                }
+                $stmt->close();
+            }
+        } catch (Exception $e) {
+            $errors[] = "Erreur de validation: " . $e->getMessage();
+        }
+    }
+
+    // Traitement si aucune erreur
+    if (empty($errors)) {
+        try {
+            // Démarrer une transaction
+            mysqli_autocommit($con, FALSE);
+            
+            // Insérer le retour
+            $stmt = $con->prepare("
+                INSERT INTO tblreturns(BillingNumber, ReturnDate, ProductID, Quantity, Reason, ReturnPrice, CreatedAt) 
+                VALUES(?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->bind_param("ssiiss", $billingNumber, $returnDate, $productID, $quantity, $reason, $returnPrice);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Erreur lors de l'enregistrement du retour.");
+            }
+            
+            // Mettre à jour le stock
+            $stmt2 = $con->prepare("UPDATE tblproducts SET Stock = Stock + ? WHERE ID = ?");
+            $stmt2->bind_param("ii", $quantity, $productID);
+            
+            if (!$stmt2->execute()) {
+                throw new Exception("Erreur lors de la mise à jour du stock.");
+            }
+            
+            // Valider la transaction
+            mysqli_commit($con);
+            
+            $stmt->close();
+            $stmt2->close();
+            
+            echo "<script>
+                    alert('Retour enregistré avec succès!');
+                    window.location.href='return.php';
+                  </script>";
+            exit;
+            
+        } catch (Exception $e) {
+            // Annuler la transaction en cas d'erreur
+            mysqli_rollback($con);
+            $errors[] = $e->getMessage();
+        }
+        
+        // Réactiver l'autocommit
+        mysqli_autocommit($con, TRUE);
+    }
+    
+    // Afficher les erreurs s'il y en a
+    if (!empty($errors)) {
+        $errorMessage = implode("\\n", $errors);
+        echo "<script>alert('Erreurs de validation:\\n$errorMessage');</script>";
+    }
+}
+
+// ==========================
+// Récupération des statistiques du jour
+// ==========================
+$statsQuery = "SELECT 
+                COUNT(*) as total_returns,
+                SUM(Quantity) as total_quantity,
+                SUM(ReturnPrice * Quantity) as total_value
+               FROM tblreturns 
+               WHERE DATE(ReturnDate) = CURDATE()";
+$statsResult = mysqli_query($con, $statsQuery);
+$stats = mysqli_fetch_assoc($statsResult);
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-    <meta charset="utf-8">
-    <title>Gestion des Retours</title>
-    <!-- Vos liens CSS existants -->
-    <link href="css/bootstrap.css" rel="stylesheet">
-    <link href="css/style.css" rel="stylesheet">
+    <title>Gestion des stocks | Retours de Article</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- CSS personnalisé pour la vérification -->
+    <?php include_once('includes/cs.php'); ?>
+    <?php include_once('includes/responsive.php'); ?>
+    
+    <!-- jQuery et plugins -->
+    <script src="js/jquery.min.js"></script>
+    
+    <!-- Styles personnalisés pour les retours -->
     <style>
-        .input-group {
+        /* ==================== STYLES POUR LA GESTION DES RETOURS ==================== */
+        .stats-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #007bff, #28a745, #ffc107);
+        }
+
+        .stats-card h4 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .stats-card p {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+        #billing-info {
+            border-radius: 6px;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        #billing-info.alert-success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+
+        #billing-info.alert-error {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+
+        #billing-info.alert-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+
+        #billing-info.alert-info {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            border-left: 4px solid #17a2b8;
+            color: #0c5460;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .icon-spinner.icon-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 0.875em;
+            font-weight: bold;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 4px;
+        }
+
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .badge-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .badge-important {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .badge-info {
+            background-color: #17a2b8;
+            color: white;
+        }
+
+        .control-label span[style*="color:red"] {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+
+        .btn {
+            transition: all 0.3s ease;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            border: none;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            border: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .toast-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+            max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 6px;
+            animation: slideInRight 0.3s ease;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-card {
+                margin-bottom: 10px;
+                padding: 15px;
+            }
+            
+            .toast-notification {
+                left: 10px;
+                right: 10px;
+                min-width: auto;
+                max-width: none;
+            }
+        }
+         .input-group {
             display: flex;
             align-items: stretch;
         }
