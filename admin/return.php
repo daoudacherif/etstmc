@@ -626,7 +626,7 @@ $(document).ready(function() {
     $('#billingnumber').on('input', function() {
         const billNum = $(this).val().trim();
         if (billNum.length >= 3) {
-            $.post('ajax/validate-billing-simple.php', {billingnumber: billNum}, function(data) {
+            $.post('ajax/validate-billing.php', {billingnumber: billNum}, function(data) {
                 if (data.valid) {
                     $('#productid').html(data.productOptions).prop('disabled', false);
                     $('#billing-info').html(data.customerInfo).show();
@@ -639,7 +639,7 @@ $(document).ready(function() {
         const productId = $(this).val();
         const billNum = $('#billingnumber').val();
         if (productId && billNum) {
-            $.post('ajax/get-product-details-simple.php', {
+            $.post('ajax/get-product-details.php', {
                 productid: productId, 
                 billingnumber: billNum
             }, function(data) {
