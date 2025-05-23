@@ -31,33 +31,19 @@ if (isset($_POST['submit'])) {
     $isValid = false;
     $errorMessage = "Numéro de facture invalide. Cette facture n'existe pas.";
   } else {
-    $customerRow = mysqli_fetch_assoc($checkBilling);
-    $customerID = $customerRow['ID'];
-
     // 2. Get original sale details and validate quantity
     $originalQty = 0;
     $originalPrice = 0;
     
-    // Check in cash sales (tblcart)
+    // Check in cash sales (tblcart) - IMPORTANT: BillingId = BillingNumber dans votre système
     $cashQuery = "SELECT ProductQty, Price FROM tblcart 
-                  WHERE BillingId = '$customerID' AND ProductId = '$productID'";
+                  WHERE BillingId = '$billingNumber' AND ProductId = '$productID' AND IsCheckOut = 1";
     $cashResult = mysqli_query($con, $cashQuery);
     
     if (mysqli_num_rows($cashResult) > 0) {
       $cashRow = mysqli_fetch_assoc($cashResult);
       $originalQty = $cashRow['ProductQty'];
       $originalPrice = $cashRow['Price'];
-    } else {
-      // Check in credit sales (tblcreditcart)
-      $creditQuery = "SELECT ProductQty, Price FROM tblcreditcart 
-                      WHERE BillingId = '$customerID' AND ProductId = '$productID'";
-      $creditResult = mysqli_query($con, $creditQuery);
-      
-      if (mysqli_num_rows($creditResult) > 0) {
-        $creditRow = mysqli_fetch_assoc($creditResult);
-        $originalQty = $creditRow['ProductQty'];
-        $originalPrice = $creditRow['Price'];
-      }
     }
 
     // Check if product was in this sale
