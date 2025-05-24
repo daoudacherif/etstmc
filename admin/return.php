@@ -125,7 +125,7 @@ if (isset($_POST['submit'])) {
                     
                     // Validation du prix
                     if ($returnPrice > $originalPrice) {
-                        $errors[] = "Le prix de retour ({$returnPrice}€) ne peut pas dépasser le prix de vente original ({$originalPrice}€).";
+                        $errors[] = "Le prix de retour ({$returnPrice} GNF) ne peut pas dépasser le prix de vente original ({$originalPrice} GNF).";
                     }
                     
                     $stmt2->close();
@@ -355,6 +355,11 @@ $stats = mysqli_fetch_assoc($statsResult);
             border: none;
         }
 
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            border: none;
+        }
+
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
@@ -382,6 +387,15 @@ $stats = mysqli_fetch_assoc($statsResult);
                 transform: translateX(0);
                 opacity: 1;
             }
+        }
+        
+        .input-append .btn {
+            margin-left: -1px;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .input-append input {
+            border-radius: 4px 0 0 4px;
         }
 
         @media (max-width: 768px) {
@@ -451,13 +465,18 @@ $stats = mysqli_fetch_assoc($statsResult);
                     <div class="widget-content nopadding">
                         <form method="post" class="form-horizontal" id="returnForm">
 
-                            <!-- Numéro de facture -->
+                            <!-- Numéro de facture avec bouton de vérification -->
                             <div class="control-group">
                                 <label class="control-label">Numéro de facture <span style="color:red;">*</span>:</label>
                                 <div class="controls">
-                                    <input type="text" id="billingnumber" name="billingnumber" 
-                                           placeholder="ex. 123456789" required maxlength="50" 
-                                           autocomplete="off" />
+                                    <div class="input-append">
+                                        <input type="text" id="billingnumber" name="billingnumber" 
+                                               placeholder="ex. 123456789" required maxlength="50" 
+                                               autocomplete="off" style="width: 250px;" />
+                                        <button type="button" id="verifyBtn" class="btn btn-primary" onclick="validateBilling()">
+                                            <i class="icon-search"></i> Vérifier
+                                        </button>
+                                    </div>
                                     <div id="billing-info" class="alert" style="display:none; margin-top:10px;"></div>
                                 </div>
                             </div>
@@ -477,7 +496,7 @@ $stats = mysqli_fetch_assoc($statsResult);
                                 <label class="control-label">Produit <span style="color:red;">*</span>:</label>
                                 <div class="controls">
                                     <select id="productid" name="productid" required disabled>
-                                        <option value="">-- Entrez d'abord le numéro de facture --</option>
+                                        <option value="">-- Vérifiez d'abord le numéro de facture --</option>
                                     </select>
                                     <div id="product-details" class="alert alert-info" style="display:none; margin-top:10px;"></div>
                                 </div>
@@ -630,7 +649,6 @@ $stats = mysqli_fetch_assoc($statsResult);
 // Variables globales
 let currentBillingData = null;
 let currentProductData = null;
-let validationTimeout = null;
 
 // ========================================
 // Fonction de validation de facture
@@ -639,7 +657,7 @@ function validateBilling() {
     const billNum = $('#billingnumber').val().trim();
     
     if (billNum.length === 0) {
-        resetBillingValidation();
+        showBillingMessage('Veuillez entrer un numéro de facture', 'warning');
         return;
     }
     
@@ -648,6 +666,10 @@ function validateBilling() {
         return;
     }
     
+    // Désactiver le bouton pendant la vérification
+    const $verifyBtn = $('#verifyBtn');
+    $verifyBtn.prop('disabled', true).html('<i class="icon-spinner icon-spin"></i> Vérification...');
+    
     showBillingMessage('<i class="icon-spinner icon-spin"></i> Vérification de la facture en cours...', 'info');
     $('#productid').prop('disabled', true).html('<option value="">-- Validation en cours --</option>');
     
@@ -655,29 +677,35 @@ function validateBilling() {
         url: 'ajax/validate-billing.php',
         type: 'POST',
         data: { billingnumber: billNum },
+        dataType: 'json',
         timeout: 15000,
         success: function(response) {
             try {
-                const data = typeof response === 'string' ? JSON.parse(response) : response;
+                console.log('Réponse reçue:', response);
                 
-                if (data.valid) {
-                    currentBillingData = data;
-                    showBillingMessage(data.customerInfo, 'success');
-                    updateProductDropdown(data.productOptions);
+                if (response.valid) {
+                    currentBillingData = response;
+                    showBillingMessage(response.customerInfo, 'success');
+                    updateProductDropdown(response.productOptions);
                     
-                    if (data.statistics) {
-                        updateDashboardStats(data.statistics);
+                    if (response.statistics) {
+                        updateDashboardStats(response.statistics);
                     }
+                    
+                    showToast('success', 'Facture validée avec succès');
                 } else {
-                    showBillingMessage(data.message, 'error');
+                    showBillingMessage(response.message, 'error');
                     resetProductSelection();
+                    showToast('error', response.message);
                 }
             } catch (e) {
+                console.error('Erreur de traitement:', e);
                 showBillingMessage('Erreur de communication avec le serveur', 'error');
                 resetProductSelection();
             }
         },
         error: function(xhr, status, error) {
+            console.error('Erreur AJAX:', status, error);
             let errorMessage = 'Erreur de connexion';
             if (status === 'timeout') {
                 errorMessage = 'Délai d\'attente dépassé. Vérifiez votre connexion.';
@@ -686,6 +714,11 @@ function validateBilling() {
             }
             showBillingMessage(errorMessage, 'error');
             resetProductSelection();
+            showToast('error', errorMessage);
+        },
+        complete: function() {
+            // Réactiver le bouton
+            $verifyBtn.prop('disabled', false).html('<i class="icon-search"></i> Vérifier');
         }
     });
 }
@@ -714,29 +747,32 @@ function loadProductDetails() {
             productid: productId,
             billingnumber: billNum
         },
+        dataType: 'json',
         timeout: 15000,
         success: function(response) {
             try {
-                const data = typeof response === 'string' ? JSON.parse(response) : response;
+                console.log('Détails produit reçus:', response);
                 
-                if (data.success) {
-                    currentProductData = data.data;
-                    $('#product-details').html(data.details)
+                if (response.success) {
+                    currentProductData = response.data;
+                    $('#product-details').html(response.details)
                                          .removeClass('alert-error alert-info')
                                          .addClass('alert-success');
                     
-                    updateFormConstraints(data.data);
-                    toggleSubmitButton(data.data.canReturn);
+                    updateFormConstraints(response.data);
+                    toggleSubmitButton(response.data.canReturn);
                 } else {
-                    $('#product-details').html('<strong>Erreur:</strong> ' + data.message)
+                    $('#product-details').html('<strong>Erreur:</strong> ' + response.message)
                                          .removeClass('alert-success alert-info')
                                          .addClass('alert-error');
                 }
             } catch (e) {
+                console.error('Erreur de traitement des détails:', e);
                 showError('Erreur lors du traitement des données produit.');
             }
         },
-        error: function() {
+        error: function(xhr, status, error) {
+            console.error('Erreur AJAX détails:', status, error);
             showError('Impossible de charger les détails du produit.');
         }
     });
@@ -816,6 +852,13 @@ function showBillingMessage(message, type) {
     $billingInfo.html(message).show();
 }
 
+function showError(message) {
+    $('#product-details').html('<strong>Erreur:</strong> ' + message)
+                         .removeClass('alert-success alert-info')
+                         .addClass('alert-error')
+                         .show();
+}
+
 function showToast(type, message, duration = 4000) {
     const toastClass = {
         'success': 'alert-success',
@@ -843,7 +886,7 @@ function resetBillingValidation() {
 
 function resetProductSelection() {
     $('#productid').prop('disabled', true)
-                   .html('<option value="">-- Entrez d\'abord le numéro de facture --</option>');
+                   .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
     resetProductDetails();
 }
 
@@ -946,34 +989,10 @@ function validateCompleteForm() {
 // Initialisation
 // ========================================
 $(document).ready(function() {
-    // Validation automatique avec délai
-    $('#billingnumber').on('input', function() {
-        const value = $(this).val().trim();
-        
-        if (validationTimeout) {
-            clearTimeout(validationTimeout);
-        }
-        
-        if (value.length === 0) {
-            resetBillingValidation();
-            return;
-        }
-        
-        validationTimeout = setTimeout(() => {
-            if (value.length >= 3) {
-                validateBilling();
-            }
-        }, 800);
-    });
-    
-    // Validation sur blur
-    $('#billingnumber').on('blur', function() {
-        if (validationTimeout) {
-            clearTimeout(validationTimeout);
-        }
-        
-        const value = $(this).val().trim();
-        if (value.length >= 3) {
+    // Validation sur pression de la touche Enter
+    $('#billingnumber').on('keypress', function(e) {
+        if (e.which === 13) { // Enter key
+            e.preventDefault();
             validateBilling();
         }
     });
@@ -994,7 +1013,7 @@ $(document).ready(function() {
     // Focus initial
     $('#billingnumber').focus();
     
-    console.log('Système de gestion des retours initialisé');
+    console.log('Système de gestion des retours initialisé avec bouton de vérification');
 });
 </script>
 
