@@ -11,16 +11,297 @@ if (strlen($_SESSION['imsaid']) == 0) {
 }
 
 // ==========================
+// TRAITEMENT AJAX POUR LA VALIDATION DE FACTURE
+// ==========================
+if (isset($_POST['ajax_validate_billing'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    
+    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
+    $response = array('valid' => false);
+    
+    if (empty($billingNumber)) {
+        $response['message'] = 'Numéro de facture requis.';
+        echo json_encode($response);
+        exit;
+    }
+    
+    // Vérifier l'existence de la facture - même logique que invoice-search.php
+    $stmt = mysqli_prepare($con, "SELECT DISTINCT 
+                                  tblcustomer.CustomerName,
+                                  tblcustomer.MobileNumber,
+                                  tblcustomer.ModeofPayment,
+                                  tblcustomer.BillingDate,
+                                  tblcustomer.BillingNumber,
+                                  tblcustomer.FinalAmount,
+                                  tblcustomer.Paid,
+                                  tblcustomer.Dues
+                                FROM 
+                                  tblcustomer
+                                LEFT JOIN 
+                                  tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
+                                LEFT JOIN 
+                                  tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
+                                WHERE 
+                                  tblcustomer.BillingNumber = ?
+                                LIMIT 1");
+    
+    mysqli_stmt_bind_param($stmt, "s", $billingNumber);
+    mysqli_stmt_execute($stmt);
+    $customerResult = mysqli_stmt_get_result($stmt);
+    
+    if (mysqli_num_rows($customerResult) == 0) {
+        $response['message'] = 'Numéro de facture introuvable dans le système.';
+        echo json_encode($response);
+        exit;
+    }
+    
+    $customer = mysqli_fetch_assoc($customerResult);
+    mysqli_stmt_close($stmt);
+    
+    // Déterminer quelle table utiliser
+    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+    $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
+    
+    $creditItems = 0;
+    $regularItems = 0;
+    
+    if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+        $creditItems = $rowCredit['count'];
+    }
+    
+    if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+        $regularItems = $rowRegular['count'];
+    }
+    
+    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+    $saleType = ($creditItems > 0) ? 'Vente à Terme' : 'Vente Cash';
+    
+    // Récupérer les produits
+    $stmt2 = mysqli_prepare($con, "
+        SELECT 
+            p.ID as ProductId,
+            p.ProductName,
+            p.CompanyName,
+            p.ModelNumber,
+            p.Stock as CurrentStock,
+            cart.ProductQty,
+            COALESCE(cart.Price, p.Price) as Price
+        FROM $useTable cart
+        INNER JOIN tblproducts p ON cart.ProductId = p.ID
+        WHERE cart.BillingId = ?
+        ORDER BY p.ProductName ASC
+    ");
+    
+    mysqli_stmt_bind_param($stmt2, "s", $billingNumber);
+    mysqli_stmt_execute($stmt2);
+    $productsResult = mysqli_stmt_get_result($stmt2);
+    
+    // Construire les options de produits
+    $productOptions = '<option value="">-- Sélectionner un produit --</option>';
+    $totalProductCount = 0;
+    $returnableProductCount = 0;
+    
+    while ($product = mysqli_fetch_assoc($productsResult)) {
+        // Vérifier les retours existants
+        $returnQuery = mysqli_query($con, "SELECT COALESCE(SUM(Quantity), 0) as returned_qty FROM tblreturns WHERE BillingNumber='$billingNumber' AND ProductID='{$product['ProductId']}'");
+        $returnData = mysqli_fetch_assoc($returnQuery);
+        $returnedQty = $returnData['returned_qty'];
+        $availableReturn = $product['ProductQty'] - $returnedQty;
+        
+        $totalProductCount++;
+        
+        $productName = htmlspecialchars($product['ProductName']);
+        $disabled = '';
+        $statusBadge = '✅';
+        $statusText = "Retournable: {$availableReturn}";
+        
+        if ($availableReturn <= 0) {
+            $disabled = 'disabled';
+            $statusBadge = '❌';
+            $statusText = "Entièrement retourné";
+        } else {
+            $returnableProductCount++;
+        }
+        
+        $productOptions .= sprintf(
+            '<option value="%d" %s data-qty="%d" data-returned="%d" data-available="%d" data-price="%.2f">%s %s | Vendu: %d | Prix: %.2f GNF | %s</option>',
+            $product['ProductId'],
+            $disabled,
+            $product['ProductQty'],
+            $returnedQty,
+            $availableReturn,
+            $product['Price'],
+            $statusBadge,
+            $productName,
+            $product['ProductQty'],
+            $product['Price'],
+            $statusText
+        );
+    }
+    
+    mysqli_stmt_close($stmt2);
+    
+    // Construire les informations client
+    $saleDate = date('d/m/Y à H:i', strtotime($customer['BillingDate']));
+    $daysSinceSale = round((time() - strtotime($customer['BillingDate'])) / (24 * 3600));
+    $isCredit = ($customer['Dues'] > 0 || $customer['ModeofPayment'] == 'credit');
+    
+    $customerInfo = "
+        <div style='padding: 12px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #28a745;'>
+            <h5 style='margin-top: 0; color: #28a745;'>
+                <i class='icon-ok-circle'></i> Facture Validée
+            </h5>
+            
+            <div class='row-fluid'>
+                <div class='span6'>
+                    <strong>👤 Client:</strong> " . htmlspecialchars($customer['CustomerName']) . "<br>
+                    <strong>📞 Téléphone:</strong> " . htmlspecialchars($customer['MobileNumber']) . "<br>
+                    <strong>🧾 N° Facture:</strong> " . htmlspecialchars($customer['BillingNumber']) . "<br>
+                    <strong>💳 Type:</strong> {$saleType}
+                </div>
+                <div class='span6'>
+                    <strong>📅 Date de vente:</strong> {$saleDate}<br>
+                    <strong>⏰ Ancienneté:</strong> {$daysSinceSale} jour(s)<br>
+                    <strong>💰 Montant total:</strong> " . number_format($customer['FinalAmount'], 2) . " GNF";
+    
+    if ($isCredit) {
+        $customerInfo .= "<br><strong>💵 Payé:</strong> " . number_format($customer['Paid'], 2) . " GNF";
+        $customerInfo .= "<br><strong>🔴 Reste dû:</strong> " . number_format($customer['Dues'], 2) . " GNF";
+    }
+    
+    $customerInfo .= "
+                </div>
+            </div>
+            
+            <div style='margin-top: 10px; padding: 8px; background: white; border-radius: 3px;'>
+                <strong>📊 Résumé:</strong> 
+                {$totalProductCount} produit(s) vendus • 
+                {$returnableProductCount} produit(s) retournable(s) • 
+                Table utilisée: {$useTable}
+            </div>
+        </div>";
+    
+    $response = array(
+        'valid' => true,
+        'customerInfo' => $customerInfo,
+        'productOptions' => $productOptions,
+        'statistics' => array(
+            'totalProducts' => $totalProductCount,
+            'returnableProducts' => $returnableProductCount,
+            'totalAmount' => $customer['FinalAmount'],
+            'customerName' => $customer['CustomerName']
+        )
+    );
+    
+    echo json_encode($response);
+    exit;
+}
+
+// ==========================
+// TRAITEMENT AJAX POUR LES DÉTAILS PRODUIT
+// ==========================
+if (isset($_POST['ajax_get_product_details'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    
+    $productID = intval($_POST['productid']);
+    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
+    
+    $response = array('success' => false);
+    
+    if ($productID <= 0 || empty($billingNumber)) {
+        $response['message'] = 'Paramètres invalides.';
+        echo json_encode($response);
+        exit;
+    }
+    
+    // Déterminer quelle table utiliser
+    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
+    $creditItems = mysqli_fetch_assoc($checkCreditCart)['count'];
+    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+    
+    // Récupérer les détails
+    $query = "
+        SELECT 
+            p.ProductName,
+            p.CompanyName,
+            p.ModelNumber,
+            p.Stock as CurrentStock,
+            cart.ProductQty as OriginalQty,
+            COALESCE(cart.Price, p.Price) as OriginalPrice,
+            cust.CustomerName,
+            cust.BillingDate as SaleDate
+        FROM $useTable cart
+        INNER JOIN tblproducts p ON p.ID = cart.ProductId
+        INNER JOIN tblcustomer cust ON cust.BillingNumber = cart.BillingId
+        WHERE cart.BillingId = '$billingNumber' AND cart.ProductId = $productID
+        LIMIT 1
+    ";
+    
+    $result = mysqli_query($con, $query);
+    
+    if (mysqli_num_rows($result) == 0) {
+        $response['message'] = "Ce produit n'a pas été vendu dans cette facture.";
+        echo json_encode($response);
+        exit;
+    }
+    
+    $saleData = mysqli_fetch_assoc($result);
+    
+    // Calculer les quantités retournées
+    $returnQuery = mysqli_query($con, "SELECT COALESCE(SUM(Quantity), 0) as TotalReturned FROM tblreturns WHERE BillingNumber='$billingNumber' AND ProductID=$productID");
+    $returnData = mysqli_fetch_assoc($returnQuery);
+    
+    $originalQty = intval($saleData['OriginalQty']);
+    $alreadyReturned = intval($returnData['TotalReturned']);
+    $availableToReturn = $originalQty - $alreadyReturned;
+    $originalPrice = floatval($saleData['OriginalPrice']);
+    
+    $details = "
+        <div style='padding: 10px; border-left: 4px solid #2c5aa0;'>
+            <h5 style='margin-top: 0; color: #2c5aa0;'>" . htmlspecialchars($saleData['ProductName']) . "</h5>
+            
+            <div class='row-fluid'>
+                <div class='span6'>
+                    <strong>📦 Marque:</strong> " . htmlspecialchars($saleData['CompanyName'] ?: 'Non spécifiée') . "<br>
+                    <strong>🔖 Référence:</strong> " . htmlspecialchars($saleData['ModelNumber'] ?: 'Non spécifiée') . "<br>
+                    <strong>💰 Prix unitaire:</strong> " . number_format($originalPrice, 2) . " GNF
+                </div>
+                <div class='span6'>
+                    <strong>📊 Vendu:</strong> <span class='badge badge-info'>{$originalQty}</span><br>
+                    <strong>↩️ Retourné:</strong> <span class='badge badge-warning'>{$alreadyReturned}</span><br>
+                    <strong>✅ Disponible:</strong> <span class='badge badge-success'>{$availableToReturn}</span>
+                </div>
+            </div>
+        </div>";
+    
+    $response = array(
+        'success' => true,
+        'details' => $details,
+        'data' => array(
+            'productName' => $saleData['ProductName'],
+            'originalQty' => $originalQty,
+            'alreadyReturned' => $alreadyReturned,
+            'maxReturn' => $availableToReturn,
+            'originalPrice' => $originalPrice,
+            'canReturn' => $availableToReturn > 0
+        )
+    );
+    
+    echo json_encode($response);
+    exit;
+}
+
+// ==========================
 // Traitement du formulaire de retour avec VALIDATION SÉCURISÉE
 // ==========================
 if (isset($_POST['submit'])) {
     // Nettoyage et validation des entrées
-    $billingNumber = trim($_POST['billingnumber']);
+    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
     $productID     = intval($_POST['productid']);
     $quantity      = intval($_POST['quantity']);
     $returnPrice   = floatval($_POST['price']);
-    $returnDate    = $_POST['returndate'];
-    $reason        = trim($_POST['reason']);
+    $returnDate    = mysqli_real_escape_string($con, $_POST['returndate']);
+    $reason        = mysqli_real_escape_string($con, trim($_POST['reason']));
 
     // Tableau pour collecter les erreurs
     $errors = [];
@@ -46,91 +327,61 @@ if (isset($_POST['submit'])) {
     if (empty($errors)) {
         try {
             // Vérifier l'existence de la facture
-            $stmt = $con->prepare("SELECT ID FROM tblcustomer WHERE BillingNumber = ?");
-            $stmt->bind_param("s", $billingNumber);
-            $stmt->execute();
-            $result = $stmt->get_result();
+            $checkInvoice = mysqli_query($con, "SELECT ID FROM tblcustomer WHERE BillingNumber = '$billingNumber'");
             
-            if ($result->num_rows == 0) {
+            if (mysqli_num_rows($checkInvoice) == 0) {
                 $errors[] = "Numéro de facture invalide. Cette facture n'existe pas.";
             }
-            $stmt->close();
 
-            // Déterminer quelle table utiliser - MÊME LOGIQUE QUE invoice-search.php
+            // Déterminer quelle table utiliser
             if (empty($errors)) {
                 $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
-                $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
-                
-                $creditItems = 0;
-                $regularItems = 0;
-                
-                if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
-                    $creditItems = $rowCredit['count'];
-                }
-                
-                if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
-                    $regularItems = $rowRegular['count'];
-                }
-                
-                // Déterminer quelle table utiliser
+                $creditItems = mysqli_fetch_assoc($checkCreditCart)['count'];
                 $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
                 
-                // Récupérer les détails de la vente originale selon la table appropriée
-                $stmt = $con->prepare("
+                // Récupérer les détails de la vente originale
+                $saleQuery = mysqli_query($con, "
                     SELECT ProductQty, COALESCE(Price, 0) as Price 
-                    FROM {$useTable} 
-                    WHERE BillingId = ? AND ProductId = ?
+                    FROM $useTable 
+                    WHERE BillingId = '$billingNumber' AND ProductId = $productID
                 ");
-                $stmt->bind_param("si", $billingNumber, $productID);
-                $stmt->execute();
-                $result = $stmt->get_result();
                 
-                if ($result->num_rows == 0) {
-                    $errors[] = "Ce produit n'a pas été vendu dans cette facture (table vérifiée: {$useTable}).";
+                if (mysqli_num_rows($saleQuery) == 0) {
+                    $errors[] = "Ce produit n'a pas été vendu dans cette facture.";
                 } else {
-                    $saleData = $result->fetch_assoc();
+                    $saleData = mysqli_fetch_assoc($saleQuery);
                     $originalQty = $saleData['ProductQty'];
                     $originalPrice = $saleData['Price'];
                     
                     // Si le prix n'est pas dans la table cart, récupérer depuis tblproducts
                     if ($originalPrice == 0) {
-                        $priceStmt = $con->prepare("SELECT Price FROM tblproducts WHERE ID = ?");
-                        $priceStmt->bind_param("i", $productID);
-                        $priceStmt->execute();
-                        $priceResult = $priceStmt->get_result();
-                        if ($priceRow = $priceResult->fetch_assoc()) {
+                        $priceQuery = mysqli_query($con, "SELECT Price FROM tblproducts WHERE ID = $productID");
+                        if ($priceRow = mysqli_fetch_assoc($priceQuery)) {
                             $originalPrice = $priceRow['Price'];
                         }
-                        $priceStmt->close();
                     }
                     
                     // Vérifier les quantités déjà retournées
-                    $stmt2 = $con->prepare("
+                    $returnQuery = mysqli_query($con, "
                         SELECT COALESCE(SUM(Quantity), 0) as TotalReturned 
                         FROM tblreturns 
-                        WHERE BillingNumber = ? AND ProductID = ?
+                        WHERE BillingNumber = '$billingNumber' AND ProductID = $productID
                     ");
-                    $stmt2->bind_param("si", $billingNumber, $productID);
-                    $stmt2->execute();
-                    $returnResult = $stmt2->get_result();
-                    $returnData = $returnResult->fetch_assoc();
+                    $returnData = mysqli_fetch_assoc($returnQuery);
                     $alreadyReturned = $returnData['TotalReturned'];
                     
                     $availableToReturn = $originalQty - $alreadyReturned;
                     
                     // Validation des quantités
                     if ($quantity > $availableToReturn) {
-                        $errors[] = "Quantité invalide. Vendu: $originalQty, Déjà retourné: $alreadyReturned, Maximum retournable: $availableToReturn (Table: {$useTable})";
+                        $errors[] = "Quantité invalide. Maximum retournable: $availableToReturn";
                     }
                     
                     // Validation du prix
                     if ($returnPrice > $originalPrice) {
-                        $errors[] = "Le prix de retour ({$returnPrice} GNF) ne peut pas dépasser le prix de vente original ({$originalPrice} GNF).";
+                        $errors[] = "Le prix de retour ne peut pas dépasser le prix de vente original.";
                     }
-                    
-                    $stmt2->close();
                 }
-                $stmt->close();
             }
         } catch (Exception $e) {
             $errors[] = "Erreur de validation: " . $e->getMessage();
@@ -144,29 +395,24 @@ if (isset($_POST['submit'])) {
             mysqli_autocommit($con, FALSE);
             
             // Insérer le retour
-            $stmt = $con->prepare("
+            $insertQuery = "
                 INSERT INTO tblreturns(BillingNumber, ReturnDate, ProductID, Quantity, Reason, ReturnPrice, CreatedAt) 
-                VALUES(?, ?, ?, ?, ?, ?, NOW())
-            ");
-            $stmt->bind_param("ssiiss", $billingNumber, $returnDate, $productID, $quantity, $reason, $returnPrice);
+                VALUES('$billingNumber', '$returnDate', $productID, $quantity, '$reason', $returnPrice, NOW())
+            ";
             
-            if (!$stmt->execute()) {
+            if (!mysqli_query($con, $insertQuery)) {
                 throw new Exception("Erreur lors de l'enregistrement du retour.");
             }
             
             // Mettre à jour le stock
-            $stmt2 = $con->prepare("UPDATE tblproducts SET Stock = Stock + ? WHERE ID = ?");
-            $stmt2->bind_param("ii", $quantity, $productID);
+            $updateStockQuery = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID = $productID";
             
-            if (!$stmt2->execute()) {
+            if (!mysqli_query($con, $updateStockQuery)) {
                 throw new Exception("Erreur lors de la mise à jour du stock.");
             }
             
             // Valider la transaction
             mysqli_commit($con);
-            
-            $stmt->close();
-            $stmt2->close();
             
             echo "<script>
                     alert('Retour enregistré avec succès!');
@@ -207,15 +453,12 @@ $stats = mysqli_fetch_assoc($statsResult);
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <title>Gestion des stocks | Retours de Article</title>
+    <title>Gestion des stocks | Retours de produits</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
-    
-    <!-- jQuery et plugins -->
-    <script src="js/jquery.min.js"></script>
     
     <!-- Styles personnalisés pour les retours -->
     <style>
@@ -424,9 +667,9 @@ $stats = mysqli_fetch_assoc($statsResult);
             <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
                 <i class="icon-home"></i> Accueil
             </a>
-            <a href="return.php" class="current">Retours de Article</a>
+            <a href="return.php" class="current">Retours de produits</a>
         </div>
-        <h1>Gérer les retours de Article</h1>
+        <h1>Gérer les retours de produits</h1>
     </div>
 
     <div class="container-fluid">
@@ -633,6 +876,7 @@ $stats = mysqli_fetch_assoc($statsResult);
 <?php include_once('includes/footer.php'); ?>
 
 <!-- Scripts JavaScript -->
+<script src="js/jquery.min.js"></script>
 <script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
 <script src="js/jquery.uniform.js"></script>
@@ -654,6 +898,8 @@ let currentProductData = null;
 // Fonction de validation de facture
 // ========================================
 function validateBilling() {
+    console.log('validateBilling called');
+    
     const billNum = $('#billingnumber').val().trim();
     
     if (billNum.length === 0) {
@@ -673,45 +919,53 @@ function validateBilling() {
     showBillingMessage('<i class="icon-spinner icon-spin"></i> Vérification de la facture en cours...', 'info');
     $('#productid').prop('disabled', true).html('<option value="">-- Validation en cours --</option>');
     
+    // Utiliser la même page pour traiter l'AJAX
     $.ajax({
-        url: 'ajax/validate-billing.php',
+        url: 'return.php',
         type: 'POST',
-        data: { billingnumber: billNum },
+        data: { 
+            ajax_validate_billing: true,
+            billingnumber: billNum 
+        },
         dataType: 'json',
         timeout: 15000,
         success: function(response) {
-            try {
-                console.log('Réponse reçue:', response);
+            console.log('Réponse reçue:', response);
+            
+            if (response.valid) {
+                currentBillingData = response;
+                showBillingMessage(response.customerInfo, 'success');
+                updateProductDropdown(response.productOptions);
                 
-                if (response.valid) {
-                    currentBillingData = response;
-                    showBillingMessage(response.customerInfo, 'success');
-                    updateProductDropdown(response.productOptions);
-                    
-                    if (response.statistics) {
-                        updateDashboardStats(response.statistics);
-                    }
-                    
-                    showToast('success', 'Facture validée avec succès');
-                } else {
-                    showBillingMessage(response.message, 'error');
-                    resetProductSelection();
-                    showToast('error', response.message);
+                if (response.statistics) {
+                    updateDashboardStats(response.statistics);
                 }
-            } catch (e) {
-                console.error('Erreur de traitement:', e);
-                showBillingMessage('Erreur de communication avec le serveur', 'error');
+                
+                showToast('success', 'Facture validée avec succès');
+            } else {
+                showBillingMessage(response.message, 'error');
                 resetProductSelection();
+                showToast('error', response.message);
             }
         },
         error: function(xhr, status, error) {
             console.error('Erreur AJAX:', status, error);
+            console.error('Response:', xhr.responseText);
+            
             let errorMessage = 'Erreur de connexion';
             if (status === 'timeout') {
                 errorMessage = 'Délai d\'attente dépassé. Vérifiez votre connexion.';
             } else if (xhr.status === 500) {
                 errorMessage = 'Erreur interne du serveur.';
+            } else if (xhr.responseText) {
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    console.error('Erreur parsing:', e);
+                }
             }
+            
             showBillingMessage(errorMessage, 'error');
             resetProductSelection();
             showToast('error', errorMessage);
@@ -741,34 +995,30 @@ function loadProductDetails() {
                          .show();
     
     $.ajax({
-        url: 'ajax/get-product-details.php',
+        url: 'return.php',
         type: 'POST',
         data: {
+            ajax_get_product_details: true,
             productid: productId,
             billingnumber: billNum
         },
         dataType: 'json',
         timeout: 15000,
         success: function(response) {
-            try {
-                console.log('Détails produit reçus:', response);
+            console.log('Détails produit reçus:', response);
+            
+            if (response.success) {
+                currentProductData = response.data;
+                $('#product-details').html(response.details)
+                                     .removeClass('alert-error alert-info')
+                                     .addClass('alert-success');
                 
-                if (response.success) {
-                    currentProductData = response.data;
-                    $('#product-details').html(response.details)
-                                         .removeClass('alert-error alert-info')
-                                         .addClass('alert-success');
-                    
-                    updateFormConstraints(response.data);
-                    toggleSubmitButton(response.data.canReturn);
-                } else {
-                    $('#product-details').html('<strong>Erreur:</strong> ' + response.message)
-                                         .removeClass('alert-success alert-info')
-                                         .addClass('alert-error');
-                }
-            } catch (e) {
-                console.error('Erreur de traitement des détails:', e);
-                showError('Erreur lors du traitement des données produit.');
+                updateFormConstraints(response.data);
+                toggleSubmitButton(response.data.canReturn);
+            } else {
+                $('#product-details').html('<strong>Erreur:</strong> ' + response.message)
+                                     .removeClass('alert-success alert-info')
+                                     .addClass('alert-error');
             }
         },
         error: function(xhr, status, error) {
@@ -782,6 +1032,7 @@ function loadProductDetails() {
 // Fonctions utilitaires
 // ========================================
 function updateProductDropdown(productOptions) {
+    console.log('Mise à jour du dropdown produit');
     const $productSelect = $('#productid');
     $productSelect.html(productOptions).prop('disabled', false);
     
@@ -989,6 +1240,14 @@ function validateCompleteForm() {
 // Initialisation
 // ========================================
 $(document).ready(function() {
+    console.log('Document ready - Système de retour initialisé');
+    
+    // Vérifier que jQuery est chargé
+    if (typeof $ === 'undefined') {
+        alert('jQuery n\'est pas chargé!');
+        return;
+    }
+    
     // Validation sur pression de la touche Enter
     $('#billingnumber').on('keypress', function(e) {
         if (e.which === 13) { // Enter key
@@ -1012,8 +1271,6 @@ $(document).ready(function() {
     
     // Focus initial
     $('#billingnumber').focus();
-    
-    console.log('Système de gestion des retours initialisé avec bouton de vérification');
 });
 </script>
 
