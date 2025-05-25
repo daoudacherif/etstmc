@@ -886,29 +886,25 @@ $stats = mysqli_fetch_assoc($statsResult);
 <script src="js/matrix.tables.js"></script>
 
 <script>
-// ========================================
-// JAVASCRIPT POUR LA GESTION DES RETOURS
-// ========================================
-
-// Variables globales
-let currentBillingData = null;
-let currentProductData = null;
-
-// ========================================
-// Fonction de validation de facture
-// ========================================
-function validateBilling() {
-    console.log('validateBilling called');
+// Définir validateBilling globalement immédiatement
+window.validateBilling = function() {
+    console.log('validateBilling called from global scope');
+    
+    // Vérifier que jQuery est chargé
+    if (typeof $ === 'undefined') {
+        alert('jQuery n\'est pas encore chargé. Réessayez dans un instant.');
+        return;
+    }
     
     const billNum = $('#billingnumber').val().trim();
     
     if (billNum.length === 0) {
-        showBillingMessage('Veuillez entrer un numéro de facture', 'warning');
+        alert('Veuillez entrer un numéro de facture');
         return;
     }
     
     if (billNum.length < 3) {
-        showBillingMessage('Numéro de facture trop court (minimum 3 caractères)', 'warning');
+        alert('Numéro de facture trop court (minimum 3 caractères)');
         return;
     }
     
@@ -916,7 +912,11 @@ function validateBilling() {
     const $verifyBtn = $('#verifyBtn');
     $verifyBtn.prop('disabled', true).html('<i class="icon-spinner icon-spin"></i> Vérification...');
     
-    showBillingMessage('<i class="icon-spinner icon-spin"></i> Vérification de la facture en cours...', 'info');
+    $('#billing-info').removeClass('alert-success alert-error alert-warning alert-info')
+                      .addClass('alert-info')
+                      .html('<i class="icon-spinner icon-spin"></i> Vérification de la facture en cours...')
+                      .show();
+    
     $('#productid').prop('disabled', true).html('<option value="">-- Validation en cours --</option>');
     
     // Utiliser la même page pour traiter l'AJAX
@@ -933,49 +933,54 @@ function validateBilling() {
             console.log('Réponse reçue:', response);
             
             if (response.valid) {
-                currentBillingData = response;
-                showBillingMessage(response.customerInfo, 'success');
-                updateProductDropdown(response.productOptions);
+                $('#billing-info').removeClass('alert-info alert-error alert-warning')
+                                  .addClass('alert-success')
+                                  .html(response.customerInfo);
                 
-                if (response.statistics) {
-                    updateDashboardStats(response.statistics);
-                }
+                $('#productid').html(response.productOptions).prop('disabled', false);
                 
-                showToast('success', 'Facture validée avec succès');
+                // Message de succès
+                alert('Facture validée avec succès! ' + response.statistics.returnableProducts + ' produit(s) retournable(s) trouvé(s).');
             } else {
-                showBillingMessage(response.message, 'error');
-                resetProductSelection();
-                showToast('error', response.message);
+                $('#billing-info').removeClass('alert-info alert-success alert-warning')
+                                  .addClass('alert-error')
+                                  .html(response.message);
+                
+                $('#productid').prop('disabled', true)
+                               .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
             }
         },
         error: function(xhr, status, error) {
             console.error('Erreur AJAX:', status, error);
             console.error('Response:', xhr.responseText);
             
-            let errorMessage = 'Erreur de connexion';
-            if (status === 'timeout') {
-                errorMessage = 'Délai d\'attente dépassé. Vérifiez votre connexion.';
-            } else if (xhr.status === 500) {
-                errorMessage = 'Erreur interne du serveur.';
-            } else if (xhr.responseText) {
-                try {
-                    const errorData = JSON.parse(xhr.responseText);
-                    errorMessage = errorData.message || errorMessage;
-                } catch (e) {
-                    console.error('Erreur parsing:', e);
-                }
-            }
+            let errorMessage = 'Erreur de connexion au serveur';
             
-            showBillingMessage(errorMessage, 'error');
-            resetProductSelection();
-            showToast('error', errorMessage);
+            $('#billing-info').removeClass('alert-info alert-success alert-warning')
+                              .addClass('alert-error')
+                              .html(errorMessage);
+            
+            $('#productid').prop('disabled', true)
+                           .html('<option value="">-- Erreur de vérification --</option>');
         },
         complete: function() {
             // Réactiver le bouton
             $verifyBtn.prop('disabled', false).html('<i class="icon-search"></i> Vérifier');
         }
     });
-}
+};
+</script>
+
+<script>
+// ========================================
+// JAVASCRIPT POUR LA GESTION DES RETOURS
+// ========================================
+
+// Variables globales
+let currentBillingData = null;
+let currentProductData = null;
+
+// La fonction validateBilling est déjà définie globalement plus haut
 
 // ========================================
 // Fonction de chargement des détails produit
@@ -1031,22 +1036,6 @@ function loadProductDetails() {
 // ========================================
 // Fonctions utilitaires
 // ========================================
-function updateProductDropdown(productOptions) {
-    console.log('Mise à jour du dropdown produit');
-    const $productSelect = $('#productid');
-    $productSelect.html(productOptions).prop('disabled', false);
-    
-    const returnableCount = $productSelect.find('option:not([disabled])').length - 1;
-    if (returnableCount === 0) {
-        $productSelect.prop('disabled', true);
-        showToast('warning', 'Aucun produit retournable trouvé dans cette facture');
-    } else {
-        showToast('success', `${returnableCount} produit(s) retournable(s) trouvé(s)`);
-    }
-    
-    resetProductDetails();
-}
-
 function updateFormConstraints(productData) {
     const $quantity = $('#quantity');
     const $price = $('#price');
@@ -1089,56 +1078,11 @@ function toggleSubmitButton(canReturn) {
     }
 }
 
-function showBillingMessage(message, type) {
-    const $billingInfo = $('#billing-info');
-    $billingInfo.removeClass('alert-success alert-error alert-warning alert-info');
-    
-    switch (type) {
-        case 'success': $billingInfo.addClass('alert-success'); break;
-        case 'error': $billingInfo.addClass('alert-error'); break;
-        case 'warning': $billingInfo.addClass('alert-warning'); break;
-        default: $billingInfo.addClass('alert-info'); break;
-    }
-    
-    $billingInfo.html(message).show();
-}
-
 function showError(message) {
     $('#product-details').html('<strong>Erreur:</strong> ' + message)
                          .removeClass('alert-success alert-info')
                          .addClass('alert-error')
                          .show();
-}
-
-function showToast(type, message, duration = 4000) {
-    const toastClass = {
-        'success': 'alert-success',
-        'error': 'alert-error',
-        'warning': 'alert-warning',
-        'info': 'alert-info'
-    }[type] || 'alert-info';
-    
-    const $toast = $(`
-        <div class="alert ${toastClass} toast-notification">
-            <button type="button" class="close" onclick="$(this).parent().remove()">&times;</button>
-            ${message}
-        </div>
-    `);
-    
-    $('body').append($toast);
-    setTimeout(() => $toast.fadeOut(() => $toast.remove()), duration);
-}
-
-function resetBillingValidation() {
-    currentBillingData = null;
-    $('#billing-info').hide();
-    resetProductSelection();
-}
-
-function resetProductSelection() {
-    $('#productid').prop('disabled', true)
-                   .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
-    resetProductDetails();
 }
 
 function resetProductDetails() {
@@ -1150,24 +1094,12 @@ function resetProductDetails() {
 }
 
 function resetForm() {
-    resetBillingValidation();
     $('#billingnumber').val('').focus();
+    $('#billing-info').hide();
+    $('#productid').prop('disabled', true)
+                   .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
+    resetProductDetails();
     $('#returnForm')[0].reset();
-}
-
-function updateDashboardStats(stats) {
-    if (!$('#billing-stats').length) {
-        const statsHtml = `
-            <div id="billing-stats" class="alert alert-info" style="margin-top: 10px;">
-                <strong>📊 Statistiques de cette facture:</strong><br>
-                Client: ${stats.customerName} • 
-                ${stats.totalProducts} produit(s) • 
-                ${stats.returnableProducts} retournable(s) • 
-                ${stats.totalAmount.toLocaleString()} GNF
-            </div>
-        `;
-        $('#billing-info').after(statsHtml);
-    }
 }
 
 function validateQuantity() {
@@ -1177,7 +1109,7 @@ function validateQuantity() {
     
     if (quantity > maxReturn) {
         $quantity.val(maxReturn);
-        showToast('warning', `Quantité ajustée au maximum retournable: ${maxReturn}`);
+        alert(`Quantité ajustée au maximum retournable: ${maxReturn}`);
     }
     
     if (quantity <= 0) {
@@ -1192,7 +1124,7 @@ function validatePrice() {
     
     if (price > maxPrice) {
         $price.val(maxPrice);
-        showToast('warning', `Prix ajusté au maximum autorisé: ${maxPrice} GNF`);
+        alert(`Prix ajusté au maximum autorisé: ${maxPrice} GNF`);
     }
     
     if (price < 0) {
@@ -1241,12 +1173,6 @@ function validateCompleteForm() {
 // ========================================
 $(document).ready(function() {
     console.log('Document ready - Système de retour initialisé');
-    
-    // Vérifier que jQuery est chargé
-    if (typeof $ === 'undefined') {
-        alert('jQuery n\'est pas chargé!');
-        return;
-    }
     
     // Validation sur pression de la touche Enter
     $('#billingnumber').on('keypress', function(e) {
