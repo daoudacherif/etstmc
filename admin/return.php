@@ -8,15 +8,18 @@ if (strlen($_SESSION['imsaid']==0)) {
 
 // Handle return submission
 if(isset($_POST['process_return'])) {
-    $invoice_id = mysqli_real_escape_string($con, $_POST['invoice_id']);
+    $billing_number = mysqli_real_escape_string($con, $_POST['billing_number']);
     $return_reason = mysqli_real_escape_string($con, $_POST['return_reason']);
     $return_date = date('Y-m-d H:i:s');
     
-    // Generate return ID
-    $return_id = 'RET' . date('YmdHis') . rand(100, 999);
-    
     $total_return_amount = 0;
     $items_returned = 0;
+    
+    // Get current customer dues before processing returns
+    $customer_query = mysqli_query($con, "SELECT Dues, ModeofPayment FROM tblcustomer WHERE BillingNumber='$billing_number'");
+    $customer_data = mysqli_fetch_assoc($customer_query);
+    $current_dues = $customer_data['Dues'];
+    $payment_mode = $customer_data['ModeofPayment'];
     
     // Process each returned item
     if(isset($_POST['return_qty']) && is_array($_POST['return_qty'])) {
@@ -27,27 +30,44 @@ if(isset($_POST['process_return'])) {
                 $product_query = mysqli_query($con, "SELECT Price FROM tblproducts WHERE ID='$product_id'");
                 $product_data = mysqli_fetch_assoc($product_query);
                 $unit_price = $product_data['Price'];
-                $return_amount = $return_qty * $unit_price;
+                $return_price = $return_qty * $unit_price;
                 
-                // Insert return record
+                // Insert return record using correct column names
                 $insert_return = mysqli_query($con, "INSERT INTO tblreturns 
-                    (ReturnId, InvoiceId, ProductId, ReturnQty, UnitPrice, ReturnAmount, ReturnReason, ReturnDate) 
+                    (BillingNumber, ReturnDate, ProductID, Quantity, Reason, ReturnPrice) 
                     VALUES 
-                    ('$return_id', '$invoice_id', '$product_id', '$return_qty', '$unit_price', '$return_amount', '$return_reason', '$return_date')");
+                    ('$billing_number', '$return_date', '$product_id', '$return_qty', '$return_reason', '$return_price')");
                 
                 if($insert_return) {
-                    // Update product stock (add back returned quantity)
-                    mysqli_query($con, "UPDATE tblproducts SET ProductStock = ProductStock + $return_qty WHERE ID='$product_id'");
+                    // Update product stock (add back returned quantity) - using correct column name 'Stock'
+                    mysqli_query($con, "UPDATE tblproducts SET Stock = Stock + $return_qty WHERE ID='$product_id'");
                     
-                    $total_return_amount += $return_amount;
+                    $total_return_amount += $return_price;
                     $items_returned++;
                 }
+            }
+        }
+        
+        // Update customer dues if there are outstanding dues
+        if($items_returned > 0 && $current_dues > 0) {
+            // Calculate new dues amount (cannot go below 0)
+            $new_dues = max(0, $current_dues - $total_return_amount);
+            
+            // Update customer dues
+            $update_dues = mysqli_query($con, "UPDATE tblcustomer SET Dues = '$new_dues' WHERE BillingNumber = '$billing_number'");
+            
+            if($update_dues) {
+                $dues_reduced = $current_dues - $new_dues;
+                $dues_info = " | Dettes réduites de " . number_format($dues_reduced, 2) . " GNF (Nouvelle dette: " . number_format($new_dues, 2) . " GNF)";
             }
         }
     }
     
     if($items_returned > 0) {
-        $success_msg = "Retour traité avec succès! ID de retour: $return_id";
+        $success_msg = "Retour traité avec succès! $items_returned produit(s) retourné(s) pour un montant total de " . number_format($total_return_amount, 2) . " GNF";
+        if(isset($dues_info)) {
+            $success_msg .= $dues_info;
+        }
     } else {
         $error_msg = "Aucun produit sélectionné pour le retour.";
     }
@@ -157,6 +177,12 @@ if(isset($_POST['process_return'])) {
     font-weight: bold;
     color: #856404;
   }
+  
+  .stock-info {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+  }
 </style>
 <script>
 function toggleReturnRow(checkbox, productId) {
@@ -201,6 +227,19 @@ function calculateReturnTotal() {
     });
     
     document.getElementById('return_total_display').textContent = total.toFixed(2);
+    
+    // Calculate new dues if applicable
+    var currentDues = parseFloat(document.getElementById('current_dues').value) || 0;
+    if(currentDues > 0) {
+        var newDues = Math.max(0, currentDues - total);
+        var duesReduction = currentDues - newDues;
+        
+        document.getElementById('dues_reduction_display').textContent = duesReduction.toFixed(2);
+        document.getElementById('new_dues_display').textContent = newDues.toFixed(2);
+        document.getElementById('dues_calculation').style.display = 'block';
+    } else {
+        document.getElementById('dues_calculation').style.display = 'none';
+    }
 }
 
 function selectAllProducts() {
@@ -274,24 +313,20 @@ function selectAllProducts() {
         </div>
         
         <?php
-        // Get customer information
-        $stmt = mysqli_prepare($con, "SELECT DISTINCT 
-                                      tblcustomer.CustomerName,
-                                      tblcustomer.MobileNumber,
-                                      tblcustomer.ModeofPayment,
-                                      tblcustomer.BillingDate,
-                                      tblcustomer.BillingNumber,
-                                      tblcustomer.FinalAmount,
-                                      tblcustomer.Paid,
-                                      tblcustomer.Dues
+        // Get customer information using correct column names
+        $stmt = mysqli_prepare($con, "SELECT 
+                                      CustomerName,
+                                      MobileNumber,
+                                      ModeofPayment,
+                                      BillingDate,
+                                      BillingNumber,
+                                      FinalAmount,
+                                      Paid,
+                                      Dues
                                     FROM 
                                       tblcustomer
-                                    LEFT JOIN 
-                                      tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
-                                    LEFT JOIN 
-                                      tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
                                     WHERE 
-                                      tblcustomer.BillingNumber = ? OR tblcustomer.MobileNumber = ?
+                                      BillingNumber = ? OR MobileNumber = ?
                                     LIMIT 1");
         
         mysqli_stmt_bind_param($stmt, "ss", $sdata, $sdata);
@@ -300,7 +335,7 @@ function selectAllProducts() {
         
         if(mysqli_num_rows($customerResult) > 0) {
           $customerRow = mysqli_fetch_assoc($customerResult);
-          $invoiceid = $customerRow['BillingNumber'];
+          $billing_number = $customerRow['BillingNumber'];
           $finalAmount = $customerRow['FinalAmount'];
           $paidAmount = $customerRow['Paid'];
           $duesAmount = $customerRow['Dues'];
@@ -308,9 +343,9 @@ function selectAllProducts() {
           
           $isCredit = ($customerRow['Dues'] > 0 || $customerRow['ModeofPayment'] == 'credit');
           
-          // Determine which table to use
-          $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$invoiceid'");
-          $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$invoiceid'");
+          // Determine which table to use for cart items
+          $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billing_number'");
+          $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billing_number'");
           
           $creditItems = 0;
           $regularItems = 0;
@@ -331,7 +366,7 @@ function selectAllProducts() {
             <div class="row-fluid">
               <div class="span6">
                 <h3>
-                  Facture #<?php echo htmlspecialchars($invoiceid); ?>
+                  Facture #<?php echo htmlspecialchars($billing_number); ?>
                   <?php if ($isCredit): ?>
                   <span class="credit-badge">Vente à Terme</span>
                   <?php endif; ?>
@@ -370,8 +405,13 @@ function selectAllProducts() {
                 <span class="payment-value"><?php echo number_format($paidAmount, 2); ?> GNF</span>
               </div>
               <div class="span4">
-                <span class="payment-label">Reste à payer:</span> 
+                <span class="payment-label">Dette actuelle:</span> 
                 <span class="payment-value"><?php echo number_format($duesAmount, 2); ?> GNF</span>
+                <?php if($duesAmount > 0): ?>
+                <br><small style="color: #856404; font-style: italic;">
+                  ⚠️ Les retours réduiront cette dette
+                </small>
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -379,7 +419,7 @@ function selectAllProducts() {
         
           <!-- Return Form -->
           <form method="post" class="return-form">
-            <input type="hidden" name="invoice_id" value="<?php echo $invoiceid; ?>">
+            <input type="hidden" name="billing_number" value="<?php echo $billing_number; ?>">
             
             <div class="widget-box">
               <div class="widget-title"> 
@@ -394,33 +434,35 @@ function selectAllProducts() {
                         <input type="checkbox" id="select_all" onchange="selectAllProducts()"> Tout
                       </th>
                       <th width="25%">Nom du produit</th>
-                      <th width="15%">Référence</th>
-                      <th width="10%">Qté achetée</th>
-                      <th width="15%">Prix unitaire</th>
-                      <th width="15%">Qté à retourner</th>
-                      <th width="15%">Total</th>
+                      <th width="10%">Référence</th>
+                      <th width="8%">Stock</th>
+                      <th width="8%">Qté achetée</th>
+                      <th width="12%">Prix unitaire</th>
+                      <th width="12%">Qté à retourner</th>
+                      <th width="15%">Montant retour</th>
                     </tr>
                   </thead>
                   <tbody>
                   <?php
-                  // Get product details
+                  // Get product details using correct column names
                   $stmt = mysqli_prepare($con, "SELECT 
-                                              tblproducts.ID,
-                                              tblproducts.ProductName,
-                                              tblproducts.ModelNumber,
-                                              tblproducts.Price,
-                                              $useTable.ProductQty,
-                                              $useTable.Price as CartPrice
+                                              p.ID,
+                                              p.ProductName,
+                                              p.ModelNumber,
+                                              p.Price,
+                                              p.Stock,
+                                              c.ProductQty,
+                                              c.Price as CartPrice
                                             FROM 
-                                              $useTable
+                                              $useTable c
                                             JOIN 
-                                              tblproducts ON $useTable.ProductId = tblproducts.ID
+                                              tblproducts p ON c.ProductId = p.ID
                                             WHERE 
-                                              $useTable.BillingId = ?
+                                              c.BillingId = ?
                                             ORDER BY
-                                              tblproducts.ProductName ASC");
+                                              p.ProductName ASC");
                   
-                  mysqli_stmt_bind_param($stmt, "s", $invoiceid);
+                  mysqli_stmt_bind_param($stmt, "s", $billing_number);
                   mysqli_stmt_execute($stmt);
                   $productResult = mysqli_stmt_get_result($stmt);
                   
@@ -428,28 +470,52 @@ function selectAllProducts() {
                     while($productRow = mysqli_fetch_assoc($productResult)) {
                       $product_id = $productRow['ID'];
                       $pq = $productRow['ProductQty'];
+                      $current_stock = $productRow['Stock'];
                       $ppu = $productRow['CartPrice'] ?: $productRow['Price'];
                       $total = $pq * $ppu;
+                      
+                      // Check if this product was already returned
+                      $returned_query = mysqli_query($con, "SELECT SUM(Quantity) as returned_qty FROM tblreturns WHERE BillingNumber='$billing_number' AND ProductID='$product_id'");
+                      $returned_data = mysqli_fetch_assoc($returned_query);
+                      $already_returned = $returned_data['returned_qty'] ?: 0;
+                      $available_for_return = $pq - $already_returned;
                   ?>
                     <tr id="product_row_<?php echo $product_id; ?>">
                       <td>
+                        <?php if($available_for_return > 0): ?>
                         <input type="checkbox" name="return_items[]" value="<?php echo $product_id; ?>" 
                                class="return-checkbox" onchange="toggleReturnRow(this, <?php echo $product_id; ?>)">
+                        <?php else: ?>
+                        <span style="color: #999;">Déjà retourné</span>
+                        <?php endif; ?>
                       </td>
-                      <td><?php echo htmlspecialchars($productRow['ProductName']); ?></td>
+                      <td>
+                        <?php echo htmlspecialchars($productRow['ProductName']); ?>
+                        <?php if($already_returned > 0): ?>
+                        <br><small class="stock-info">Déjà retourné: <?php echo $already_returned; ?></small>
+                        <?php endif; ?>
+                      </td>
                       <td><?php echo htmlspecialchars($productRow['ModelNumber']); ?></td>
+                      <td>
+                        <span class="stock-info"><?php echo $current_stock; ?></span>
+                      </td>
                       <td><?php echo $pq; ?></td>
                       <td><?php echo number_format($ppu, 2); ?></td>
                       <td>
+                        <?php if($available_for_return > 0): ?>
                         <input type="number" 
                                id="return_qty_<?php echo $product_id; ?>"
                                name="return_qty[<?php echo $product_id; ?>]" 
                                class="return-qty-input" 
                                min="0" 
-                               max="<?php echo $pq; ?>" 
+                               max="<?php echo $available_for_return; ?>" 
                                disabled
-                               onchange="validateReturnQty(this, <?php echo $pq; ?>)"
+                               onchange="validateReturnQty(this, <?php echo $available_for_return; ?>)"
                                oninput="calculateReturnTotal()">
+                        <br><small class="stock-info">Max: <?php echo $available_for_return; ?></small>
+                        <?php else: ?>
+                        <span style="color: #999;">0</span>
+                        <?php endif; ?>
                         <input type="hidden" id="unit_price_<?php echo $product_id; ?>" value="<?php echo $ppu; ?>">
                       </td>
                       <td><?php echo number_format($total, 2); ?></td>
@@ -459,7 +525,7 @@ function selectAllProducts() {
                   } else { 
                   ?>
                     <tr>
-                      <td colspan="7" class="text-center">Aucun produit trouvé pour cette facture</td>
+                      <td colspan="8" class="text-center">Aucun produit trouvé pour cette facture</td>
                     </tr>
                   <?php 
                   } 
@@ -482,6 +548,8 @@ function selectAllProducts() {
                         <option value="Erreur de commande">Erreur de commande</option>
                         <option value="Client insatisfait">Client insatisfait</option>
                         <option value="Produit endommagé">Produit endommagé</option>
+                        <option value="Produit périmé">Produit périmé</option>
+                        <option value="Mauvaise taille/couleur">Mauvaise taille/couleur</option>
                         <option value="Autre">Autre</option>
                       </select>
                     </div>
@@ -490,6 +558,19 @@ function selectAllProducts() {
                 <div class="span6">
                   <div class="text-right">
                     <h4>Montant total du retour: <span id="return_total_display">0.00</span> GNF</h4>
+                    
+                    <!-- Dues Calculation Display -->
+                    <?php if($duesAmount > 0): ?>
+                    <input type="hidden" id="current_dues" value="<?php echo $duesAmount; ?>">
+                    <div id="dues_calculation" style="display: none; margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px;">
+                      <h5 style="margin: 0; color: #856404;">Impact sur les dettes:</h5>
+                      <p style="margin: 5px 0; color: #856404;">
+                        <strong>Dette actuelle:</strong> <?php echo number_format($duesAmount, 2); ?> GNF<br>
+                        <strong>Réduction de dette:</strong> <span id="dues_reduction_display">0.00</span> GNF<br>
+                        <strong>Nouvelle dette:</strong> <span id="new_dues_display"><?php echo number_format($duesAmount, 2); ?></span> GNF
+                      </p>
+                    </div>
+                    <?php endif; ?>
                   </div>
                 </div>
               </div>
