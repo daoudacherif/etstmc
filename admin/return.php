@@ -1,1204 +1,538 @@
 <?php
-// ============== PAGE return.php COMPLÈTE ET AMÉLIORÉE ==============
 session_start();
 error_reporting(0);
 include('includes/dbconnection.php');
+if (strlen($_SESSION['imsaid']==0)) {
+  header('location:logout.php');
+} else {
 
-// Vérification de la session admin
-if (strlen($_SESSION['imsaid']) == 0) {
-    header('location:logout.php');
-    exit;
-}
-
-// ==========================
-// TRAITEMENT AJAX POUR LA VALIDATION DE FACTURE
-// ==========================
-if (isset($_POST['ajax_validate_billing'])) {
-    header('Content-Type: application/json; charset=utf-8');
+// Handle return submission
+if(isset($_POST['process_return'])) {
+    $invoice_id = mysqli_real_escape_string($con, $_POST['invoice_id']);
+    $return_reason = mysqli_real_escape_string($con, $_POST['return_reason']);
+    $return_date = date('Y-m-d H:i:s');
     
-    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
-    $response = array('valid' => false);
+    // Generate return ID
+    $return_id = 'RET' . date('YmdHis') . rand(100, 999);
     
-    if (empty($billingNumber)) {
-        $response['message'] = 'Numéro de facture requis.';
-        echo json_encode($response);
-        exit;
-    }
+    $total_return_amount = 0;
+    $items_returned = 0;
     
-    // Vérifier l'existence de la facture - même logique que invoice-search.php
-    $stmt = mysqli_prepare($con, "SELECT DISTINCT 
-                                  tblcustomer.CustomerName,
-                                  tblcustomer.MobileNumber,
-                                  tblcustomer.ModeofPayment,
-                                  tblcustomer.BillingDate,
-                                  tblcustomer.BillingNumber,
-                                  tblcustomer.FinalAmount,
-                                  tblcustomer.Paid,
-                                  tblcustomer.Dues
-                                FROM 
-                                  tblcustomer
-                                LEFT JOIN 
-                                  tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
-                                LEFT JOIN 
-                                  tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
-                                WHERE 
-                                  tblcustomer.BillingNumber = ?
-                                LIMIT 1");
-    
-    mysqli_stmt_bind_param($stmt, "s", $billingNumber);
-    mysqli_stmt_execute($stmt);
-    $customerResult = mysqli_stmt_get_result($stmt);
-    
-    if (mysqli_num_rows($customerResult) == 0) {
-        $response['message'] = 'Numéro de facture introuvable dans le système.';
-        echo json_encode($response);
-        exit;
-    }
-    
-    $customer = mysqli_fetch_assoc($customerResult);
-    mysqli_stmt_close($stmt);
-    
-    // Déterminer quelle table utiliser
-    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
-    $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$billingNumber'");
-    
-    $creditItems = 0;
-    $regularItems = 0;
-    
-    if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
-        $creditItems = $rowCredit['count'];
-    }
-    
-    if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
-        $regularItems = $rowRegular['count'];
-    }
-    
-    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
-    $saleType = ($creditItems > 0) ? 'Vente à Terme' : 'Vente Cash';
-    
-    // Récupérer les produits
-    $stmt2 = mysqli_prepare($con, "
-        SELECT 
-            p.ID as ProductId,
-            p.ProductName,
-            p.CompanyName,
-            p.ModelNumber,
-            p.Stock as CurrentStock,
-            cart.ProductQty,
-            COALESCE(cart.Price, p.Price) as Price
-        FROM $useTable cart
-        INNER JOIN tblproducts p ON cart.ProductId = p.ID
-        WHERE cart.BillingId = ?
-        ORDER BY p.ProductName ASC
-    ");
-    
-    mysqli_stmt_bind_param($stmt2, "s", $billingNumber);
-    mysqli_stmt_execute($stmt2);
-    $productsResult = mysqli_stmt_get_result($stmt2);
-    
-    // Construire les options de produits
-    $productOptions = '<option value="">-- Sélectionner un produit --</option>';
-    $totalProductCount = 0;
-    $returnableProductCount = 0;
-    
-    while ($product = mysqli_fetch_assoc($productsResult)) {
-        // Vérifier les retours existants
-        $returnQuery = mysqli_query($con, "SELECT COALESCE(SUM(Quantity), 0) as returned_qty FROM tblreturns WHERE BillingNumber='$billingNumber' AND ProductID='{$product['ProductId']}'");
-        $returnData = mysqli_fetch_assoc($returnQuery);
-        $returnedQty = $returnData['returned_qty'];
-        $availableReturn = $product['ProductQty'] - $returnedQty;
-        
-        $totalProductCount++;
-        
-        $productName = htmlspecialchars($product['ProductName']);
-        $disabled = '';
-        $statusBadge = '✅';
-        $statusText = "Retournable: {$availableReturn}";
-        
-        if ($availableReturn <= 0) {
-            $disabled = 'disabled';
-            $statusBadge = '❌';
-            $statusText = "Entièrement retourné";
-        } else {
-            $returnableProductCount++;
-        }
-        
-        $productOptions .= sprintf(
-            '<option value="%d" %s data-qty="%d" data-returned="%d" data-available="%d" data-price="%.2f">%s %s | Vendu: %d | Prix: %.2f GNF | %s</option>',
-            $product['ProductId'],
-            $disabled,
-            $product['ProductQty'],
-            $returnedQty,
-            $availableReturn,
-            $product['Price'],
-            $statusBadge,
-            $productName,
-            $product['ProductQty'],
-            $product['Price'],
-            $statusText
-        );
-    }
-    
-    mysqli_stmt_close($stmt2);
-    
-    // Construire les informations client
-    $saleDate = date('d/m/Y à H:i', strtotime($customer['BillingDate']));
-    $daysSinceSale = round((time() - strtotime($customer['BillingDate'])) / (24 * 3600));
-    $isCredit = ($customer['Dues'] > 0 || $customer['ModeofPayment'] == 'credit');
-    
-    $customerInfo = "
-        <div style='padding: 12px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #28a745;'>
-            <h5 style='margin-top: 0; color: #28a745;'>
-                <i class='icon-ok-circle'></i> Facture Validée
-            </h5>
-            
-            <div class='row-fluid'>
-                <div class='span6'>
-                    <strong>👤 Client:</strong> " . htmlspecialchars($customer['CustomerName']) . "<br>
-                    <strong>📞 Téléphone:</strong> " . htmlspecialchars($customer['MobileNumber']) . "<br>
-                    <strong>🧾 N° Facture:</strong> " . htmlspecialchars($customer['BillingNumber']) . "<br>
-                    <strong>💳 Type:</strong> {$saleType}
-                </div>
-                <div class='span6'>
-                    <strong>📅 Date de vente:</strong> {$saleDate}<br>
-                    <strong>⏰ Ancienneté:</strong> {$daysSinceSale} jour(s)<br>
-                    <strong>💰 Montant total:</strong> " . number_format($customer['FinalAmount'], 2) . " GNF";
-    
-    if ($isCredit) {
-        $customerInfo .= "<br><strong>💵 Payé:</strong> " . number_format($customer['Paid'], 2) . " GNF";
-        $customerInfo .= "<br><strong>🔴 Reste dû:</strong> " . number_format($customer['Dues'], 2) . " GNF";
-    }
-    
-    $customerInfo .= "
-                </div>
-            </div>
-            
-            <div style='margin-top: 10px; padding: 8px; background: white; border-radius: 3px;'>
-                <strong>📊 Résumé:</strong> 
-                {$totalProductCount} produit(s) vendus • 
-                {$returnableProductCount} produit(s) retournable(s) • 
-                Table utilisée: {$useTable}
-            </div>
-        </div>";
-    
-    $response = array(
-        'valid' => true,
-        'customerInfo' => $customerInfo,
-        'productOptions' => $productOptions,
-        'statistics' => array(
-            'totalProducts' => $totalProductCount,
-            'returnableProducts' => $returnableProductCount,
-            'totalAmount' => $customer['FinalAmount'],
-            'customerName' => $customer['CustomerName']
-        )
-    );
-    
-    echo json_encode($response);
-    exit;
-}
-
-// ==========================
-// TRAITEMENT AJAX POUR LES DÉTAILS PRODUIT
-// ==========================
-if (isset($_POST['ajax_get_product_details'])) {
-    header('Content-Type: application/json; charset=utf-8');
-    
-    $productID = intval($_POST['productid']);
-    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
-    
-    $response = array('success' => false);
-    
-    if ($productID <= 0 || empty($billingNumber)) {
-        $response['message'] = 'Paramètres invalides.';
-        echo json_encode($response);
-        exit;
-    }
-    
-    // Déterminer quelle table utiliser
-    $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
-    $creditItems = mysqli_fetch_assoc($checkCreditCart)['count'];
-    $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
-    
-    // Récupérer les détails
-    $query = "
-        SELECT 
-            p.ProductName,
-            p.CompanyName,
-            p.ModelNumber,
-            p.Stock as CurrentStock,
-            cart.ProductQty as OriginalQty,
-            COALESCE(cart.Price, p.Price) as OriginalPrice,
-            cust.CustomerName,
-            cust.BillingDate as SaleDate
-        FROM $useTable cart
-        INNER JOIN tblproducts p ON p.ID = cart.ProductId
-        INNER JOIN tblcustomer cust ON cust.BillingNumber = cart.BillingId
-        WHERE cart.BillingId = '$billingNumber' AND cart.ProductId = $productID
-        LIMIT 1
-    ";
-    
-    $result = mysqli_query($con, $query);
-    
-    if (mysqli_num_rows($result) == 0) {
-        $response['message'] = "Ce produit n'a pas été vendu dans cette facture.";
-        echo json_encode($response);
-        exit;
-    }
-    
-    $saleData = mysqli_fetch_assoc($result);
-    
-    // Calculer les quantités retournées
-    $returnQuery = mysqli_query($con, "SELECT COALESCE(SUM(Quantity), 0) as TotalReturned FROM tblreturns WHERE BillingNumber='$billingNumber' AND ProductID=$productID");
-    $returnData = mysqli_fetch_assoc($returnQuery);
-    
-    $originalQty = intval($saleData['OriginalQty']);
-    $alreadyReturned = intval($returnData['TotalReturned']);
-    $availableToReturn = $originalQty - $alreadyReturned;
-    $originalPrice = floatval($saleData['OriginalPrice']);
-    
-    $details = "
-        <div style='padding: 10px; border-left: 4px solid #2c5aa0;'>
-            <h5 style='margin-top: 0; color: #2c5aa0;'>" . htmlspecialchars($saleData['ProductName']) . "</h5>
-            
-            <div class='row-fluid'>
-                <div class='span6'>
-                    <strong>📦 Marque:</strong> " . htmlspecialchars($saleData['CompanyName'] ?: 'Non spécifiée') . "<br>
-                    <strong>🔖 Référence:</strong> " . htmlspecialchars($saleData['ModelNumber'] ?: 'Non spécifiée') . "<br>
-                    <strong>💰 Prix unitaire:</strong> " . number_format($originalPrice, 2) . " GNF
-                </div>
-                <div class='span6'>
-                    <strong>📊 Vendu:</strong> <span class='badge badge-info'>{$originalQty}</span><br>
-                    <strong>↩️ Retourné:</strong> <span class='badge badge-warning'>{$alreadyReturned}</span><br>
-                    <strong>✅ Disponible:</strong> <span class='badge badge-success'>{$availableToReturn}</span>
-                </div>
-            </div>
-        </div>";
-    
-    $response = array(
-        'success' => true,
-        'details' => $details,
-        'data' => array(
-            'productName' => $saleData['ProductName'],
-            'originalQty' => $originalQty,
-            'alreadyReturned' => $alreadyReturned,
-            'maxReturn' => $availableToReturn,
-            'originalPrice' => $originalPrice,
-            'canReturn' => $availableToReturn > 0
-        )
-    );
-    
-    echo json_encode($response);
-    exit;
-}
-
-// ==========================
-// Traitement du formulaire de retour avec VALIDATION SÉCURISÉE
-// ==========================
-if (isset($_POST['submit'])) {
-    // Nettoyage et validation des entrées
-    $billingNumber = mysqli_real_escape_string($con, trim($_POST['billingnumber']));
-    $productID     = intval($_POST['productid']);
-    $quantity      = intval($_POST['quantity']);
-    $returnPrice   = floatval($_POST['price']);
-    $returnDate    = mysqli_real_escape_string($con, $_POST['returndate']);
-    $reason        = mysqli_real_escape_string($con, trim($_POST['reason']));
-
-    // Tableau pour collecter les erreurs
-    $errors = [];
-
-    // Validation de base
-    if (empty($billingNumber)) {
-        $errors[] = "Le numéro de facture est requis.";
-    }
-    if ($productID <= 0) {
-        $errors[] = "Veuillez sélectionner un produit valide.";
-    }
-    if ($quantity <= 0) {
-        $errors[] = "La quantité doit être supérieure à zéro.";
-    }
-    if ($returnPrice < 0) {
-        $errors[] = "Le prix de retour ne peut pas être négatif.";
-    }
-    if (empty($returnDate)) {
-        $errors[] = "La date de retour est requise.";
-    }
-
-    // Validation avancée si pas d'erreurs de base
-    if (empty($errors)) {
-        try {
-            // Vérifier l'existence de la facture
-            $checkInvoice = mysqli_query($con, "SELECT ID FROM tblcustomer WHERE BillingNumber = '$billingNumber'");
-            
-            if (mysqli_num_rows($checkInvoice) == 0) {
-                $errors[] = "Numéro de facture invalide. Cette facture n'existe pas.";
-            }
-
-            // Déterminer quelle table utiliser
-            if (empty($errors)) {
-                $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$billingNumber'");
-                $creditItems = mysqli_fetch_assoc($checkCreditCart)['count'];
-                $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+    // Process each returned item
+    if(isset($_POST['return_qty']) && is_array($_POST['return_qty'])) {
+        foreach($_POST['return_qty'] as $product_id => $return_qty) {
+            $return_qty = intval($return_qty);
+            if($return_qty > 0) {
+                // Get product details
+                $product_query = mysqli_query($con, "SELECT Price FROM tblproducts WHERE ID='$product_id'");
+                $product_data = mysqli_fetch_assoc($product_query);
+                $unit_price = $product_data['Price'];
+                $return_amount = $return_qty * $unit_price;
                 
-                // Récupérer les détails de la vente originale
-                $saleQuery = mysqli_query($con, "
-                    SELECT ProductQty, COALESCE(Price, 0) as Price 
-                    FROM $useTable 
-                    WHERE BillingId = '$billingNumber' AND ProductId = $productID
-                ");
+                // Insert return record
+                $insert_return = mysqli_query($con, "INSERT INTO tblreturns 
+                    (ReturnId, InvoiceId, ProductId, ReturnQty, UnitPrice, ReturnAmount, ReturnReason, ReturnDate) 
+                    VALUES 
+                    ('$return_id', '$invoice_id', '$product_id', '$return_qty', '$unit_price', '$return_amount', '$return_reason', '$return_date')");
                 
-                if (mysqli_num_rows($saleQuery) == 0) {
-                    $errors[] = "Ce produit n'a pas été vendu dans cette facture.";
-                } else {
-                    $saleData = mysqli_fetch_assoc($saleQuery);
-                    $originalQty = $saleData['ProductQty'];
-                    $originalPrice = $saleData['Price'];
+                if($insert_return) {
+                    // Update product stock (add back returned quantity)
+                    mysqli_query($con, "UPDATE tblproducts SET ProductStock = ProductStock + $return_qty WHERE ID='$product_id'");
                     
-                    // Si le prix n'est pas dans la table cart, récupérer depuis tblproducts
-                    if ($originalPrice == 0) {
-                        $priceQuery = mysqli_query($con, "SELECT Price FROM tblproducts WHERE ID = $productID");
-                        if ($priceRow = mysqli_fetch_assoc($priceQuery)) {
-                            $originalPrice = $priceRow['Price'];
-                        }
-                    }
-                    
-                    // Vérifier les quantités déjà retournées
-                    $returnQuery = mysqli_query($con, "
-                        SELECT COALESCE(SUM(Quantity), 0) as TotalReturned 
-                        FROM tblreturns 
-                        WHERE BillingNumber = '$billingNumber' AND ProductID = $productID
-                    ");
-                    $returnData = mysqli_fetch_assoc($returnQuery);
-                    $alreadyReturned = $returnData['TotalReturned'];
-                    
-                    $availableToReturn = $originalQty - $alreadyReturned;
-                    
-                    // Validation des quantités
-                    if ($quantity > $availableToReturn) {
-                        $errors[] = "Quantité invalide. Maximum retournable: $availableToReturn";
-                    }
-                    
-                    // Validation du prix
-                    if ($returnPrice > $originalPrice) {
-                        $errors[] = "Le prix de retour ne peut pas dépasser le prix de vente original.";
-                    }
+                    $total_return_amount += $return_amount;
+                    $items_returned++;
                 }
             }
-        } catch (Exception $e) {
-            $errors[] = "Erreur de validation: " . $e->getMessage();
         }
-    }
-
-    // Traitement si aucune erreur
-    if (empty($errors)) {
-        try {
-            // Démarrer une transaction
-            mysqli_autocommit($con, FALSE);
-            
-            // Insérer le retour
-            $insertQuery = "
-                INSERT INTO tblreturns(BillingNumber, ReturnDate, ProductID, Quantity, Reason, ReturnPrice, CreatedAt) 
-                VALUES('$billingNumber', '$returnDate', $productID, $quantity, '$reason', $returnPrice, NOW())
-            ";
-            
-            if (!mysqli_query($con, $insertQuery)) {
-                throw new Exception("Erreur lors de l'enregistrement du retour.");
-            }
-            
-            // Mettre à jour le stock
-            $updateStockQuery = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID = $productID";
-            
-            if (!mysqli_query($con, $updateStockQuery)) {
-                throw new Exception("Erreur lors de la mise à jour du stock.");
-            }
-            
-            // Valider la transaction
-            mysqli_commit($con);
-            
-            echo "<script>
-                    alert('Retour enregistré avec succès!');
-                    window.location.href='return.php';
-                  </script>";
-            exit;
-            
-        } catch (Exception $e) {
-            // Annuler la transaction en cas d'erreur
-            mysqli_rollback($con);
-            $errors[] = $e->getMessage();
-        }
-        
-        // Réactiver l'autocommit
-        mysqli_autocommit($con, TRUE);
     }
     
-    // Afficher les erreurs s'il y en a
-    if (!empty($errors)) {
-        $errorMessage = implode("\\n", $errors);
-        echo "<script>alert('Erreurs de validation:\\n$errorMessage');</script>";
+    if($items_returned > 0) {
+        $success_msg = "Retour traité avec succès! ID de retour: $return_id";
+    } else {
+        $error_msg = "Aucun produit sélectionné pour le retour.";
     }
 }
-
-// ==========================
-// Récupération des statistiques du jour
-// ==========================
-$statsQuery = "SELECT 
-                COUNT(*) as total_returns,
-                SUM(Quantity) as total_quantity,
-                SUM(ReturnPrice * Quantity) as total_value
-               FROM tblreturns 
-               WHERE DATE(ReturnDate) = CURDATE()";
-$statsResult = mysqli_query($con, $statsQuery);
-$stats = mysqli_fetch_assoc($statsResult);
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <title>Gestion des stocks | Retours de produits</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Système de Gestion d'Inventaire || Retour de Produits</title>
+<?php include_once('includes/cs.php');?>
+<?php include_once('includes/responsive.php'); ?>
+<style>
+  .invoice-box {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+  .invoice-header {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+  }
+  .invoice-total {
+    font-weight: bold;
+    color: #d9534f;
+  }
+  .search-form {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  .customer-info td, .customer-info th {
+    padding: 8px;
+  }
+  
+  /* Return-specific styles */
+  .return-form {
+    background-color: #e8f5e8;
+    border: 2px solid #4caf50;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 20px;
+  }
+  
+  .return-qty-input {
+    width: 60px;
+    text-align: center;
+  }
+  
+  .return-checkbox {
+    margin-right: 10px;
+  }
+  
+  .return-row {
+    background-color: #f0f8f0;
+  }
+  
+  .return-summary {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 20px;
+  }
+  
+  .alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  
+  .alert-error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  
+  .credit-badge {
+    display: inline-block;
+    padding: 3px 7px;
+    background-color: #f0ad4e;
+    color: white;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-left: 10px;
+  }
+  
+  .dues-info {
+    background-color: #fff3cd;
+    padding: 10px;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .payment-label {
+    font-weight: bold;
+    color: #856404;
+  }
+</style>
+<script>
+function toggleReturnRow(checkbox, productId) {
+    var row = document.getElementById('product_row_' + productId);
+    var qtyInput = document.getElementById('return_qty_' + productId);
     
-    <?php include_once('includes/cs.php'); ?>
-    <?php include_once('includes/responsive.php'); ?>
+    if(checkbox.checked) {
+        row.classList.add('return-row');
+        qtyInput.disabled = false;
+        qtyInput.focus();
+    } else {
+        row.classList.remove('return-row');
+        qtyInput.disabled = true;
+        qtyInput.value = '';
+    }
+    calculateReturnTotal();
+}
+
+function validateReturnQty(input, maxQty) {
+    var value = parseInt(input.value);
+    if(value > maxQty) {
+        alert('La quantité de retour ne peut pas dépasser la quantité achetée (' + maxQty + ')');
+        input.value = maxQty;
+    }
+    if(value < 0) {
+        input.value = 0;
+    }
+    calculateReturnTotal();
+}
+
+function calculateReturnTotal() {
+    var total = 0;
+    var checkboxes = document.querySelectorAll('input[name="return_items[]"]:checked');
     
-    <!-- Styles personnalisés pour les retours -->
-    <style>
-        /* ==================== STYLES POUR LA GESTION DES RETOURS ==================== */
-        .stats-card {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stats-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .stats-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #007bff, #28a745, #ffc107);
-        }
-
-        .stats-card h4 {
-            color: #495057;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .stats-card p {
-            margin: 0;
-            font-size: 1.2em;
-        }
-
-        #billing-info {
-            border-radius: 6px;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-
-        #billing-info.alert-success {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            border-left: 4px solid #28a745;
-            color: #155724;
-        }
-
-        #billing-info.alert-error {
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-        }
-
-        #billing-info.alert-warning {
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-            border-left: 4px solid #ffc107;
-            color: #856404;
-        }
-
-        #billing-info.alert-info {
-            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-            border-left: 4px solid #17a2b8;
-            color: #0c5460;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .icon-spinner.icon-spin {
-            animation: spin 1s linear infinite;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            font-size: 0.875em;
-            font-weight: bold;
-            line-height: 1;
-            text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 4px;
-        }
-
-        .badge-success {
-            background-color: #28a745;
-            color: white;
-        }
-
-        .badge-warning {
-            background-color: #ffc107;
-            color: #212529;
-        }
-
-        .badge-important {
-            background-color: #dc3545;
-            color: white;
-        }
-
-        .badge-info {
-            background-color: #17a2b8;
-            color: white;
-        }
-
-        .control-label span[style*="color:red"] {
-            color: #dc3545 !important;
-            font-weight: bold;
-        }
-
-        .btn {
-            transition: all 0.3s ease;
-            border-radius: 4px;
-            font-weight: 500;
-        }
-
-        .btn:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            border: none;
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            border: none;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            border: none;
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .toast-notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-            min-width: 300px;
-            max-width: 500px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            border-radius: 6px;
-            animation: slideInRight 0.3s ease;
-        }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
+    checkboxes.forEach(function(checkbox) {
+        var productId = checkbox.value;
+        var qtyInput = document.getElementById('return_qty_' + productId);
+        var unitPrice = parseFloat(document.getElementById('unit_price_' + productId).value);
+        var qty = parseInt(qtyInput.value) || 0;
         
-        .input-append .btn {
-            margin-left: -1px;
-            border-radius: 0 4px 4px 0;
-        }
-        
-        .input-append input {
-            border-radius: 4px 0 0 4px;
-        }
+        total += qty * unitPrice;
+    });
+    
+    document.getElementById('return_total_display').textContent = total.toFixed(2);
+}
 
-        @media (max-width: 768px) {
-            .stats-card {
-                margin-bottom: 10px;
-                padding: 15px;
-            }
-            
-            .toast-notification {
-                left: 10px;
-                right: 10px;
-                min-width: auto;
-                max-width: none;
-            }
-        }
-    </style>
+function selectAllProducts() {
+    var checkboxes = document.querySelectorAll('input[name="return_items[]"]');
+    var selectAll = document.getElementById('select_all').checked;
+    
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = selectAll;
+        toggleReturnRow(checkbox, checkbox.value);
+    });
+}
+</script>
 </head>
-
 <body>
-<?php include_once('includes/header.php'); ?>
-<?php include_once('includes/sidebar.php'); ?>
+<?php include_once('includes/header.php');?>
+<?php include_once('includes/sidebar.php');?>
 
 <div id="content">
-    <div id="content-header">
-        <div id="breadcrumb">
-            <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom">
-                <i class="icon-home"></i> Accueil
-            </a>
-            <a href="return.php" class="current">Retours de produits</a>
-        </div>
-        <h1>Gérer les retours de produits</h1>
+  <div id="content-header">
+    <div id="breadcrumb"> 
+      <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> 
+      <a href="product-return.php" class="current">Retour de Produits</a> 
     </div>
-
-    <div class="container-fluid">
-        <!-- =========== STATISTIQUES DU JOUR =========== -->
-        <div class="row-fluid">
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-retweet"></i> Retours aujourd'hui</h4>
-                    <p><strong><?php echo $stats['total_returns'] ?: 0; ?></strong> retours</p>
-                </div>
-            </div>
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-shopping-cart"></i> Quantité totale</h4>
-                    <p><strong><?php echo $stats['total_quantity'] ?: 0; ?></strong> articles</p>
-                </div>
-            </div>
-            <div class="span4">
-                <div class="stats-card">
-                    <h4><i class="icon-money"></i> Valeur totale</h4>
-                    <p><strong><?php echo number_format($stats['total_value'] ?: 0, 2); ?> GNF</strong></p>
-                </div>
-            </div>
-        </div>
-
-        <hr>
-
-        <!-- =========== FORMULAIRE DE NOUVEAU RETOUR =========== -->
-        <div class="row-fluid">
-            <div class="span12">
-                <div class="widget-box">
-                    <div class="widget-title">
-                        <span class="icon"><i class="icon-plus"></i></span>
-                        <h5>Ajouter un nouveau retour</h5>
-                    </div>
-                    <div class="widget-content nopadding">
-                        <form method="post" class="form-horizontal" id="returnForm">
-
-                            <!-- Numéro de facture avec bouton de vérification -->
-                            <div class="control-group">
-                                <label class="control-label">Numéro de facture <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <div class="input-append">
-                                        <input type="text" id="billingnumber" name="billingnumber" 
-                                               placeholder="ex. 123456789" required maxlength="50" 
-                                               autocomplete="off" style="width: 250px;" />
-                                        <button type="button" id="verifyBtn" class="btn btn-primary" onclick="validateBilling()">
-                                            <i class="icon-search"></i> Vérifier
-                                        </button>
-                                    </div>
-                                    <div id="billing-info" class="alert" style="display:none; margin-top:10px;"></div>
-                                </div>
-                            </div>
-
-                            <!-- Date de retour -->
-                            <div class="control-group">
-                                <label class="control-label">Date de retour <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="date" name="returndate" value="<?php echo date('Y-m-d'); ?>" 
-                                           max="<?php echo date('Y-m-d'); ?>" required />
-                                    <span class="help-inline">La date ne peut pas être dans le futur</span>
-                                </div>
-                            </div>
-
-                            <!-- Sélection du produit -->
-                            <div class="control-group">
-                                <label class="control-label">Produit <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <select id="productid" name="productid" required disabled>
-                                        <option value="">-- Vérifiez d'abord le numéro de facture --</option>
-                                    </select>
-                                    <div id="product-details" class="alert alert-info" style="display:none; margin-top:10px;"></div>
-                                </div>
-                            </div>
-
-                            <!-- Quantité -->
-                            <div class="control-group">
-                                <label class="control-label">Quantité <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="number" id="quantity" name="quantity" min="1" value="1" required />
-                                    <span class="help-inline">Maximum basé sur la quantité disponible pour retour</span>
-                                </div>
-                            </div>
-
-                            <!-- Prix de retour -->
-                            <div class="control-group">
-                                <label class="control-label">Prix de retour <span style="color:red;">*</span>:</label>
-                                <div class="controls">
-                                    <input type="number" id="price" name="price" step="0.01" min="0" value="0" required />
-                                    <span class="help-inline">Prix maximum basé sur le prix de vente original</span>
-                                </div>
-                            </div>
-
-                            <!-- Raison -->
-                            <div class="control-group">
-                                <label class="control-label">Raison :</label>
-                                <div class="controls">
-                                    <select name="reason">
-                                        <option value="">-- Sélectionner une raison --</option>
-                                        <option value="Défaut produit">Défaut produit</option>
-                                        <option value="Mauvaise taille">Mauvaise taille</option>
-                                        <option value="Ne correspond pas à la description">Ne correspond pas à la description</option>
-                                        <option value="Changement d'avis">Changement d'avis</option>
-                                        <option value="Erreur de commande">Erreur de commande</option>
-                                        <option value="Autre">Autre</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" name="submit" class="btn btn-success" id="submitBtn">
-                                    <i class="icon-ok"></i> Enregistrer le retour
-                                </button>
-                                <button type="reset" class="btn btn-warning" onclick="resetForm()">
-                                    <i class="icon-refresh"></i> Réinitialiser
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <hr>
-
-        <!-- =========== LISTE DES RETOURS RÉCENTS =========== -->
-        <div class="row-fluid">
-            <div class="span12">
-                <div class="widget-box">
-                    <div class="widget-title">
-                        <span class="icon"><i class="icon-th"></i></span>
-                        <h5>Retours récents</h5>
-                    </div>
-                    <div class="widget-content nopadding">
-                        <table class="table table-bordered table-striped data-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Numéro de facture</th>
-                                    <th>Date de retour</th>
-                                    <th>Produit</th>
-                                    <th>Quantité</th>
-                                    <th>Prix unitaire</th>
-                                    <th>Total</th>
-                                    <th>Raison</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $sqlReturns = "
-                                    SELECT r.ID as returnID,
-                                           r.BillingNumber,
-                                           r.ReturnDate,
-                                           r.Quantity,
-                                           r.Reason,
-                                           r.ReturnPrice,
-                                           r.CreatedAt,
-                                           p.ProductName
-                                    FROM tblreturns r
-                                    LEFT JOIN tblproducts p ON p.ID = r.ProductID
-                                    ORDER BY r.ID DESC
-                                    LIMIT 50
-                                ";
-                                $returnsQuery = mysqli_query($con, $sqlReturns);
-                                $cnt = 1;
-                                
-                                if (mysqli_num_rows($returnsQuery) > 0) {
-                                    while ($row = mysqli_fetch_assoc($returnsQuery)) {
-                                        $totalPrice = $row['ReturnPrice'] * $row['Quantity'];
-                                        ?>
-                                        <tr>
-                                            <td><?php echo $cnt; ?></td>
-                                            <td><?php echo htmlspecialchars($row['BillingNumber']); ?></td>
-                                            <td><?php echo date('d/m/Y', strtotime($row['ReturnDate'])); ?></td>
-                                            <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                                            <td><?php echo $row['Quantity']; ?></td>
-                                            <td><?php echo number_format($row['ReturnPrice'], 2); ?> GNF</td>
-                                            <td><?php echo number_format($totalPrice, 2); ?> GNF</td>
-                                            <td><?php echo htmlspecialchars($row['Reason'] ?: 'Non spécifiée'); ?></td>
-                                            <td>
-                                                <a href="view-return.php?id=<?php echo $row['returnID']; ?>" 
-                                                   class="btn btn-mini btn-info" title="Voir détails">
-                                                    <i class="icon-eye-open"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                        <?php
-                                        $cnt++;
-                                    }
-                                } else {
-                                    echo '<tr><td colspan="9" class="text-center">Aucun retour trouvé</td></tr>';
-                                }
-                                ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <h1>Retour de Produits</h1>
+  </div>
+  
+  <div class="container-fluid">
+    <hr>
+    
+    <?php if(isset($success_msg)) { ?>
+    <div class="alert alert-success">
+      <button class="close" data-dismiss="alert">×</button>
+      <strong>Succès!</strong> <?php echo $success_msg; ?>
     </div>
+    <?php } ?>
+    
+    <?php if(isset($error_msg)) { ?>
+    <div class="alert alert-error">
+      <button class="close" data-dismiss="alert">×</button>
+      <strong>Erreur!</strong> <?php echo $error_msg; ?>
+    </div>
+    <?php } ?>
+    
+    <div class="row-fluid">
+      <div class="span12">
+        <!-- Search Form -->
+        <div class="widget-box search-form">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-search"></i></span>
+            <h5>Rechercher une Facture pour Retour</h5>
+          </div>
+          <div class="widget-content">
+            <form method="post" class="form-horizontal">
+              <div class="control-group">
+                <label class="control-label">Rechercher par :</label>
+                <div class="controls">
+                  <input type="text" class="span6" name="searchdata" id="searchdata" value="<?php echo isset($_POST['searchdata']) ? htmlspecialchars($_POST['searchdata']) : ''; ?>" required='true' placeholder="Numéro de facture ou numéro de mobile"/>
+                  <button class="btn btn-primary" type="submit" name="search"><i class="icon-search"></i> Rechercher</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      
+        <?php
+        if(isset($_POST['search'])) { 
+          $sdata = mysqli_real_escape_string($con, $_POST['searchdata']);
+        ?>
+        <div>
+          <h4 align="center">Facture trouvée pour "<?php echo htmlspecialchars($sdata); ?>"</h4>
+        </div>
+        
+        <?php
+        // Get customer information
+        $stmt = mysqli_prepare($con, "SELECT DISTINCT 
+                                      tblcustomer.CustomerName,
+                                      tblcustomer.MobileNumber,
+                                      tblcustomer.ModeofPayment,
+                                      tblcustomer.BillingDate,
+                                      tblcustomer.BillingNumber,
+                                      tblcustomer.FinalAmount,
+                                      tblcustomer.Paid,
+                                      tblcustomer.Dues
+                                    FROM 
+                                      tblcustomer
+                                    LEFT JOIN 
+                                      tblcart ON tblcustomer.BillingNumber = tblcart.BillingId
+                                    LEFT JOIN 
+                                      tblcreditcart ON tblcustomer.BillingNumber = tblcreditcart.BillingId
+                                    WHERE 
+                                      tblcustomer.BillingNumber = ? OR tblcustomer.MobileNumber = ?
+                                    LIMIT 1");
+        
+        mysqli_stmt_bind_param($stmt, "ss", $sdata, $sdata);
+        mysqli_stmt_execute($stmt);
+        $customerResult = mysqli_stmt_get_result($stmt);
+        
+        if(mysqli_num_rows($customerResult) > 0) {
+          $customerRow = mysqli_fetch_assoc($customerResult);
+          $invoiceid = $customerRow['BillingNumber'];
+          $finalAmount = $customerRow['FinalAmount'];
+          $paidAmount = $customerRow['Paid'];
+          $duesAmount = $customerRow['Dues'];
+          $formattedDate = date("d/m/Y", strtotime($customerRow['BillingDate']));
+          
+          $isCredit = ($customerRow['Dues'] > 0 || $customerRow['ModeofPayment'] == 'credit');
+          
+          // Determine which table to use
+          $checkCreditCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcreditcart WHERE BillingId='$invoiceid'");
+          $checkRegularCart = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$invoiceid'");
+          
+          $creditItems = 0;
+          $regularItems = 0;
+          
+          if ($rowCredit = mysqli_fetch_assoc($checkCreditCart)) {
+            $creditItems = $rowCredit['count'];
+          }
+          
+          if ($rowRegular = mysqli_fetch_assoc($checkRegularCart)) {
+            $regularItems = $rowRegular['count'];
+          }
+          
+          $useTable = ($creditItems > 0) ? 'tblcreditcart' : 'tblcart';
+        ?>
+        
+        <div class="invoice-box">
+          <div class="invoice-header">
+            <div class="row-fluid">
+              <div class="span6">
+                <h3>
+                  Facture #<?php echo htmlspecialchars($invoiceid); ?>
+                  <?php if ($isCredit): ?>
+                  <span class="credit-badge">Vente à Terme</span>
+                  <?php endif; ?>
+                </h3>
+                <p>Date: <?php echo $formattedDate; ?></p>
+              </div>
+              <div class="span6 text-right">
+                <h4><?php echo htmlspecialchars($_SERVER['HTTP_HOST']); ?></h4>
+                <p>Système de Gestion d'Inventaire</p>
+              </div>
+            </div>
+          </div>
+          
+          <table class="table customer-info">
+            <tr>
+              <th width="25%">Nom du client:</th>
+              <td width="25%"><?php echo htmlspecialchars($customerRow['CustomerName']); ?></td>
+              <th width="25%">Numéro de mobile:</th>
+              <td width="25%"><?php echo htmlspecialchars($customerRow['MobileNumber']); ?></td>
+            </tr>
+            <tr>
+              <th>Mode de paiement:</th>
+              <td colspan="3"><?php echo htmlspecialchars($customerRow['ModeofPayment']); ?></td>
+            </tr>
+          </table>
+          
+          <?php if ($isCredit): ?>
+          <div class="dues-info">
+            <div class="row-fluid">
+              <div class="span4">
+                <span class="payment-label">Montant total:</span> 
+                <span class="payment-value"><?php echo number_format($finalAmount, 2); ?> GNF</span>
+              </div>
+              <div class="span4">
+                <span class="payment-label">Montant payé:</span> 
+                <span class="payment-value"><?php echo number_format($paidAmount, 2); ?> GNF</span>
+              </div>
+              <div class="span4">
+                <span class="payment-label">Reste à payer:</span> 
+                <span class="payment-value"><?php echo number_format($duesAmount, 2); ?> GNF</span>
+              </div>
+            </div>
+          </div>
+          <?php endif; ?>
+        
+          <!-- Return Form -->
+          <form method="post" class="return-form">
+            <input type="hidden" name="invoice_id" value="<?php echo $invoiceid; ?>">
+            
+            <div class="widget-box">
+              <div class="widget-title"> 
+                <span class="icon"><i class="icon-th"></i></span>
+                <h5>Sélectionner les produits à retourner</h5>
+              </div>
+              <div class="widget-content nopadding">
+                <table class="table table-bordered table-striped">
+                  <thead>
+                    <tr>
+                      <th width="5%">
+                        <input type="checkbox" id="select_all" onchange="selectAllProducts()"> Tout
+                      </th>
+                      <th width="25%">Nom du produit</th>
+                      <th width="15%">Référence</th>
+                      <th width="10%">Qté achetée</th>
+                      <th width="15%">Prix unitaire</th>
+                      <th width="15%">Qté à retourner</th>
+                      <th width="15%">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  <?php
+                  // Get product details
+                  $stmt = mysqli_prepare($con, "SELECT 
+                                              tblproducts.ID,
+                                              tblproducts.ProductName,
+                                              tblproducts.ModelNumber,
+                                              tblproducts.Price,
+                                              $useTable.ProductQty,
+                                              $useTable.Price as CartPrice
+                                            FROM 
+                                              $useTable
+                                            JOIN 
+                                              tblproducts ON $useTable.ProductId = tblproducts.ID
+                                            WHERE 
+                                              $useTable.BillingId = ?
+                                            ORDER BY
+                                              tblproducts.ProductName ASC");
+                  
+                  mysqli_stmt_bind_param($stmt, "s", $invoiceid);
+                  mysqli_stmt_execute($stmt);
+                  $productResult = mysqli_stmt_get_result($stmt);
+                  
+                  if(mysqli_num_rows($productResult) > 0) {
+                    while($productRow = mysqli_fetch_assoc($productResult)) {
+                      $product_id = $productRow['ID'];
+                      $pq = $productRow['ProductQty'];
+                      $ppu = $productRow['CartPrice'] ?: $productRow['Price'];
+                      $total = $pq * $ppu;
+                  ?>
+                    <tr id="product_row_<?php echo $product_id; ?>">
+                      <td>
+                        <input type="checkbox" name="return_items[]" value="<?php echo $product_id; ?>" 
+                               class="return-checkbox" onchange="toggleReturnRow(this, <?php echo $product_id; ?>)">
+                      </td>
+                      <td><?php echo htmlspecialchars($productRow['ProductName']); ?></td>
+                      <td><?php echo htmlspecialchars($productRow['ModelNumber']); ?></td>
+                      <td><?php echo $pq; ?></td>
+                      <td><?php echo number_format($ppu, 2); ?></td>
+                      <td>
+                        <input type="number" 
+                               id="return_qty_<?php echo $product_id; ?>"
+                               name="return_qty[<?php echo $product_id; ?>]" 
+                               class="return-qty-input" 
+                               min="0" 
+                               max="<?php echo $pq; ?>" 
+                               disabled
+                               onchange="validateReturnQty(this, <?php echo $pq; ?>)"
+                               oninput="calculateReturnTotal()">
+                        <input type="hidden" id="unit_price_<?php echo $product_id; ?>" value="<?php echo $ppu; ?>">
+                      </td>
+                      <td><?php echo number_format($total, 2); ?></td>
+                    </tr>
+                  <?php
+                    }
+                  } else { 
+                  ?>
+                    <tr>
+                      <td colspan="7" class="text-center">Aucun produit trouvé pour cette facture</td>
+                    </tr>
+                  <?php 
+                  } 
+                  ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- Return Summary and Reason -->
+            <div class="return-summary">
+              <div class="row-fluid">
+                <div class="span6">
+                  <div class="control-group">
+                    <label class="control-label"><strong>Motif du retour:</strong></label>
+                    <div class="controls">
+                      <select name="return_reason" required class="span10">
+                        <option value="">Sélectionner un motif</option>
+                        <option value="Produit défectueux">Produit défectueux</option>
+                        <option value="Erreur de commande">Erreur de commande</option>
+                        <option value="Client insatisfait">Client insatisfait</option>
+                        <option value="Produit endommagé">Produit endommagé</option>
+                        <option value="Autre">Autre</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="span6">
+                  <div class="text-right">
+                    <h4>Montant total du retour: <span id="return_total_display">0.00</span> GNF</h4>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="row-fluid">
+                <div class="span12 text-center">
+                  <button type="submit" name="process_return" class="btn btn-success btn-large">
+                    <i class="icon-ok"></i> Traiter le Retour
+                  </button>
+                  <button type="button" class="btn btn-secondary" onclick="window.location.reload();">
+                    <i class="icon-refresh"></i> Annuler
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <?php 
+        } else { 
+        ?>
+          <div class="alert alert-error">
+            <button class="close" data-dismiss="alert">×</button>
+            <strong>Erreur!</strong> Aucune facture trouvée pour ce numéro de facture ou numéro de mobile.
+          </div>
+        <?php 
+        }
+        } 
+        ?>
+      </div>
+    </div>
+  </div>
 </div>
 
-<?php include_once('includes/footer.php'); ?>
+<?php include_once('includes/footer.php');?>
 
-<!-- Scripts JavaScript -->
-<script src="js/jquery.min.js"></script>
-<script src="js/jquery.ui.custom.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.uniform.js"></script>
-<script src="js/select2.min.js"></script>
-<script src="js/jquery.dataTables.min.js"></script>
-<script src="js/matrix.js"></script>
+<script src="js/jquery.min.js"></script> 
+<script src="js/jquery.ui.custom.js"></script> 
+<script src="js/bootstrap.min.js"></script> 
+<script src="js/jquery.uniform.js"></script> 
+<script src="js/select2.min.js"></script> 
+<script src="js/jquery.dataTables.min.js"></script> 
+<script src="js/matrix.js"></script> 
 <script src="js/matrix.tables.js"></script>
-
-<script>
-// Définir validateBilling globalement immédiatement
-window.validateBilling = function() {
-    console.log('validateBilling called from global scope');
-    
-    // Vérifier que jQuery est chargé
-    if (typeof $ === 'undefined') {
-        alert('jQuery n\'est pas encore chargé. Réessayez dans un instant.');
-        return;
-    }
-    
-    const billNum = $('#billingnumber').val().trim();
-    
-    if (billNum.length === 0) {
-        alert('Veuillez entrer un numéro de facture');
-        return;
-    }
-    
-    if (billNum.length < 3) {
-        alert('Numéro de facture trop court (minimum 3 caractères)');
-        return;
-    }
-    
-    // Désactiver le bouton pendant la vérification
-    const $verifyBtn = $('#verifyBtn');
-    $verifyBtn.prop('disabled', true).html('<i class="icon-spinner icon-spin"></i> Vérification...');
-    
-    $('#billing-info').removeClass('alert-success alert-error alert-warning alert-info')
-                      .addClass('alert-info')
-                      .html('<i class="icon-spinner icon-spin"></i> Vérification de la facture en cours...')
-                      .show();
-    
-    $('#productid').prop('disabled', true).html('<option value="">-- Validation en cours --</option>');
-    
-    // Utiliser la même page pour traiter l'AJAX
-    $.ajax({
-        url: 'return.php',
-        type: 'POST',
-        data: { 
-            ajax_validate_billing: true,
-            billingnumber: billNum 
-        },
-        dataType: 'json',
-        timeout: 15000,
-        success: function(response) {
-            console.log('Réponse reçue:', response);
-            
-            if (response.valid) {
-                $('#billing-info').removeClass('alert-info alert-error alert-warning')
-                                  .addClass('alert-success')
-                                  .html(response.customerInfo);
-                
-                $('#productid').html(response.productOptions).prop('disabled', false);
-                
-                // Message de succès
-                alert('Facture validée avec succès! ' + response.statistics.returnableProducts + ' produit(s) retournable(s) trouvé(s).');
-            } else {
-                $('#billing-info').removeClass('alert-info alert-success alert-warning')
-                                  .addClass('alert-error')
-                                  .html(response.message);
-                
-                $('#productid').prop('disabled', true)
-                               .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Erreur AJAX:', status, error);
-            console.error('Response:', xhr.responseText);
-            
-            let errorMessage = 'Erreur de connexion au serveur';
-            
-            $('#billing-info').removeClass('alert-info alert-success alert-warning')
-                              .addClass('alert-error')
-                              .html(errorMessage);
-            
-            $('#productid').prop('disabled', true)
-                           .html('<option value="">-- Erreur de vérification --</option>');
-        },
-        complete: function() {
-            // Réactiver le bouton
-            $verifyBtn.prop('disabled', false).html('<i class="icon-search"></i> Vérifier');
-        }
-    });
-};
-</script>
-
-<script>
-// ========================================
-// JAVASCRIPT POUR LA GESTION DES RETOURS
-// ========================================
-
-// Variables globales
-let currentBillingData = null;
-let currentProductData = null;
-
-// La fonction validateBilling est déjà définie globalement plus haut
-
-// ========================================
-// Fonction de chargement des détails produit
-// ========================================
-function loadProductDetails() {
-    const productId = $('#productid').val();
-    const billNum = $('#billingnumber').val().trim();
-    
-    if (!productId || !billNum) {
-        resetProductDetails();
-        return;
-    }
-    
-    $('#product-details').html('<i class="icon-spinner icon-spin"></i> Chargement des détails...')
-                         .removeClass('alert-success alert-error')
-                         .addClass('alert-info')
-                         .show();
-    
-    $.ajax({
-        url: 'return.php',
-        type: 'POST',
-        data: {
-            ajax_get_product_details: true,
-            productid: productId,
-            billingnumber: billNum
-        },
-        dataType: 'json',
-        timeout: 15000,
-        success: function(response) {
-            console.log('Détails produit reçus:', response);
-            
-            if (response.success) {
-                currentProductData = response.data;
-                $('#product-details').html(response.details)
-                                     .removeClass('alert-error alert-info')
-                                     .addClass('alert-success');
-                
-                updateFormConstraints(response.data);
-                toggleSubmitButton(response.data.canReturn);
-            } else {
-                $('#product-details').html('<strong>Erreur:</strong> ' + response.message)
-                                     .removeClass('alert-success alert-info')
-                                     .addClass('alert-error');
-            }
-        },
-        error: function(xhr, status, error) {
-            console.error('Erreur AJAX détails:', status, error);
-            showError('Impossible de charger les détails du produit.');
-        }
-    });
-}
-
-// ========================================
-// Fonctions utilitaires
-// ========================================
-function updateFormConstraints(productData) {
-    const $quantity = $('#quantity');
-    const $price = $('#price');
-    
-    $quantity.attr('max', productData.maxReturn).val(Math.min(1, productData.maxReturn));
-    $price.attr('max', productData.originalPrice).val(productData.originalPrice);
-    
-    if (productData.maxReturn <= 0) {
-        $quantity.prop('disabled', true);
-        $price.prop('disabled', true);
-    } else {
-        $quantity.prop('disabled', false);
-        $price.prop('disabled', false);
-    }
-    
-    updateHelpText(productData);
-}
-
-function updateHelpText(productData) {
-    const quantityHelp = `Maximum retournable: ${productData.maxReturn} sur ${productData.originalQty} vendu(s)`;
-    const priceHelp = `Prix maximum: ${productData.originalPrice} GNF (prix de vente original)`;
-    
-    $('#quantity').siblings('.help-inline').text(quantityHelp);
-    $('#price').siblings('.help-inline').text(priceHelp);
-}
-
-function toggleSubmitButton(canReturn) {
-    const $submitBtn = $('#submitBtn');
-    
-    if (canReturn) {
-        $submitBtn.prop('disabled', false)
-                  .removeClass('btn-warning')
-                  .addClass('btn-success')
-                  .html('<i class="icon-ok"></i> Enregistrer le retour');
-    } else {
-        $submitBtn.prop('disabled', true)
-                  .removeClass('btn-success')
-                  .addClass('btn-warning')
-                  .html('<i class="icon-ban-circle"></i> Retour impossible');
-    }
-}
-
-function showError(message) {
-    $('#product-details').html('<strong>Erreur:</strong> ' + message)
-                         .removeClass('alert-success alert-info')
-                         .addClass('alert-error')
-                         .show();
-}
-
-function resetProductDetails() {
-    currentProductData = null;
-    $('#product-details').hide();
-    $('#quantity').val(1).removeAttr('max').prop('disabled', false);
-    $('#price').val(0).removeAttr('max').prop('disabled', false);
-    toggleSubmitButton(true);
-}
-
-function resetForm() {
-    $('#billingnumber').val('').focus();
-    $('#billing-info').hide();
-    $('#productid').prop('disabled', true)
-                   .html('<option value="">-- Vérifiez d\'abord le numéro de facture --</option>');
-    resetProductDetails();
-    $('#returnForm')[0].reset();
-}
-
-function validateQuantity() {
-    const $quantity = $('#quantity');
-    const quantity = parseInt($quantity.val());
-    const maxReturn = currentProductData ? currentProductData.maxReturn : 0;
-    
-    if (quantity > maxReturn) {
-        $quantity.val(maxReturn);
-        alert(`Quantité ajustée au maximum retournable: ${maxReturn}`);
-    }
-    
-    if (quantity <= 0) {
-        $quantity.val(1);
-    }
-}
-
-function validatePrice() {
-    const $price = $('#price');
-    const price = parseFloat($price.val());
-    const maxPrice = currentProductData ? currentProductData.originalPrice : 0;
-    
-    if (price > maxPrice) {
-        $price.val(maxPrice);
-        alert(`Prix ajusté au maximum autorisé: ${maxPrice} GNF`);
-    }
-    
-    if (price < 0) {
-        $price.val(0);
-    }
-}
-
-function validateCompleteForm() {
-    const errors = [];
-    
-    if (!$('#billingnumber').val().trim()) {
-        errors.push('Le numéro de facture est requis');
-    }
-    
-    if (!$('#productid').val()) {
-        errors.push('Veuillez sélectionner un produit');
-    }
-    
-    if (currentProductData) {
-        const quantity = parseInt($('#quantity').val());
-        const price = parseFloat($('#price').val());
-        
-        if (quantity <= 0 || quantity > currentProductData.maxReturn) {
-            errors.push(`Quantité invalide (max: ${currentProductData.maxReturn})`);
-        }
-        
-        if (price < 0 || price > currentProductData.originalPrice) {
-            errors.push(`Prix invalide (max: ${currentProductData.originalPrice} GNF)`);
-        }
-        
-        if (!currentProductData.canReturn) {
-            errors.push('Aucun retour possible pour ce produit');
-        }
-    }
-    
-    if (errors.length > 0) {
-        alert('Erreurs de validation:\n• ' + errors.join('\n• '));
-        return false;
-    }
-    
-    return true;
-}
-
-// ========================================
-// Initialisation
-// ========================================
-$(document).ready(function() {
-    console.log('Document ready - Système de retour initialisé');
-    
-    // Validation sur pression de la touche Enter
-    $('#billingnumber').on('keypress', function(e) {
-        if (e.which === 13) { // Enter key
-            e.preventDefault();
-            validateBilling();
-        }
-    });
-    
-    // Événements pour les champs du formulaire
-    $('#quantity').on('change keyup', validateQuantity);
-    $('#price').on('change keyup', validatePrice);
-    $('#productid').on('change', loadProductDetails);
-    
-    // Validation avant soumission
-    $('#returnForm').on('submit', function(e) {
-        if (!validateCompleteForm()) {
-            e.preventDefault();
-            return false;
-        }
-    });
-    
-    // Focus initial
-    $('#billingnumber').focus();
-});
-</script>
-
 </body>
 </html>
+<?php } ?>
