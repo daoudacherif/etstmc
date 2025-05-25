@@ -16,6 +16,11 @@ if (empty($_SESSION['imsaid'])) {
   <title>Inventaire des Articles</title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
+  <style>
+    .stock-critical { color: #c62828; font-weight: bold; }
+    .stock-low { color: #ef6c00; font-weight: bold; }
+    .stock-good { color: #2e7d32; }
+  </style>
 </head>
 <body>
 <?php include_once('includes/header.php'); ?>
@@ -52,13 +57,13 @@ if (empty($_SESSION['imsaid'])) {
                   <th>Stock Initial</th>
                   <th>Vendus</th>
                   <th>Retournés</th>
-                  <th>Stock Restant</th>
+                  <th>Stock Actuel</th>
                   <th>Statut</th>
                 </tr>
               </thead>
               <tbody>
                 <?php
-                // On ne prend que les lignes de panier validées (IsCheckOut = 1)
+                // Requête pour récupérer l'inventaire
                 $sql = "
                   SELECT 
                     p.ID            AS pid,
@@ -66,7 +71,7 @@ if (empty($_SESSION['imsaid'])) {
                     COALESCE(c.CategoryName, 'N/A') AS CategoryName,
                     p.BrandName,
                     p.ModelNumber,
-                    p.Stock         AS initial_stock,
+                    p.Stock         AS current_stock,
                     COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
                     COALESCE(
                       (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
@@ -80,7 +85,7 @@ if (empty($_SESSION['imsaid'])) {
                     ON cart.ProductId = p.ID 
                    AND cart.IsCheckOut = 1
                   GROUP BY p.ID
-                  ORDER BY p.ID DESC
+                  ORDER BY p.Stock ASC, p.ID DESC
                 ";
                 $ret = mysqli_query($con, $sql) 
                   or die('Erreur SQL : ' . mysqli_error($con));
@@ -88,14 +93,23 @@ if (empty($_SESSION['imsaid'])) {
                 if (mysqli_num_rows($ret) > 0) {
                   $cnt = 1;
                   while ($row = mysqli_fetch_assoc($ret)) {
-                    // Calcul du stock restant en tenant compte des retours
+                    // Le stock actuel est déjà dans la base de données
+                    $current_stock = intval($row['current_stock']);
                     $sold = intval($row['sold_qty']);
                     $returned = intval($row['returned_qty']);
-                    $initial = intval($row['initial_stock']);
                     
-                    // Le stock restant est: initial - vendu + retourné
-                    $remaining = $initial - $sold;
-                    $remaining = max(0, $remaining);
+                    // Calcul du stock initial = stock actuel + vendu - retourné
+                    $initial_stock = $current_stock + $sold - $returned;
+                    
+                    // Déterminer la classe CSS pour le niveau de stock
+                    $stockClass = '';
+                    if ($current_stock == 0) {
+                        $stockClass = 'stock-critical';
+                    } elseif ($current_stock <= 5) {
+                        $stockClass = 'stock-low';
+                    } else {
+                        $stockClass = 'stock-good';
+                    }
                     ?>
                     <tr>
                       <td><?= $cnt ?></td>
@@ -103,11 +117,11 @@ if (empty($_SESSION['imsaid'])) {
                       <td><?= htmlspecialchars($row['CategoryName']) ?></td>
                       <td><?= htmlspecialchars($row['BrandName']) ?></td>
                       <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                      <td><?= $initial ?></td>
+                      <td><?= $initial_stock ?></td>
                       <td><?= $sold ?></td>
                       <td><?= $returned ?></td>
-                      <td class="<?= $remaining === 0 ? 'text-danger' : '' ?>">
-                        <?= $remaining === 0 ? 'Épuisé' : $remaining ?>
+                      <td class="<?= $stockClass ?>">
+                        <?= $current_stock === 0 ? 'Épuisé' : $current_stock ?>
                       </td>
                       <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
                     </tr>
