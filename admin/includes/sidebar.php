@@ -56,7 +56,7 @@ try {
         <li><a href="add-product.php">Ajouter un Article</a></li>
         <li><a href="manage-product.php">Gérer les Articles</a></li>
         <li><a href="inventory.php">Inventaire</a></li>
-        <li><a href="inventory-history.php">Inventaire</a></li>
+        <li><a href="inventory-history.php">Inventaire history</a></li>
       </ul>
     </li>
     <?php endif; ?>
