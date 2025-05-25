@@ -19,7 +19,7 @@ $productResult = mysqli_stmt_get_result($stmt);
 $product = mysqli_fetch_assoc($productResult);
 
 if (!$product) {
-    header('location:inventory.php');
+    header('location:inventory-history.php');
     exit;
 }
 
