@@ -244,6 +244,9 @@ if (isset($_POST['submit'])) {
     $custmobile = preg_replace('/[^0-9+]/', '', $_POST['mobilenumber']);
     $modepayment = mysqli_real_escape_string($con, $_POST['modepayment']);
     $paidNow = max(0, floatval($_POST['paid']));
+    
+    // Vérifier si l'utilisateur veut envoyer un SMS
+    $sendSms = isset($_POST['send_sms']) && $_POST['send_sms'] == '1';
 
     // Calcul total du panier
     $grandTotal = 0;
@@ -300,23 +303,38 @@ if (isset($_POST['submit'])) {
               AND c.IsCheckOut = 1
         ") or die(mysqli_error($con));
 
-        // SMS personnalisé avec vérification du statut d'envoi
-        if ($dues > 0) {
-            $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+        // Variable pour le message de résultat
+        $smsStatusMessage = "";
+        
+        // Envoyer SMS seulement si l'utilisateur l'a choisi
+        if ($sendSms) {
+            // SMS personnalisé avec vérification du statut d'envoi
+            if ($dues > 0) {
+                $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+            } else {
+                $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
+            }
+
+            // Envoyer le SMS et stocker le résultat (true/false)
+            $smsResult = sendSmsNotification($custmobile, $smsMessage);
+
+            // Journal de l'envoi SMS (si la table existe)
+            $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
+            if (mysqli_num_rows($tableExists) > 0) {
+                $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
+                               VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
+                               ($smsResult ? '1' : '0') . ", NOW())";
+                mysqli_query($con, $smsLogQuery);
+            }
+            
+            // Préparer le message de statut SMS
+            if ($smsResult) {
+                $smsStatusMessage = " - SMS envoyé avec succès";
+            } else {
+                $smsStatusMessage = " - ÉCHEC de l'envoi du SMS";
+            }
         } else {
-            $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
-        }
-
-        // Envoyer le SMS et stocker le résultat (true/false)
-        $smsResult = sendSmsNotification($custmobile, $smsMessage);
-
-        // Journal de l'envoi SMS (si la table existe)
-        $tableExists = mysqli_query($con, "SHOW TABLES LIKE 'tbl_sms_logs'");
-        if (mysqli_num_rows($tableExists) > 0) {
-            $smsLogQuery = "INSERT INTO tbl_sms_logs (recipient, message, status, send_date) 
-                           VALUES ('$custmobile', '" . mysqli_real_escape_string($con, $smsMessage) . "', " . 
-                           ($smsResult ? '1' : '0') . ", NOW())";
-            mysqli_query($con, $smsLogQuery);
+            $smsStatusMessage = " - SMS non envoyé (choix utilisateur)";
         }
 
         unset($_SESSION['credit_discount']);
@@ -324,12 +342,8 @@ if (isset($_POST['submit'])) {
         unset($_SESSION['credit_discountValue']);
         $_SESSION['invoiceid'] = $billingnum;
 
-        // Afficher le statut de l'envoi SMS dans le message d'alerte
-        if ($smsResult) {
-            echo "<script>alert('Facture créée: $billingnum - SMS envoyé avec succès'); window.location='invoice_dettecard.php?print=auto';</script>";
-        } else {
-            echo "<script>alert('Facture créée: $billingnum - ÉCHEC de l\'envoi du SMS'); window.location='invoice_dettecard.php?print=auto';</script>";
-        }
+        // Afficher le message avec le statut SMS approprié
+        echo "<script>alert('Facture créée: $billingnum$smsStatusMessage'); window.location='invoice_dettecard.php?print=auto';</script>";
         exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
@@ -411,6 +425,32 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
         .user-cart-indicator i {
             margin-right: 5px;
             color: #27a9e3;
+        }
+        
+        .sms-option {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        
+        .sms-option label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+            font-weight: normal;
+        }
+        
+        .sms-option input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        .sms-option .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-left: 20px;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -631,10 +671,26 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                 <p style="font-size: 12px; color: #666;">(Laissez 0 si rien n'est payé maintenant)</p>
                             </div>
                         </div>
+                        
+                        <!-- Option SMS -->
+                        <div class="control-group">
+                            <label class="control-label">Notification SMS :</label>
+                            <div class="controls">
+                                <div class="sms-option">
+                                    <label>
+                                        <input type="checkbox" name="send_sms" value="1" checked>
+                                        <i class="icon-comment"></i> Envoyer un SMS de confirmation au client
+                                    </label>
+                                    <div class="help-text">
+                                        Si coché, le client recevra un SMS confirmant sa commande avec les détails du solde à payer (si applicable).
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
   
                         <div class="form-actions" style="text-align:center;">
                             <button class="btn btn-primary" type="submit" name="submit" <?php echo $hasStockIssue ? 'disabled' : ''; ?>>
-                                Valider & Créer la Facture
+                                <i class="icon-ok"></i> Valider & Créer la Facture
                             </button>
                         </div>
                     </form>
