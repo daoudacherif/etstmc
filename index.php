@@ -1,429 +1,349 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-    <!-- Meta tags de base -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    
-    <title>Gescometstmc - Commerce general</title>
-    <meta name="description"
-          content="Gescometstmc est une entreprise spécialisée dans l'importation et la vente de matériaux de construction en aluminium en République de Guinée." />
-     <link rel="icon" href="images/logo.jpg" type="image/png">
-    <!-- Inter UI font -->
-    <link href="https://rsms.me/inter/inter-ui.css" rel="stylesheet">
-
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETSTMC - Matériaux de Construction à Bailobaya</title>
+    <base target="_self">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@preline/preline@2.0.0/dist/preline.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#04BBFF',
+                        'primary-dark': '#0594D0',
+                        'secondary': '#007198',
+                        'dark': '#003C58',
+                        'darker': '#003C58',
+                        'darkest': '#051C24',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        html { scroll-behavior: smooth; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            color: #333;
-            background-color: #f8f9fa;
-            overflow-x: hidden;
+        .hero-bg {
+            background: linear-gradient(135deg, rgba(4, 187, 255, 0.1) 0%, rgba(5, 148, 208, 0.2) 100%);
         }
-
-        header {
-            background: linear-gradient(135deg, #005f73, #0a9396);
-            padding: 1rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
-        .navbar-brand {
-            color: #fff !important;
-            font-weight: 700;
-            transition: transform 0.3s ease;
-            font-size: 1.5rem;
-        }
-
-        .navbar-brand:hover { transform: scale(1.05); }
-
-        .nav-link { 
-            color: white !important; 
-            font-weight: 500;
-            margin: 0 5px;
+        .btn-primary {
+            background-color: #04BBFF;
             transition: all 0.3s ease;
         }
-
-        .nav-link:hover {
-            color: #ee9b00 !important;
+        .btn-primary:hover {
+            background-color: #0594D0;
+            transform: translateY(-2px);
         }
-
-        /* Styles pour le dropdown */
-        .dropdown-menu {
-            background-color: #f8f9fa;
-            border: none;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            margin-top: 8px;
-        }
-
-        .dropdown-item {
-            color: #333;
-            font-weight: 500;
-            padding: 8px 15px;
-            transition: all 2s ease;
-        }
-
-        .dropdown-item:hover, .dropdown-item:focus {
-            background-color: #e9ecef;
-            color: #0a9396;
-        }
-
-        .dropdown-toggle::after {
-            margin-left: 5px;
-            vertical-align: middle;
-        }
-
-        .hero {
-    min-height: 90vh;
-    background: url('https://images.unsplash.com/photo-1560748952-1d2d768c2337?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') no-repeat center center/cover;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    text-align: center;
-    padding: 2rem 1rem;
-}
-
-        .hero h1 {
-            font-size: 3.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            opacity: 0;
-            animation: fadeIn 1s forwards;
-        }
-
-        .hero p {
-            font-size: 1.25rem;
-            max-width: 800px;
-            margin-bottom: 2rem;
-            opacity: 0;
-            animation: fadeIn 1s forwards;
-        }
-
-        .hero h1 { animation-delay: 0.3s; }
-        .hero p { animation-delay: 0.6s; }
-        .hero button { animation-delay: 0.9s; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .btn-hero {
-            background-color: #ee9b00;
-            color: #fff;
-            padding: 12px 30px;
-            border-radius: 30px;
-            font-weight: 600;
-            border: none;
-            transition: all 0.3s ease;
-            opacity: 0;
-            animation: fadeIn 1s forwards;
-            animation-delay: 0.9s;
-        }
-
-        .btn-hero:hover { 
-            background-color: #ca6702; 
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        }
-
-        /* Bouton de navigation */
-        .btn-nav {
-            padding: 8px 20px;
-            border-radius: 50px;
-            cursor: pointer;
-            border: 1px solid white;
-            background-color: transparent;
-            color: white;
-            letter-spacing: 1px;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.5s ease;
-        }
-
-        .btn-nav:hover {
-            background-color: white;
-            color: #0a9396;
-            box-shadow: 0 4px 10px rgba(255, 255, 255, 0.2);
-        }
-
-        /* Services section */
-        .services {
-            padding: 5rem 0;
-            background-color: #fff;
-        }
-
-        .section-title {
-            text-align: center;
-            margin-bottom: 3rem;
-            color: #005f73;
-        }
-
-        .service-card {
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-            height: 100%;
-            background-color: white;
-        }
-
-        .service-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-
-        .service-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1.5rem;
-            color: #0a9396;
-        }
-
-        /* Footer */
-        footer {
-            background-color: #005f73;
-            color: white;
-            padding: 3rem 0 1.5rem 0;
-        }
-
-        .footer-heading {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-        }
-
-        .footer-link {
-            color: rgba(255,255,255,0.8);
-            text-decoration: none;
+        .dropdown:hover .dropdown-menu {
             display: block;
-            margin-bottom: 0.5rem;
-            transition: all 0.3s ease;
-        }
-
-        .footer-link:hover {
-            color: white;
-            transform: translateX(5px);
-        }
-
-        .footer-contact {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .footer-contact i {
-            margin-right: 10px;
-            color: #ee9b00;
-        }
-
-        .footer-bottom {
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 1.5rem;
-            margin-top: 3rem;
-            text-align: center;
-            font-size: 0.9rem;
-            color: rgba(255,255,255,0.7);
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 992px) {
-            .hero h1 {
-                font-size: 2.5rem;
-            }
-
-            .hero p {
-                font-size: 1rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .service-card {
-                margin-bottom: 1.5rem;
-            }
         }
     </style>
 </head>
-
-<body>
-
-<!-- Header -->
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container">
-            <a class="navbar-brand" href="#">GESCOMETSTMC</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="#services">Service</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#contact">Contact</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Magasins
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="https://second.etstmc.com/admin/login.php">Bailobaya</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#">Autre magasin</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item ms-lg-3">
-                        <a class="btn-nav" href="admin/login.php">Connexion</a>
-                    </li>
-                </ul>
+<body class="font-sans">
+    <!-- Header -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xl mr-3">ET</div>
+                <h1 class="text-2xl font-bold text-darkest">ETSTMC</h1>
+            </div>
+            <div class="hidden md:flex space-x-6 items-center">
+                <a href="#accueil" class="text-dark hover:text-primary transition">Accueil</a>
+                
+                <!-- Dropdown Magasins -->
+                <div class="relative dropdown">
+                    <button class="flex items-center text-dark hover:text-primary transition">
+                        <span>Magasins</span>
+                        <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                    </button>
+                    <div class="dropdown-menu absolute hidden mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="https://second.etstmc.com/admin/login.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Bailobaya</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Matam</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Ratoma</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Dixinn</a>
+                    </div>
+                </div>
+                
+                <a href="#produits" class="text-dark hover:text-primary transition">Produits</a>
+                <a href="#services" class="text-dark hover:text-primary transition">Services</a>
+                <a href="#contact" class="text-dark hover:text-primary transition">Contact</a>
+            </div>
+            <div class="flex items-center space-x-4">
+                <a href="admin/login.php" class="hidden md:block text-dark hover:text-primary transition" id="login-btn">
+                    <i class="fas fa-user mr-1"></i>
+                    Connexion
+                </a>
+                <a href="tel:+224621598780" class="bg-primary text-white px-4 py-2 rounded-lg flex items-center">
+                    <i class="fas fa-phone mr-2"></i>
+                    <span>621 59 87 80</span>
+                </a>
+                <button class="md:hidden text-darkest" id="menu-toggle">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
             </div>
         </div>
-    </nav>
-</header>
+    </header>
 
-<!-- Hero Section -->
-<section class="hero">
-    <div class="container text-center">
-        <h1>Votre Partenaire en Commerce Général</h1>
-        <p>GESCOMETSTMC, leader dans l'importation et la distribution de produits de qualité. Nous vous offrons une large gamme d'articles et équipements professionnels avec un service client exceptionnel.</p>
-        <button class="btn btn-hero">Découvrir nos offres</button>
+    <!-- Mobile Menu -->
+    <div class="hidden bg-white shadow-lg" id="mobile-menu">
+        <div class="container mx-auto px-4 py-4 flex flex-col space-y-4">
+            <a href="#accueil" class="text-dark hover:text-primary transition py-2">Accueil</a>
+            
+            <!-- Mobile Dropdown Magasins -->
+            <div class="relative">
+                <button class="flex items-center justify-between w-full text-dark hover:text-primary transition py-2" id="mobile-shops-toggle">
+                    <span>Magasins</span>
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </button>
+                <div class="hidden pl-4 mt-2 space-y-2" id="mobile-shops-menu">
+                    <a href="#" class="block text-dark hover:text-primary transition py-1">Bailobaya</a>
+                    <a href="#" class="block text-dark hover:text-primary transition py-1">Matam</a>
+                    <a href="#" class="block text-dark hover:text-primary transition py-1">Ratoma</a>
+                    <a href="#" class="block text-dark hover:text-primary transition py-1">Dixinn</a>
+                </div>
+            </div>
+            
+            <a href="#produits" class="text-dark hover:text-primary transition py-2">Produits</a>
+            <a href="#services" class="text-dark hover:text-primary transition py-2">Services</a>
+            <a href="#contact" class="text-dark hover:text-primary transition py-2">Contact</a>
+            <a href="#" class="text-dark hover:text-primary transition py-2">Connexion</a>
+        </div>
     </div>
-</section>
 
-<!-- Services Section -->
-<section class="services" id="services">
-    <div class="container">
-        <h2 class="section-title">Nos Services</h2>
-        <div class="row">
-            <div class="col-md-4 mb-4">
-                <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-truck"></i>
+    <!-- Hero Section -->
+    <section id="accueil" class="hero-bg py-16 md:py-24">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-1/2 mb-12 md:mb-0">
+                    <h1 class="text-4xl md:text-5xl font-bold text-darkest mb-6">Votre fournisseur de matériaux de construction à Bailobaya</h1>
+                    <p class="text-lg text-secondary mb-8">ETSTMC vous propose les meilleurs matériaux de construction pour tous vos projets, avec un service personnalisé et des prix compétitifs.</p>
+                    <div class="flex flex-wrap gap-4">
+                        <a href="#produits" class="btn-primary text-white px-8 py-3 rounded-lg font-medium shadow-lg">Nos produits</a>
+                        <a href="#contact" class="border-2 border-primary text-primary px-8 py-3 rounded-lg font-medium hover:bg-primary hover:text-white transition">Contactez-nous</a>
                     </div>
-                    <h3>Importation</h3>
-                    <p>Nous importons une large gamme de produits de qualité pour répondre à vos besoins.</p>
                 </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-store"></i>
-                    </div>
-                    <h3>Vente en Gros</h3>
-                    <p>Profitez de nos tarifs compétitifs pour vos achats en gros et demi-gros.</p>
-                </div>
-            </div>
-            <div class="col-md-4 mb-4">
-                <div class="service-card">
-                    <div class="service-icon">
-                        <i class="fas fa-tools"></i>
-                    </div>
-                    <h3>Équipements Professionnels</h3>
-                    <p>Des équipements de qualité pour tous vos besoins professionnels et industriels.</p>
+                <div class="md:w-1/2">
+                    <img src="https://images.unsplash.com/photo-1600585152220-9035925d0d0f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80" 
+                         alt="Matériaux de construction" 
+                         class="rounded-lg shadow-xl w-full">
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- Contact Section -->
-<section class="py-5 bg-light" id="contact">
-    <div class="container">
-        <h2 class="section-title">Contactez-nous</h2>
-        <div class="row">
-            <div class="col-lg-6 mx-auto">
-                <div class="bg-white p-4 rounded shadow">
-                    <form>
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Nom</label>
-                            <input type="text" class="form-control" id="name" placeholder="Votre nom">
+    <!-- Produits Section -->
+    <section id="produits" class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-darkest mb-4">Nos Produits</h2>
+                <p class="text-secondary max-w-2xl mx-auto">Découvrez notre large gamme de matériaux de construction de qualité</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Produit 1 -->
+                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                    <div class="h-48 bg-primary flex items-center justify-center">
+                        <i class="fas fa-cubes text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold mb-2 text-darkest">Ciments & Mortiers</h3>
+                        <p class="text-secondary mb-4">Tous types de ciments et mortiers pour vos travaux de maçonnerie.</p>
+                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                    </div>
+                </div>
+                
+                <!-- Produit 2 -->
+                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                    <div class="h-48 bg-primary flex items-center justify-center">
+                        <i class="fas fa-bricks text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold mb-2 text-darkest">Briques & Parpaings</h3>
+                        <p class="text-secondary mb-4">Large choix de briques et parpaings pour vos constructions.</p>
+                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                    </div>
+                </div>
+                
+                <!-- Produit 3 -->
+                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                    <div class="h-48 bg-primary flex items-center justify-center">
+                        <i class="fas fa-trowel text-white text-6xl"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold mb-2 text-darkest">Carrelages</h3>
+                        <p class="text-secondary mb-4">Carrelages de qualité pour sols et murs, divers styles et coloris.</p>
+                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="py-16 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-darkest mb-4">Nos Services</h2>
+                <p class="text-secondary max-w-2xl mx-auto">Nous offrons des services complets pour vos projets de construction</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-lg shadow-md text-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-truck text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-darkest">Livraison sur site</h3>
+                    <p class="text-secondary">Livraison rapide de vos matériaux directement sur votre chantier à Bailobaya et environs.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-lg shadow-md text-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-calculator text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-darkest">Conseils techniques</h3>
+                    <p class="text-secondary">Nos experts vous conseillent pour choisir les meilleurs matériaux pour votre projet.</p>
+                </div>
+                
+                <div class="bg-white p-8 rounded-lg shadow-md text-center">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-percentage text-white text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3 text-darkest">Prix compétitifs</h3>
+                    <p class="text-secondary">Nous proposons les meilleurs prix pour les professionnels et particuliers.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-16 bg-primary text-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-4">Contactez-nous</h2>
+                <p class="max-w-2xl mx-auto">Besoin de matériaux de construction ? Contactez-nous dès maintenant.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">Coordonnées</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-map-marker-alt mr-3 mt-1"></i>
+                            <div>
+                                <p class="font-medium">Adresse</p>
+                                <p>Bailobaya, Conakry, Guinée</p>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" placeholder="Votre email">
+                        <div class="flex items-start">
+                            <i class="fas fa-phone mr-3 mt-1"></i>
+                            <div>
+                                <p class="font-medium">Téléphone</p>
+                                <p>621 59 87 80</p>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="message" class="form-label">Message</label>
-                            <textarea class="form-control" id="message" rows="4" placeholder="Votre message"></textarea>
+                        <div class="flex items-start">
+                            <i class="fas fa-clock mr-3 mt-1"></i>
+                            <div>
+                                <p class="font-medium">Horaires</p>
+                                <p>Lundi - Samedi: 8h - 18h</p>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-hero w-100">Envoyer</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <form class="space-y-4">
+                        <div>
+                            <label for="name" class="block mb-1">Nom</label>
+                            <input type="text" id="name" class="w-full px-4 py-2 rounded-lg bg-white/20 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white">
+                        </div>
+                        <div>
+                            <label for="phone" class="block mb-1">Téléphone</label>
+                            <input type="tel" id="phone" class="w-full px-4 py-2 rounded-lg bg-white/20 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white">
+                        </div>
+                        <div>
+                            <label for="message" class="block mb-1">Message</label>
+                            <textarea id="message" rows="4" class="w-full px-4 py-2 rounded-lg bg-white/20 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white"></textarea>
+                        </div>
+                        <button type="submit" class="bg-white text-primary px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition">Envoyer</button>
                     </form>
                 </div>
             </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<!-- Footer -->
-<footer>
-    <div class="container">
-        <div class="row">
-            <div class="col-md-4 mb-4">
-                <h4 class="footer-heading">À propos de GESCOMETSTMC</h4>
-                <p>Leader dans l'importation et la distribution de produits de qualité en République de Guinée depuis plusieurs années.</p>
+    <!-- Footer -->
+    <footer class="bg-darkest text-white py-12">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold text-lg mr-3">ET</div>
+                        <h3 class="text-xl font-bold">ETSTMC</h3>
+                    </div>
+                    <p class="text-gray-400">Votre fournisseur de matériaux de construction à Bailobaya, Guinée.</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Liens rapides</h3>
+                    <ul class="space-y-2">
+                        <li><a href="#accueil" class="text-gray-400 hover:text-white transition">Accueil</a></li>
+                        <li><a href="#produits" class="text-gray-400 hover:text-white transition">Produits</a></li>
+                        <li><a href="#services" class="text-gray-400 hover:text-white transition">Services</a></li>
+                        <li><a href="#contact" class="text-gray-400 hover:text-white transition">Contact</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-bold mb-4">Contact</h3>
+                    <p class="text-gray-400 mb-2">Bailobaya, Conakry, Guinée</p>
+                    <p class="text-gray-400 mb-2">621 59 87 80</p>
+                    <p class="text-gray-400">Lundi - Samedi: 8h - 18h</p>
+                </div>
             </div>
-            <div class="col-md-3 mb-4">
-                <h4 class="footer-heading">Liens Rapides</h4>
-                <a href="#" class="footer-link">Accueil</a>
-                <a href="#services" class="footer-link">Services</a>
-                <a href="#contact" class="footer-link">Contact</a>
-                <a href="admin/login.php" class="footer-link">Connexion</a>
-            </div>
-            <div class="col-md-5 mb-4">
-                <h4 class="footer-heading">Coordonnées</h4>
-                <div class="footer-contact">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span>Conakry, République de Guinée</span>
-                </div>
-                <div class="footer-contact">
-                    <i class="fas fa-phone-alt"></i>
-                    <span>+224 00 00 00 00</span>
-                </div>
-                <div class="footer-contact">
-                    <i class="fas fa-envelope"></i>
-                    <span>contact@etstmc.com</span>
-                </div>
+            
+            <div class="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
+                <p>&copy; 2023 ETSTMC. Tous droits réservés.</p>
             </div>
         </div>
-        <div class="footer-bottom">
-            <p>&copy; 2025 GESCOMETSTMC. Tous droits réservés.</p>
-        </div>
-    </div>
-</footer>
+    </footer>
 
-<!-- Include Bootstrap Bundle JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Assurer que les dropdowns fonctionnent correctement
-    document.addEventListener('DOMContentLoaded', function() {
-        var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
-        dropdownElementList.map(function(dropdownToggleEl) {
-            return new bootstrap.Dropdown(dropdownToggleEl);
+    <script>
+        // Mobile menu toggle
+        document.getElementById('menu-toggle').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
         });
 
-        // Fermer le menu mobile après clic sur un lien
-        var navLinks = document.querySelectorAll('.navbar-nav .nav-link');
-        var navbarCollapse = document.querySelector('.navbar-collapse');
-        navLinks.forEach(function(link) {
-            link.addEventListener('click', function() {
-                if (window.innerWidth < 992) {
-                    bootstrap.Collapse.getInstance(navbarCollapse).hide();
-                }
+        // Mobile shops menu toggle
+        document.getElementById('mobile-shops-toggle').addEventListener('click', function() {
+            document.getElementById('mobile-shops-menu').classList.toggle('hidden');
+        });
+
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
             });
         });
-    });
-</script>
+
+        // Form submission
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            alert('Merci pour votre message ! Nous vous contacterons bientôt.');
+            this.reset();
+        });
+
+        // Login button
+        document.getElementById('login-btn').addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('Fonctionnalité de connexion à implémenter');
+        });
+    </script>
 </body>
 </html>
