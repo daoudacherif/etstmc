@@ -50,6 +50,21 @@
             opacity: 1;
             pointer-events: auto;
         }
+        
+        /* Mobile dropdown animations */
+        #mobile-shops-menu {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        #mobile-shops-menu:not(.hidden) {
+            max-height: 200px;
+        }
+        
+        #mobile-shops-toggle i {
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body class="font-sans">
@@ -66,7 +81,7 @@
                 <div class="relative inline-block text-left">
                     <div>
                         <button type="button" class="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs ring-1 ring-gray-300 ring-inset hover:bg-gray-50 transition-colors" id="menu-button" aria-expanded="false" aria-haspopup="true">
-                            Magasins
+                            Options
                             <svg class="-mr-1 size-5 text-gray-400 transition-transform" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon" id="dropdown-arrow">
                                 <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
                             </svg>
@@ -75,8 +90,11 @@
 
                     <div class="dropdown-menu absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-hidden" role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1" id="dropdown-menu">
                         <div class="py-1" role="none">
-                            <a href="https://second.etstmc.com/admin/login.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Bailobaya</a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Matam</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Paramètres du compte</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Support</a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Licence</a>
+                            <div class="border-t border-gray-100"></div>
+                            <button type="button" class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors" role="menuitem" tabindex="-1">Se déconnecter</button>
                         </div>
                     </div>
                 </div>
@@ -113,10 +131,8 @@
                     <i class="fas fa-chevron-down text-xs"></i>
                 </button>
                 <div class="hidden pl-4 mt-2 space-y-2" id="mobile-shops-menu">
-                    <a href="#" class="block text-dark hover:text-primary transition py-1">Bailobaya</a>
+                    <a href="https://second.etstmc.com/admin/login.php" class="block text-dark hover:text-primary transition py-1">Bailobaya</a>
                     <a href="#" class="block text-dark hover:text-primary transition py-1">Matam</a>
-                    <a href="#" class="block text-dark hover:text-primary transition py-1">Ratoma</a>
-                    <a href="#" class="block text-dark hover:text-primary transition py-1">Dixinn</a>
                 </div>
             </div>
             
@@ -380,14 +396,39 @@
             }
         });
 
+        // Mobile menu elements
+        const mobileMenu = document.getElementById('mobile-menu');
+        const menuToggle = document.getElementById('menu-toggle');
+        const mobileShopsToggle = document.getElementById('mobile-shops-toggle');
+        const mobileShopsMenu = document.getElementById('mobile-shops-menu');
+        const mobileChevron = mobileShopsToggle.querySelector('i');
+
         // Mobile menu toggle
-        document.getElementById('menu-toggle').addEventListener('click', function() {
-            document.getElementById('mobile-menu').classList.toggle('hidden');
+        menuToggle.addEventListener('click', function() {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // Close mobile menu when clicking on links
+        mobileMenu.addEventListener('click', function(e) {
+            if (e.target.tagName === 'A' && e.target.getAttribute('href').startsWith('#')) {
+                mobileMenu.classList.add('hidden');
+                // Also close the shops submenu
+                mobileShopsMenu.classList.add('hidden');
+                mobileChevron.style.transform = 'rotate(0deg)';
+            }
         });
 
         // Mobile shops menu toggle
-        document.getElementById('mobile-shops-toggle').addEventListener('click', function() {
-            document.getElementById('mobile-shops-menu').classList.toggle('hidden');
+        mobileShopsToggle.addEventListener('click', function() {
+            const isHidden = mobileShopsMenu.classList.contains('hidden');
+            
+            if (isHidden) {
+                mobileShopsMenu.classList.remove('hidden');
+                mobileChevron.style.transform = 'rotate(180deg)';
+            } else {
+                mobileShopsMenu.classList.add('hidden');
+                mobileChevron.style.transform = 'rotate(0deg)';
+            }
         });
 
         // Smooth scrolling
