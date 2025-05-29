@@ -339,11 +339,11 @@
             this.reset();
         });
 
-        // Login button
-        document.getElementById('login-btn').addEventListener('click', function(e) {
-            e.preventDefault();
-            alert('Fonctionnalité de connexion à implémenter');
-        });
+       // Login button
+       document.getElementById('login-btn').addEventListener('click', function(e) {
+           e.preventDefault();
+           window.location.href = 'admin/login.php';
+       });
     </script>
 </body>
 </html>
