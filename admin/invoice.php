@@ -42,6 +42,46 @@ if (strlen($_SESSION['imsaid']==0)) {
   .print-header {
     display: none;
   }
+  .company-header {
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #333;
+    padding-bottom: 15px;
+  }
+  .company-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+  .company-subtitle {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .company-contact {
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .company-contact .left-info {
+    text-align: left;
+    flex: 1;
+  }
+  .company-contact .right-info {
+    background-color: #333;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+  }
+  .invoice-footer {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    font-size: 12px;
+    color: #666;
+  }
   
   /* Styles spécifiques pour l'impression */
   @media print {
@@ -122,6 +162,11 @@ if (strlen($_SESSION['imsaid']==0)) {
       color: #d9534f !important;
     }
     
+    .company-contact .right-info {
+      background-color: #333 !important;
+      color: white !important;
+    }
+    
     /* Assurer que les liens sont visibles et sans URL */
     a, a:visited {
       text-decoration: underline;
@@ -155,10 +200,17 @@ if (strlen($_SESSION['imsaid']==0)) {
     <hr class="no-print">
     <div class="row-fluid">
       <div class="span12" id="printArea">
-        <!-- En-tête qui n'apparaît qu'à l'impression -->
-        <div class="print-header">
-          <h2>Système de Gestion d'Inventaire</h2>
-          <p>Facture #<?php echo $_SESSION['invoiceid']; ?></p>
+        <!-- En-tête de l'entreprise -->
+        <div class="company-header">
+          <div class="company-title">VENTE DE MATERIEL DE CONSTRUCTION</div>
+          <div class="company-subtitle">Pointes, Contre plaque, Brouette, Fil d'attache, Peinture, et Divers</div>
+          <div class="company-contact">
+            <div class="left-info">
+              Sis à Bailobaya à côté du marché<br>
+              Tél 621 59 87 80 / 621 72 36 46
+            </div>
+            <div class="right-info">C Plaque</div>
+          </div>
         </div>
         
         <div class="invoice-box">
@@ -271,6 +323,11 @@ if (strlen($_SESSION['imsaid']==0)) {
               </div>
             </div>
           </div>
+        </div>
+        
+        <!-- Pied de page avec RCCM -->
+        <div class="invoice-footer">
+          <strong>RCCM GN.TCC.2023.A.14202</strong>
         </div>
         
         <!-- Bouton d'impression - caché à l'impression -->
