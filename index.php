@@ -158,53 +158,89 @@
         </div>
     </section>
 
-    <!-- Produits Section -->
-    <section id="produits" class="py-16 bg-white">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold text-darkest mb-4">Nos Produits</h2>
-                <p class="text-secondary max-w-2xl mx-auto">Découvrez notre large gamme de matériaux de construction de qualité</p>
+  <!-- Produits Section -->
+<section id="produits" class="py-16 bg-white">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-darkest mb-4">Nos Produits</h2>
+            <p class="text-secondary max-w-2xl mx-auto">Découvrez notre gamme complète de matériaux de construction</p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <!-- Produit 1 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-thumbtack text-white text-6xl"></i>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Pointes</h3>
+                    <p class="text-secondary mb-4">Large gamme de pointes pour tous vos travaux de construction.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                </div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Produit 1 -->
-                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
-                    <div class="h-48 bg-primary flex items-center justify-center">
-                        <i class="fas fa-cubes text-white text-6xl"></i>
-                    </div>
-                    <div class="p-6">
-                        <h3 class="text-xl font-bold mb-2 text-darkest">Ciments & Mortiers</h3>
-                        <p class="text-secondary mb-4">Tous types de ciments et mortiers pour vos travaux de maçonnerie.</p>
-                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
-                    </div>
+            <!-- Produit 2 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-layer-group text-white text-6xl"></i>
                 </div>
-                
-                <!-- Produit 2 -->
-                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
-                    <div class="h-48 bg-primary flex items-center justify-center">
-                        <i class="fas fa-bricks text-white text-6xl"></i>
-                    </div>
-                    <div class="p-6">
-                        <h3 class="text-xl font-bold mb-2 text-darkest">Briques & Parpaings</h3>
-                        <p class="text-secondary mb-4">Large choix de briques et parpaings pour vos constructions.</p>
-                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
-                    </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Contre plaque</h3>
+                    <p class="text-secondary mb-4">Contre plaque de qualité pour vos besoins en construction.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
                 </div>
-                
-                <!-- Produit 3 -->
-                <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
-                    <div class="h-48 bg-primary flex items-center justify-center">
-                        <i class="fas fa-trowel text-white text-6xl"></i>
-                    </div>
-                    <div class="p-6">
-                        <h3 class="text-xl font-bold mb-2 text-darkest">Carrelages</h3>
-                        <p class="text-secondary mb-4">Carrelages de qualité pour sols et murs, divers styles et coloris.</p>
-                        <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
-                    </div>
+            </div>
+            
+            <!-- Produit 3 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-paint-roller text-white text-6xl"></i>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Peinture</h3>
+                    <p class="text-secondary mb-4">Large choix de peintures pour tous vos projets.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                </div>
+            </div>
+
+            <!-- Produit 4 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-link text-white text-6xl"></i>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Fil d'attache</h3>
+                    <p class="text-secondary mb-4">Fils d'attache de différentes tailles pour vos besoins.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                </div>
+            </div>
+
+            <!-- Produit 5 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-cart-flatbed text-white text-6xl"></i>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Brouette</h3>
+                    <p class="text-secondary mb-4">Brouettes robustes pour le transport de matériaux.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
+                </div>
+            </div>
+
+            <!-- Produit 6 -->
+            <div class="bg-gray-50 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
+                <div class="h-48 bg-primary flex items-center justify-center">
+                    <i class="fas fa-tools text-white text-6xl"></i>
+                </div>
+                <div class="p-6">
+                    <h3 class="text-xl font-bold mb-2 text-darkest">Divers</h3>
+                    <p class="text-secondary mb-4">Autres matériaux et outils de construction disponibles.</p>
+                    <a href="#contact" class="text-primary font-medium hover:underline">Demander un devis</a>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
     <!-- Services Section -->
     <section id="services" class="py-16 bg-gray-50">
