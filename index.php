@@ -136,9 +136,14 @@
                 </div>
             </div>
             
-            <a href="#produits" class="text-dark hover:text-primary transition py-2">Produits</a>
-            <a href="#services" class="text-dark hover:text-primary transition py-2">Services</a>
-            <a href="#contact" class="text-dark hover:text-primary transition py-2">Contact</a>
+             <button class="flex items-center justify-between w-full text-dark hover:text-primary transition py-2" id="mobile-shops-toggle">
+                    <span>Magasins</span>
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </button>
+                <div class="hidden pl-4 mt-2 space-y-2" id="mobile-shops-menu">
+                    <a href="https://second.etstmc.com/admin/login.php" class="block text-dark hover:text-primary transition py-1">Bailobaya</a>
+                    <a href="#" class="block text-dark hover:text-primary transition py-1">Matam</a>
+                </div>
             <a href="#" class="text-dark hover:text-primary transition py-2">Connexion</a>
         </div>
     </div>
