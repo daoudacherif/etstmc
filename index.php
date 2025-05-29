@@ -59,7 +59,7 @@
                         <span>Magasins</span>
                         <i class="fas fa-chevron-down ml-1 text-xs"></i>
                     </button>
-                    <div class="dropdown-menu absolute hidden mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                    <div class="dropdown-menu absolute hidden mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 transition ease-in duration-75">
                         <a href="https://second.etstmc.com/admin/login.php" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Bailobaya</a>
                         <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Matam</a>
                         <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Ratoma</a>
