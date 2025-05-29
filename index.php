@@ -132,10 +132,7 @@
                     <a href="#" class="block text-dark hover:text-primary transition py-1">Matam</a>
                 </div>
             </div>
-            
-            <a href="#produits" class="text-dark hover:text-primary transition py-2">Produits</a>
-            <a href="#services" class="text-dark hover:text-primary transition py-2">Services</a>
-            <a href="#contact" class="text-dark hover:text-primary transition py-2">Contact</a>
+          
             <a href="#" class="text-dark hover:text-primary transition py-2">Connexion</a>
         </div>
     </div>
