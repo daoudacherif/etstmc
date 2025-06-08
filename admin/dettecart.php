@@ -283,7 +283,7 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-    $billingnum = mt_rand(100000000, 999999999);
+   $billingnum = mt_rand(1000, 9999);
 
     // Validation du panier + Création facture
     $queries = "
