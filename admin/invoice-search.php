@@ -577,21 +577,21 @@ if (strlen($_SESSION['imsaid']==0)) {
                 <div class="signature-box">
                   <p class="signature-label">Signature du Vendeur:</p>
                   <div class="signature-line"></div>
-                  <p class="signature-date">Date: _______________</p>
+                  <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
                 </div>
               </div>
               <div class="span4">
                 <div class="signature-box">
                   <p class="signature-label">Signature du Client:</p>
                   <div class="signature-line"></div>
-                  <p class="signature-date">Date: _______________</p>
+                  <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
                 </div>
               </div>
               <div class="span4">
                 <div class="signature-box">
                   <p class="signature-label">Signature du Chauffeur:</p>
                   <div class="signature-line"></div>
-                  <p class="signature-date">Date: _______________</p>
+                  <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
                 </div>
               </div>
             </div>
