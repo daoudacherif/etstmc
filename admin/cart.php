@@ -221,7 +221,7 @@ if (isset($_POST['submit'])) {
     }
 
     // Générer un numéro de facture unique
-    $billingnum = mt_rand(100000000, 999999999);
+    $billingnum = mt_rand(1000, 9999);
 
     // Mise à jour du panier + insertion client - Modification pour enlever ProcessedBy
     $query  = "UPDATE tblcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0 AND AdminID='$currentAdminID';";
