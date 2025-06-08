@@ -305,7 +305,7 @@ if (strlen($_SESSION['imsaid']==0)) {
         <div class="company-header">
           <!-- Logo de l'entreprise -->
           <div class="company-logo">
-            <img src="images/logo.png" alt="Logo de l'entreprise" />
+        <img src="includes/img/logo.jpg" alt="Logo de l'entreprise" />
           </div>
           
           <!-- Informations de l'entreprise -->
