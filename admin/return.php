@@ -155,6 +155,15 @@ if(isset($_POST['process_return'])) {
     margin-bottom: 20px;
   }
   
+  .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  
   .credit-badge {
     display: inline-block;
     padding: 3px 7px;
@@ -185,47 +194,47 @@ if(isset($_POST['process_return'])) {
     font-style: italic;
   }
   
-.returns-history {
-  background-color: #fff5f5;
-  border: 1px solid #fecaca;
-  border-radius: 4px;
-  padding: 15px;
-  margin: 20px 0;
-}
+  .returns-history {
+    background-color: #fff5f5;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 20px 0;
+  }
 
-.returns-summary {
-  background-color: #fef2f2;
-  border: 1px solid #fca5a5;
-  border-radius: 4px;
-  padding: 10px;
-  margin-bottom: 15px;
-  text-align: center;
-}
+  .returns-summary {
+    background-color: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 15px;
+    text-align: center;
+  }
 
-.no-returns {
-  text-align: center;
-  color: #6b7280;
-  font-style: italic;
-  padding: 20px;
-}
+  .no-returns {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    padding: 20px;
+  }
 
-.return-amount {
-  font-weight: bold;
-  color: #dc2626;
-}
+  .return-amount {
+    font-weight: bold;
+    color: #dc2626;
+  }
 
-.return-date {
-  font-size: 12px;
-  color: #6b7280;
-}
+  .return-date {
+    font-size: 12px;
+    color: #6b7280;
+  }
 
-.return-reason {
-  background-color: #fef3c7;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  color: #92400e;
-}
+  .return-reason {
+    background-color: #fef3c7;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #92400e;
+  }
 </style>
 <script>
 function toggleReturnRow(checkbox, productId) {
@@ -459,9 +468,145 @@ function selectAllProducts() {
             </div>
           </div>
           <?php endif; ?>
+        </div>
+
+        <?php
+        // === AJOUT DE L'HISTORIQUE DES RETOURS (À LA BONNE PLACE) ===
         
-          <!-- Return Form -->
-          <form method="post" class="return-form">
+        // Récupérer l'historique des retours pour cette facture
+        $returnsQuery = mysqli_query($con, "
+            SELECT 
+                r.ID,
+                r.ReturnDate,
+                r.ProductID,
+                r.Quantity,
+                r.Reason,
+                r.ReturnPrice,
+                p.ProductName,
+                p.ModelNumber
+            FROM 
+                tblreturns r
+            JOIN 
+                tblproducts p ON r.ProductID = p.ID
+            WHERE 
+                r.BillingNumber = '$billing_number'
+            ORDER BY 
+                r.ReturnDate DESC
+        ");
+
+        $totalReturns = mysqli_num_rows($returnsQuery);
+        $totalReturnAmount = 0;
+
+        // Calculer le montant total des retours
+        if($totalReturns > 0) {
+            $sumQuery = mysqli_query($con, "SELECT SUM(ReturnPrice) as total_return_amount FROM tblreturns WHERE BillingNumber = '$billing_number'");
+            $sumData = mysqli_fetch_assoc($sumQuery);
+            $totalReturnAmount = $sumData['total_return_amount'] ?: 0;
+        }
+        ?>
+
+        <!-- Section Historique des Retours -->
+        <div class="returns-history">
+            <div class="widget-title" style="background: none; border: none; padding: 0; margin-bottom: 15px;">
+                <span class="icon"><i class="icon-list"></i></span>
+                <h5 style="color: #dc2626;">Historique des Retours pour cette Facture</h5>
+            </div>
+            
+            <?php if($totalReturns > 0): ?>
+            <!-- Résumé des retours -->
+            <div class="returns-summary">
+                <div class="row-fluid">
+                    <div class="span4">
+                        <strong>Total des retours :</strong> <?php echo $totalReturns; ?> transaction(s)
+                    </div>
+                    <div class="span4">
+                        <strong>Montant total retourné :</strong> 
+                        <span class="return-amount"><?php echo number_format($totalReturnAmount, 2); ?> GNF</span>
+                    </div>
+                    <div class="span4">
+                        <strong>Statut :</strong> 
+                        <span style="color: #dc2626;">Retours effectués</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tableau détaillé des retours -->
+            <div class="widget-box">
+                <div class="widget-content nopadding">
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr style="background-color: #fca5a5;">
+                                <th width="8%">ID</th>
+                                <th width="15%">Date de retour</th>
+                                <th width="25%">Produit</th>
+                                <th width="12%">Référence</th>
+                                <th width="8%">Quantité</th>
+                                <th width="12%">Montant</th>
+                                <th width="20%">Motif</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php
+                        // Reset le pointeur de résultat pour parcourir à nouveau
+                        mysqli_data_seek($returnsQuery, 0);
+                        while($returnRow = mysqli_fetch_assoc($returnsQuery)): 
+                            $returnDate = date("d/m/Y H:i", strtotime($returnRow['ReturnDate']));
+                        ?>
+                            <tr>
+                                <td><?php echo $returnRow['ID']; ?></td>
+                                <td>
+                                    <span class="return-date"><?php echo $returnDate; ?></span>
+                                </td>
+                                <td><?php echo htmlspecialchars($returnRow['ProductName']); ?></td>
+                                <td><?php echo htmlspecialchars($returnRow['ModelNumber']); ?></td>
+                                <td class="text-center">
+                                    <strong><?php echo $returnRow['Quantity']; ?></strong>
+                                </td>
+                                <td class="text-right">
+                                    <span class="return-amount"><?php echo number_format($returnRow['ReturnPrice'], 2); ?> GNF</span>
+                                </td>
+                                <td>
+                                    <span class="return-reason"><?php echo htmlspecialchars($returnRow['Reason']); ?></span>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #fee2e2; font-weight: bold;">
+                                <td colspan="5" class="text-right">TOTAL RETOURNÉ :</td>
+                                <td class="text-right">
+                                    <span class="return-amount"><?php echo number_format($totalReturnAmount, 2); ?> GNF</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            
+            <?php else: ?>
+            <!-- Aucun retour trouvé -->
+            <div class="no-returns">
+                <i class="icon-info-sign" style="font-size: 24px; color: #6b7280; margin-bottom: 10px;"></i>
+                <p>Aucun retour n'a été effectué pour cette facture.</p>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <?php
+        // === SECTION OPTIONNELLE: Statistiques rapides ===
+        if($totalReturns > 0):
+            $returnPercentage = ($totalReturnAmount / $finalAmount) * 100;
+        ?>
+        <div class="alert alert-info">
+            <strong>Statistiques :</strong> 
+            <?php echo number_format($returnPercentage, 1); ?>% du montant total de la facture a été retourné
+            (<?php echo number_format($totalReturnAmount, 2); ?> GNF sur <?php echo number_format($finalAmount, 2); ?> GNF)
+        </div>
+        <?php endif; ?>
+
+        <!-- Formulaire de Retour -->
+        <form method="post" class="return-form">
             <input type="hidden" name="billing_number" value="<?php echo $billing_number; ?>">
             
             <div class="widget-box">
@@ -630,7 +775,7 @@ function selectAllProducts() {
               </div>
             </div>
           </form>
-        </div>
+        
         <?php 
         } else { 
         ?>
@@ -646,138 +791,6 @@ function selectAllProducts() {
     </div>
   </div>
 </div>
-<?php
-// === CODE PHP (à ajouter après la section des informations client et avant le formulaire de retour) ===
-
-// Récupérer l'historique des retours pour cette facture
-$returnsQuery = mysqli_query($con, "
-    SELECT 
-        r.ID,
-        r.ReturnDate,
-        r.ProductID,
-        r.Quantity,
-        r.Reason,
-        r.ReturnPrice,
-        p.ProductName,
-        p.ModelNumber
-    FROM 
-        tblreturns r
-    JOIN 
-        tblproducts p ON r.ProductID = p.ID
-    WHERE 
-        r.BillingNumber = '$billing_number'
-    ORDER BY 
-        r.ReturnDate DESC
-");
-
-$totalReturns = mysqli_num_rows($returnsQuery);
-$totalReturnAmount = 0;
-
-// Calculer le montant total des retours
-$sumQuery = mysqli_query($con, "SELECT SUM(ReturnPrice) as total_return_amount FROM tblreturns WHERE BillingNumber = '$billing_number'");
-$sumData = mysqli_fetch_assoc($sumQuery);
-$totalReturnAmount = $sumData['total_return_amount'] ?: 0;
-?>
-
-<!-- Section Historique des Retours -->
-<div class="returns-history">
-    <div class="widget-title" style="background: none; border: none; padding: 0; margin-bottom: 15px;">
-        <span class="icon"><i class="icon-list"></i></span>
-        <h5 style="color: #dc2626;">Historique des Retours pour cette Facture</h5>
-    </div>
-    
-    <?php if($totalReturns > 0): ?>
-    <!-- Résumé des retours -->
-    <div class="returns-summary">
-        <div class="row-fluid">
-            <div class="span4">
-                <strong>Total des retours :</strong> <?php echo $totalReturns; ?> transaction(s)
-            </div>
-            <div class="span4">
-                <strong>Montant total retourné :</strong> 
-                <span class="return-amount"><?php echo number_format($totalReturnAmount, 2); ?> GNF</span>
-            </div>
-            <div class="span4">
-                <strong>Statut :</strong> 
-                <span style="color: #dc2626;">Retours effectués</span>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Tableau détaillé des retours -->
-    <div class="widget-box">
-        <div class="widget-content nopadding">
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr style="background-color: #fca5a5;">
-                        <th width="8%">ID</th>
-                        <th width="15%">Date de retour</th>
-                        <th width="25%">Produit</th>
-                        <th width="12%">Référence</th>
-                        <th width="8%">Quantité</th>
-                        <th width="12%">Montant</th>
-                        <th width="20%">Motif</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php
-                // Reset le pointeur de résultat pour parcourir à nouveau
-                mysqli_data_seek($returnsQuery, 0);
-                while($returnRow = mysqli_fetch_assoc($returnsQuery)): 
-                    $returnDate = date("d/m/Y H:i", strtotime($returnRow['ReturnDate']));
-                ?>
-                    <tr>
-                        <td><?php echo $returnRow['ID']; ?></td>
-                        <td>
-                            <span class="return-date"><?php echo $returnDate; ?></span>
-                        </td>
-                        <td><?php echo htmlspecialchars($returnRow['ProductName']); ?></td>
-                        <td><?php echo htmlspecialchars($returnRow['ModelNumber']); ?></td>
-                        <td class="text-center">
-                            <strong><?php echo $returnRow['Quantity']; ?></strong>
-                        </td>
-                        <td class="text-right">
-                            <span class="return-amount"><?php echo number_format($returnRow['ReturnPrice'], 2); ?> GNF</span>
-                        </td>
-                        <td>
-                            <span class="return-reason"><?php echo htmlspecialchars($returnRow['Reason']); ?></span>
-                        </td>
-                    </tr>
-                <?php endwhile; ?>
-                </tbody>
-                <tfoot>
-                    <tr style="background-color: #fee2e2; font-weight: bold;">
-                        <td colspan="5" class="text-right">TOTAL RETOURNÉ :</td>
-                        <td class="text-right">
-                            <span class="return-amount"><?php echo number_format($totalReturnAmount, 2); ?> GNF</span>
-                        </td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-    
-    <?php else: ?>
-    <!-- Aucun retour trouvé -->
-    <div class="no-returns">
-        <i class="icon-info-sign" style="font-size: 24px; color: #6b7280; margin-bottom: 10px;"></i>
-        <p>Aucun retour n'a été effectué pour cette facture.</p>
-    </div>
-    <?php endif; ?>
-</div>
-
-<?php
-// === SECTION OPTIONNELLE: Statistiques rapides ===
-if($totalReturns > 0):
-    $returnPercentage = ($totalReturnAmount / $finalAmount) * 100;
-?>
-<div class="alert alert-info">
-    <strong>Statistiques :</strong> 
-    <?php echo number_format($returnPercentage, 1); ?>% du montant total de la facture a été retourné
-    (<?php echo number_format($totalReturnAmount, 2); ?> GNF sur <?php echo number_format($finalAmount, 2); ?> GNF)
-</div>
-<?php endif; ?>
 
 <?php include_once('includes/footer.php');?>
 
