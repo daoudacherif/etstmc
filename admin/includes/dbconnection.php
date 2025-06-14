@@ -1,7 +1,18 @@
 <?php
-$con = mysqli_connect("mysql.hostinger.com", "u451994146_root", "Daoudacherif4321", "u451994146_etstmc");
+require_once 'config.php';
 
-if (!$con) {
-    die("Connection failed: " . mysqli_connect_error());
-} 
+try {
+    $con = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    
+    if (!$con) {
+        throw new Exception("Database connection failed: " . mysqli_connect_error());
+    }
+    
+    // Set charset to prevent SQL injection
+    mysqli_set_charset($con, "utf8mb4");
+    
+} catch (Exception $e) {
+    error_log($e->getMessage());
+    die("A database error occurred. Please try again later.");
+}
 ?>
