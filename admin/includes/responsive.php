@@ -67,7 +67,7 @@
   </head>
 <body>
      <!-- Orientation overlay -->
-  <div id="rotate-overlay">
+  <!-- <div id="rotate-overlay">
     <p>Pour une meilleure expérience, veuillez tourner votre appareil.</p>
   </div>
-  
+   -->
