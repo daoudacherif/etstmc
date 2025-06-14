@@ -1,48 +1,80 @@
-<!--Header-part-->
-<div id="header">
-  <h2 style="padding-top: 20px;padding-left: 10px"><a href="dashboard.php"><strong style="color: red">ETSTMC</strong></a></h2>
-</div>
-<!--close-Header-part-->
-<!--top-Header-menu-->
-<div id="user-nav" class="navbar navbar-inverse">
-  <ul class="nav">
-    <?php
-    // Récupérer le type d'utilisateur connecté
-    $adminid = $_SESSION['imsaid'];
-    $ret = mysqli_query($con, "SELECT AdminName, UserName FROM tbladmin WHERE ID='$adminid'");
-    $row = mysqli_fetch_array($ret);
-    $name = $row['AdminName'];
-    $username = $row['UserName'];
-
-    // Récupérer le compteur du panier
-    $ret2 = mysqli_query($con, "Select * from tblcart where IsCheckOut='0'");
-    $cartcountcount = mysqli_num_rows($ret2);
-    ?>
-    <li class="dropdown" id="profile-messages"><a title="" href="#" data-toggle="dropdown" data-target="#profile-messages" class="dropdown-toggle"><i class="icon icon-user"></i> <span class="text">Welcome <?php echo $name; ?></span><b class="caret"></b></a>
-      <ul class="dropdown-menu">
-        <?php if($username != 'saler'): ?>
-        <!-- Profile link only shown to regular users -->
-        <li><a href="profile.php"><i class="icon-user"></i> My Profile</a></li>
-        <li class="divider"></li>
-        <?php endif; ?>
-        <li><a href="change-password.php"><i class="icon-check"></i> Setting</a></li>
-        <li class="divider"></li>
-        <li><a href="logout.php"><i class="icon-key"></i> Log Out</a></li>
-      </ul>
-    </li>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de gestion d'inventaire</title>
     
-    <?php if($username != 'saler'): ?>
-    <!-- Items shown to regular users but not to 'saler' users -->
-    <li id="menu-messages"><a href="cart.php" data-target="#menu-messages"><i class="icon icon-shopping-cart" style="color: white;font-size: 15px"></i> <span class="text" style="font-size: 15px">Cart</span> <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span><b class="caret"></b></a></li>
-    <li class=""><a title="" href="change-password.php"><i class="icon icon-cog"></i> <span class="text">Settings</span></a></li>
-    <?php else: ?>
-    <!-- Items shown only to 'saler' users -->
-    <li id="menu-messages"><a href="cart.php" data-target="#menu-messages"><i class="icon icon-shopping-cart" style="color: white;font-size: 15px"></i> <span class="text" style="font-size: 15px">Cart</span> <span class="label label-important"><?php echo htmlentities($cartcountcount);?></span><b class="caret"></b></a></li>
-    <?php endif; ?>
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/bootstrap-responsive.min.css">
+    <link rel="stylesheet" href="css/matrix-style.css">
+    <link rel="stylesheet" href="css/matrix-media.css">
+    <link rel="stylesheet" href="css/responsive-sidebar.css">
+    <link href="font-awesome/css/font-awesome.css" rel="stylesheet">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700,800' rel='stylesheet' type='text/css'>
     
-    <!-- Common items shown to all users -->
-    <li class=""><a title="" href="logout.php"><i class="icon icon-share-alt"></i> <span class="text">Logout</span></a></li>
-  </ul>
-</div>
-<!--close-top-Header-menu-->
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- JavaScript Files -->
+    <script src="js/jquery.min.js"></script>
+    <script src="js/jquery.ui.custom.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/matrix.js"></script>
+    <script src="js/responsive-sidebar.js"></script>
+    
+    <?php include_once('includes/responsive.php'); ?>
+</head>
+<body>
+    <!-- Header -->
+    <header id="header">
+        <h1><a href="dashboard.php">Système de gestion d'inventaire</a></h1>
+    </header>
+    
+    <!-- Sidebar -->
+    <div id="sidebar">
+        <ul>
+            <li class="submenu">
+                <a href="#"><i class="icon icon-home"></i> <span>Tableau de bord</span></a>
+                <ul>
+                    <li><a href="dashboard.php">Vue d'ensemble</a></li>
+                    <li><a href="daily-repport.php">Rapport quotidien</a></li>
+                </ul>
+            </li>
+            <li class="submenu">
+                <a href="#"><i class="icon icon-shopping-cart"></i> <span>Ventes</span></a>
+                <ul>
+                    <li><a href="cart.php">Nouvelle vente</a></li>
+                    <li><a href="invoice.php">Factures</a></li>
+                    <li><a href="return.php">Retours</a></li>
+                </ul>
+            </li>
+            <li class="submenu">
+                <a href="#"><i class="icon icon-truck"></i> <span>Stock</span></a>
+                <ul>
+                    <li><a href="inventory.php">Inventaire</a></li>
+                    <li><a href="arrival.php">Arrivages</a></li>
+                    <li><a href="stock-report.php">Rapport de stock</a></li>
+                </ul>
+            </li>
+            <li class="submenu">
+                <a href="#"><i class="icon icon-group"></i> <span>Clients</span></a>
+                <ul>
+                    <li><a href="client-account.php">Comptes clients</a></li>
+                    <li><a href="customer-details.php">Détails clients</a></li>
+                </ul>
+            </li>
+            <li class="submenu">
+                <a href="#"><i class="icon icon-cog"></i> <span>Paramètres</span></a>
+                <ul>
+                    <li><a href="profile.php">Profil</a></li>
+                    <li><a href="change-password.php">Changer mot de passe</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    
+    <!-- Content -->
+    <div id="content">
+        <!-- Content will be loaded here -->
+    </div>
+</body>
+</html>
