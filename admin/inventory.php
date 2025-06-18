@@ -21,44 +21,198 @@ if (empty($_SESSION['imsaid'])) {
     .stock-low { color: #ef6c00; font-weight: bold; }
     .stock-good { color: #2e7d32; }
     
-    /* Styles pour l'impression */
+    /* Styles complets pour l'impression - Masquer tous les éléments UI */
     @media print {
-      .no-print {
+      /* Masquer tous les éléments d'interface utilisateur */
+      .no-print,
+      header,
+      #header,
+      nav,
+      .navbar,
+      .nav,
+      #sidebar,
+      .sidebar,
+      #content-header,
+      #breadcrumb,
+      .breadcrumb,
+      footer,
+      #footer,
+      .footer,
+      .widget-title,
+      .btn,
+      .button,
+      .action-buttons,
+      .alert,
+      .dataTables_wrapper .dataTables_length,
+      .dataTables_wrapper .dataTables_filter,
+      .dataTables_wrapper .dataTables_info,
+      .dataTables_wrapper .dataTables_paginate,
+      .dataTables_wrapper .dataTables_processing,
+      .pagination,
+      .pager,
+      input,
+      select,
+      textarea,
+      .form-control,
+      .dropdown,
+      .modal,
+      .tooltip,
+      .popover {
         display: none !important;
+        visibility: hidden !important;
       }
-      .print-title {
-        text-align: center;
-        margin-bottom: 20px;
+      
+      /* Styles pour la page d'impression */
+      body {
+        margin: 0 !important;
+        padding: 15px !important;
+        background: white !important;
+        color: black !important;
+        font-family: Arial, sans-serif !important;
+        font-size: 12px !important;
+        line-height: 1.3 !important;
       }
+      
+      /* Réinitialiser le contenu principal */
+      #content {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+      }
+      
+      .container-fluid {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      
+      .row-fluid {
+        margin: 0 !important;
+        width: 100% !important;
+      }
+      
+      .span12 {
+        width: 100% !important;
+        margin: 0 !important;
+      }
+      
+      .widget-box {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+      }
+      
+      .widget-content {
+        padding: 0 !important;
+        background: transparent !important;
+      }
+      
+      /* Styles du tableau pour l'impression */
       .table {
-        font-size: 12px;
+        width: 100% !important;
+        font-size: 10px !important;
+        border-collapse: collapse !important;
+        margin: 0 !important;
+        background: white !important;
       }
+      
       .table th,
       .table td {
+        border: 1px solid #000 !important;
+        padding: 3px 5px !important;
+        text-align: left !important;
+        vertical-align: top !important;
+        background: white !important;
+        color: black !important;
+        font-size: 10px !important;
+        line-height: 1.2 !important;
+      }
+      
+      .table th {
+        background: #f0f0f0 !important;
+        font-weight: bold !important;
+        text-align: center !important;
+      }
+      
+      /* En-tête d'impression */
+      .print-header {
+        display: block !important;
+        text-align: center !important;
+        margin-bottom: 20px !important;
+        border-bottom: 2px solid #000 !important;
+        padding-bottom: 10px !important;
+      }
+      
+      .print-header h1 {
+        font-size: 18px !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: bold !important;
+        color: black !important;
+      }
+      
+      .print-header p {
+        font-size: 12px !important;
+        margin: 0 !important;
+        color: black !important;
+      }
+      
+      /* Résumé pour l'impression */
+      .print-summary-table {
+        display: block !important;
+        margin-top: 20px !important;
+        page-break-inside: avoid !important;
+      }
+      
+      .print-summary-table h3 {
+        font-size: 14px !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: bold !important;
+        color: black !important;
+      }
+      
+      .print-summary-table table {
+        width: 50% !important;
+        border-collapse: collapse !important;
+        font-size: 10px !important;
+      }
+      
+      .print-summary-table td {
+        border: 1px solid #000 !important;
         padding: 5px !important;
+        background: white !important;
+        color: black !important;
       }
-      body {
-        margin: 0;
-        padding: 10px;
+      
+      /* Éviter les coupures de page */
+      .table tr {
+        page-break-inside: avoid !important;
       }
-      #content-header,
-      #breadcrumb {
-        display: none;
+      
+      /* Masquer toutes les colonnes d'action */
+      .table th:last-child,
+      .table td:last-child {
+        display: none !important;
+      }
+      
+      /* Forcer l'affichage des couleurs de stock en noir pour l'impression */
+      .stock-critical,
+      .stock-low,
+      .stock-good {
+        color: black !important;
+        font-weight: bold !important;
+      }
+      
+      /* Masquer hr */
+      hr {
+        display: none !important;
       }
     }
     
+    /* Styles normaux (écran) */
     .print-header {
       display: none;
-    }
-    
-    @media print {
-      .print-header {
-        display: block;
-        text-align: center;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #000;
-        padding-bottom: 10px;
-      }
     }
     
     .action-buttons {
@@ -76,6 +230,10 @@ if (empty($_SESSION['imsaid'])) {
       background-color: #31b0d5;
       border-color: #269abc;
       color: white;
+    }
+    
+    .print-summary-table {
+      display: none;
     }
   </style>
 </head>
@@ -223,7 +381,7 @@ if (empty($_SESSION['imsaid'])) {
       </div><!-- span12 -->
     </div><!-- row-fluid -->
     
-    <!-- Résumé pour l'impression -->
+    <!-- Résumé pour l'écran -->
     <div class="row-fluid" style="margin-top: 20px;">
       <div class="span12">
         <div class="print-summary">
@@ -250,28 +408,26 @@ if (empty($_SESSION['imsaid'])) {
           </div>
           
           <!-- Version imprimable du résumé -->
-          <div style="display: none;">
-            <div class="print-summary-table">
-              <h3>Résumé de l'inventaire</h3>
-              <table style="width: 100%; margin-top: 20px; border: 1px solid #000;">
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total produits actifs</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_products'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en rupture</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_out_of_stock'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en stock faible</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_low_stock'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total unités en stock</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_stock_units'] ?></td>
-                </tr>
-              </table>
-            </div>
+          <div class="print-summary-table">
+            <h3>Résumé de l'inventaire</h3>
+            <table>
+              <tr>
+                <td><strong>Total produits actifs</strong></td>
+                <td><?= $stats['total_products'] ?></td>
+              </tr>
+              <tr>
+                <td><strong>Produits en rupture</strong></td>
+                <td><?= $stats['products_out_of_stock'] ?></td>
+              </tr>
+              <tr>
+                <td><strong>Produits en stock faible</strong></td>
+                <td><?= $stats['products_low_stock'] ?></td>
+              </tr>
+              <tr>
+                <td><strong>Total unités en stock</strong></td>
+                <td><?= $stats['total_stock_units'] ?></td>
+              </tr>
+            </table>
           </div>
         </div>
       </div>
@@ -309,33 +465,17 @@ $(document).ready(function() {
         }
     });
     
-    // Gestion de l'impression
+    // Gestion de l'impression - Afficher tous les éléments lors de l'impression
     window.addEventListener('beforeprint', function() {
-        // Afficher le résumé dans la version imprimée
-        $('.print-summary-table').parent().show();
-        
-        // Masquer la pagination DataTable
-        $('.dataTables_wrapper .dataTables_paginate').hide();
-        $('.dataTables_wrapper .dataTables_info').hide();
-        $('.dataTables_wrapper .dataTables_length').hide();
-        $('.dataTables_wrapper .dataTables_filter').hide();
-        
-        // Afficher tous les éléments du tableau
-        $('.data-table').dataTable().fnSettings()._iDisplayLength = -1;
-        $('.data-table').dataTable().fnDraw();
+        // Afficher tous les éléments du tableau sans pagination
+        var table = $('.data-table').DataTable();
+        table.page.len(-1).draw();
     });
     
     window.addEventListener('afterprint', function() {
-        // Restaurer l'affichage normal
-        $('.print-summary-table').parent().hide();
-        $('.dataTables_wrapper .dataTables_paginate').show();
-        $('.dataTables_wrapper .dataTables_info').show();
-        $('.dataTables_wrapper .dataTables_length').show();
-        $('.dataTables_wrapper .dataTables_filter').show();
-        
-        // Restaurer la pagination
-        $('.data-table').dataTable().fnSettings()._iDisplayLength = 50;
-        $('.data-table').dataTable().fnDraw();
+        // Restaurer la pagination normale
+        var table = $('.data-table').DataTable();
+        table.page.len(50).draw();
     });
 });
 
