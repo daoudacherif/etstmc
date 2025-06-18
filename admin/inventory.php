@@ -23,77 +23,106 @@ if (empty($_SESSION['imsaid'])) {
     
     /* Styles pour l'impression */
     @media print {
-      .no-print,
-      #sidebar,
-      #header,
-      .dataTables_wrapper .dataTables_paginate,
-      .dataTables_wrapper .dataTables_info,
-      .dataTables_wrapper .dataTables_length,
-      .dataTables_wrapper .dataTables_filter,
-      .widget-title,
-      .widget-box,
-      #content-header,
-      #breadcrumb {
+      /* Masquer tous les éléments sauf le tableau */
+      body * {
+        visibility: hidden;
+      }
+      
+      /* Rendre visible uniquement le contenu à imprimer */
+      .print-container,
+      .print-container * {
+        visibility: visible;
+      }
+      
+      /* Positionnement du contenu à imprimer */
+      .print-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      
+      /* Masquer les colonnes Actions */
+      .no-print {
         display: none !important;
       }
       
-      body {
-        margin: 0;
-        padding: 10px;
-        background: white !important;
-      }
-      
-      #content {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      
-      .container-fluid {
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      
-      .table {
-        font-size: 11px;
+      /* Styles du tableau pour l'impression */
+      table {
         width: 100% !important;
-        margin: 0 !important;
+        border-collapse: collapse !important;
+        font-size: 11px !important;
       }
       
-      .table th,
-      .table td {
-        padding: 4px !important;
+      table th,
+      table td {
         border: 1px solid #000 !important;
+        padding: 5px !important;
+        text-align: left !important;
       }
       
-      .table thead th {
-        background-color: #f5f5f5 !important;
-        font-weight: bold;
-        text-align: center;
+      table th {
+        background-color: #f0f0f0 !important;
+        font-weight: bold !important;
+        text-align: center !important;
       }
       
-      .widget-content {
-        padding: 0 !important;
-        border: none !important;
-      }
-      
-      .print-title {
+      /* En-tête d'impression */
+      .print-header {
+        display: block !important;
         text-align: center;
         margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+      }
+      
+      .print-header h2 {
+        margin: 0 0 10px 0;
+        font-size: 20px;
+      }
+      
+      .print-header p {
+        margin: 5px 0;
+        font-size: 12px;
+      }
+      
+      /* Couleurs pour l'impression */
+      .stock-critical { 
+        color: #000 !important; 
+        font-weight: bold !important;
+        text-decoration: underline !important;
+      }
+      
+      .stock-low { 
+        color: #000 !important; 
+        font-weight: bold !important;
+        font-style: italic !important;
+      }
+      
+      .stock-good { 
+        color: #000 !important; 
+      }
+      
+      /* Supprimer les marges du body */
+      body {
+        margin: 0 !important;
+        padding: 10px !important;
+      }
+      
+      /* Pagination DataTables */
+      .dataTables_paginate,
+      .dataTables_info,
+      .dataTables_length,
+      .dataTables_filter,
+      .dataTables_wrapper .row:first-child,
+      .dataTables_wrapper .row:last-child {
+        display: none !important;
       }
     }
     
+    /* Masquer l'en-tête d'impression en mode normal */
     .print-header {
       display: none;
-    }
-    
-    @media print {
-      .print-header {
-        display: block;
-        text-align: center;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #000;
-        padding-bottom: 10px;
-      }
     }
     
     .action-buttons {
@@ -119,7 +148,7 @@ if (empty($_SESSION['imsaid'])) {
 <?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">
-  <div id="content-header" class="no-print">
+  <div id="content-header">
     <div id="breadcrumb">
       <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
@@ -129,19 +158,13 @@ if (empty($_SESSION['imsaid'])) {
     <h1>Inventaire des Articles</h1>
   </div>
   
-  <!-- En-tête pour l'impression -->
-  <div class="print-header">
-    <h1>INVENTAIRE DES ARTICLES</h1>
-    <p>Date d'impression : <?= date('d/m/Y H:i') ?></p>
-  </div>
-  
   <div class="container-fluid">
-    <hr class="no-print">
+    <hr>
     
     <!-- Bouton d'impression -->
-    <div class="row-fluid no-print">
+    <div class="row-fluid">
       <div class="span12">
-        <button onclick="window.print()" class="btn btn-print">
+        <button onclick="printInventory()" class="btn btn-print">
           <i class="icon-print"></i> Imprimer l'inventaire
         </button>
       </div>
@@ -150,116 +173,128 @@ if (empty($_SESSION['imsaid'])) {
     <div class="row-fluid">
       <div class="span12">
         <div class="widget-box">
-          <div class="widget-title no-print">
+          <div class="widget-title">
             <span class="icon"><i class="icon-th"></i></span>
             <h5>Inventaire des Articles</h5>
           </div>
           <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
-              <thead>
-                <tr>
-                  <th>N°</th>
-                  <th>Nom du Article</th>
-                  <th>Catégorie</th>
-                  <th>Marque</th>
-                  <th>Modèle</th>
-                  <th>Stock Initial</th>
-                  <th>Vendus</th>
-                  <th>Retournés</th>
-                  <th>Stock Actuel</th>
-                  <th>Statut</th>
-                  <th class="no-print">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php
-                // Requête pour récupérer l'inventaire (logique métier inchangée)
-                $sql = "
-                  SELECT 
-                    p.ID            AS pid,
-                    p.ProductName,
-                    COALESCE(c.CategoryName, 'N/A') AS CategoryName,
-                    p.BrandName,
-                    p.ModelNumber,
-                    p.Stock         AS current_stock,
-                    COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
-                    COALESCE(
-                      (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
-                      0
-                    ) AS returned_qty,
-                    p.Status
-                  FROM tblproducts p
-                  LEFT JOIN tblcategory c 
-                    ON c.ID = p.CatID
-                  LEFT JOIN tblcart cart 
-                    ON cart.ProductId = p.ID 
-                   AND cart.IsCheckOut = 1
-                  GROUP BY p.ID
-                  ORDER BY p.Stock ASC, p.ID DESC
-                ";
-                $ret = mysqli_query($con, $sql) 
-                  or die('Erreur SQL : ' . mysqli_error($con));
+            <!-- Container pour l'impression -->
+            <div class="print-container">
+              <!-- En-tête pour l'impression -->
+              <div class="print-header">
+                <h2>INVENTAIRE DES ARTICLES</h2>
+                <p>Date d'impression : <?= date('d/m/Y H:i') ?></p>
+                <p>Nombre total d'articles : <span id="total-articles">0</span></p>
+              </div>
+              
+              <table class="table table-bordered data-table" id="inventory-table">
+                <thead>
+                  <tr>
+                    <th>N°</th>
+                    <th>Nom du Article</th>
+                    <th>Catégorie</th>
+                    <th>Marque</th>
+                    <th>Modèle</th>
+                    <th>Stock Initial</th>
+                    <th>Vendus</th>
+                    <th>Retournés</th>
+                    <th>Stock Actuel</th>
+                    <th>Statut</th>
+                    <th class="no-print">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  // Requête pour récupérer l'inventaire
+                  $sql = "
+                    SELECT 
+                      p.ID            AS pid,
+                      p.ProductName,
+                      COALESCE(c.CategoryName, 'N/A') AS CategoryName,
+                      p.BrandName,
+                      p.ModelNumber,
+                      p.Stock         AS current_stock,
+                      COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                      COALESCE(
+                        (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
+                        0
+                      ) AS returned_qty,
+                      p.Status
+                    FROM tblproducts p
+                    LEFT JOIN tblcategory c 
+                      ON c.ID = p.CatID
+                    LEFT JOIN tblcart cart 
+                      ON cart.ProductId = p.ID 
+                     AND cart.IsCheckOut = 1
+                    GROUP BY p.ID
+                    ORDER BY p.Stock ASC, p.ID DESC
+                  ";
+                  $ret = mysqli_query($con, $sql) 
+                    or die('Erreur SQL : ' . mysqli_error($con));
 
-                if (mysqli_num_rows($ret) > 0) {
-                  $cnt = 1;
-                  while ($row = mysqli_fetch_assoc($ret)) {
-                    // Le stock actuel est déjà dans la base de données
-                    $current_stock = intval($row['current_stock']);
-                    $sold = intval($row['sold_qty']);
-                    $returned = intval($row['returned_qty']);
-                    
-                    // Calcul du stock initial = stock actuel + vendu - retourné (logique inchangée)
-                    $initial_stock = $current_stock + $sold - $returned;
-                    
-                    // Déterminer la classe CSS pour le niveau de stock
-                    $stockClass = '';
-                    if ($current_stock == 0) {
-                        $stockClass = 'stock-critical';
-                    } elseif ($current_stock <= 5) {
-                        $stockClass = 'stock-low';
-                    } else {
-                        $stockClass = 'stock-good';
+                  $totalProducts = 0;
+                  if (mysqli_num_rows($ret) > 0) {
+                    $cnt = 1;
+                    while ($row = mysqli_fetch_assoc($ret)) {
+                      $totalProducts++;
+                      // Le stock actuel est déjà dans la base de données
+                      $current_stock = intval($row['current_stock']);
+                      $sold = intval($row['sold_qty']);
+                      $returned = intval($row['returned_qty']);
+                      
+                      // Calcul du stock initial = stock actuel + vendu - retourné
+                      $initial_stock = $current_stock + $sold - $returned;
+                      
+                      // Déterminer la classe CSS pour le niveau de stock
+                      $stockClass = '';
+                      if ($current_stock == 0) {
+                          $stockClass = 'stock-critical';
+                      } elseif ($current_stock <= 5) {
+                          $stockClass = 'stock-low';
+                      } else {
+                          $stockClass = 'stock-good';
+                      }
+                      ?>
+                      <tr>
+                        <td><?= $cnt ?></td>
+                        <td><?= htmlspecialchars($row['ProductName']) ?></td>
+                        <td><?= htmlspecialchars($row['CategoryName']) ?></td>
+                        <td><?= htmlspecialchars($row['BrandName']) ?></td>
+                        <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                        <td><?= $initial_stock ?></td>
+                        <td><?= $sold ?></td>
+                        <td><?= $returned ?></td>
+                        <td class="<?= $stockClass ?>">
+                          <?= $current_stock === 0 ? 'Épuisé' : $current_stock ?>
+                        </td>
+                        <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
+                        <td class="no-print">
+                          <div class="action-buttons">
+                            <a href="product-history.php?pid=<?= $row['pid'] ?>" 
+                               class="btn btn-info btn-mini tip-top" 
+                               title="Voir l'historique">
+                              <i class="icon-time"></i> Historique
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <?php
+                      $cnt++;
                     }
-                    ?>
-                    <tr>
-                      <td><?= $cnt ?></td>
-                      <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                      <td><?= htmlspecialchars($row['CategoryName']) ?></td>
-                      <td><?= htmlspecialchars($row['BrandName']) ?></td>
-                      <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                      <td><?= $initial_stock ?></td>
-                      <td><?= $sold ?></td>
-                      <td><?= $returned ?></td>
-                      <td class="<?= $stockClass ?>">
-                        <?= $current_stock === 0 ? 'Épuisé' : $current_stock ?>
-                      </td>
-                      <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
-                      <td class="no-print">
-                        <div class="action-buttons">
-                          <a href="product-history.php?pid=<?= $row['pid'] ?>" 
-                             class="btn btn-info btn-mini tip-top" 
-                             title="Voir l'historique">
-                            <i class="icon-time"></i> Historique
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                    <?php
-                    $cnt++;
+                  } else {
+                    echo '<tr><td colspan="11" class="text-center">Aucun Article trouvé</td></tr>';
                   }
-                } else {
-                  echo '<tr><td colspan="11" class="text-center">Aucun Article trouvé</td></tr>';
-                }
-                ?>
-              </tbody>
-            </table>
+                  ?>
+                </tbody>
+              </table>
+            </div><!-- print-container -->
           </div><!-- widget-content -->
         </div><!-- widget-box -->
       </div><!-- span12 -->
     </div><!-- row-fluid -->
     
     <!-- Résumé pour affichage écran uniquement -->
-    <div class="row-fluid no-print" style="margin-top: 20px;">
+    <div class="row-fluid" style="margin-top: 20px;">
       <div class="span12">
         <?php
         // Statistiques globales
@@ -290,7 +325,7 @@ if (empty($_SESSION['imsaid'])) {
 
 <?php include_once('includes/footer.php'); ?>
 
-<!-- scripts pour DataTable si nécessaire -->
+<!-- scripts pour DataTable -->
 <script src="js/jquery.min.js"></script>
 <script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
@@ -302,14 +337,11 @@ if (empty($_SESSION['imsaid'])) {
 
 <script>
 $(document).ready(function() {
-    // Vérifier si DataTable existe déjà et le détruire si nécessaire
-    if ($.fn.DataTable.isDataTable('.data-table')) {
-        $('.data-table').DataTable().destroy();
-    }
+    // Mettre à jour le nombre total d'articles
+    $('#total-articles').text('<?= $totalProducts ?>');
     
-    // Initialisation DataTable avec configuration pour l'impression
-    $('.data-table').dataTable({
-        "destroy": true, // Permet de réinitialiser automatiquement
+    // Initialisation DataTable
+    var table = $('.data-table').DataTable({
         "pageLength": 50,
         "order": [[ 8, "asc" ]], // Trier par stock actuel croissant
         "language": {
@@ -317,34 +349,34 @@ $(document).ready(function() {
         }
     });
     
-    // Gestion de l'impression
-    window.addEventListener('beforeprint', function() {
-        // Masquer tous les éléments non nécessaires
-        $('#sidebar, #header, .dataTables_wrapper .dataTables_paginate, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter, .widget-title').hide();
-        
-        // Afficher tous les éléments du tableau sans pagination
-        if ($.fn.DataTable.isDataTable('.data-table')) {
-            $('.data-table').DataTable().page.len(-1).draw();
-        }
-    });
-    
-    window.addEventListener('afterprint', function() {
-        // Restaurer l'affichage normal après impression
-        $('#sidebar, #header, .dataTables_wrapper .dataTables_paginate, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter, .widget-title').show();
-        
-        // Restaurer la pagination normale
-        if ($.fn.DataTable.isDataTable('.data-table')) {
-            $('.data-table').DataTable().page.len(50).draw();
-        }
-    });
-});
-
-// Tooltip pour les boutons d'action
-$(document).ready(function() {
+    // Tooltip pour les boutons d'action
     $('.tip-top').tooltip({
         placement: 'top'
     });
 });
+
+// Fonction d'impression personnalisée
+function printInventory() {
+    // Sauvegarder la configuration actuelle du DataTable
+    var table = $('.data-table').DataTable();
+    var currentPage = table.page.info().page;
+    var currentLength = table.page.info().length;
+    
+    // Afficher toutes les lignes avant l'impression
+    table.page.len(-1).draw();
+    
+    // Attendre que le DataTable se redessine
+    setTimeout(function() {
+        // Lancer l'impression
+        window.print();
+        
+        // Restaurer la pagination après un court délai
+        setTimeout(function() {
+            table.page.len(currentLength).draw();
+            table.page(currentPage).draw('page');
+        }, 100);
+    }, 100);
+}
 </script>
 
 </body>
