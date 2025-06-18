@@ -27,7 +27,7 @@ $productResult = mysqli_stmt_get_result($stmt);
 $product = mysqli_fetch_assoc($productResult);
 
 if (!$product) {
-    echo "<script>alert('Produit non trouvé'); window.location.href='manage-products.php';</script>";
+    echo "<script>alert('Produit non trouvé'); window.location.href='manage-product.php';</script>";
     exit;
 }
 ?>
