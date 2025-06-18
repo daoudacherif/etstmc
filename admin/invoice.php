@@ -1,498 +1,350 @@
-<?php
+<?php 
 session_start();
-error_reporting(0);
+error_reporting(E_ALL);
 include('includes/dbconnection.php');
-if (strlen($_SESSION['imsaid']==0)) {
-  header('location:logout.php');
-} else {
+
+// Vérifier si l'admin est connecté
+if (empty($_SESSION['imsaid'])) {
+    header('location:logout.php');
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<title>Système de Gestion d'Inventaire || Facture</title>
-<?php include_once('includes/cs.php');?>
-<?php include_once('includes/responsive.php'); ?>
-<style>
-  /* Styles pour l'interface normale */
-  .invoice-box {
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 15px;
-    margin-bottom: 20px;
-  }
-  .invoice-header {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-  }
-  .invoice-total {
-    font-weight: bold;
-    color: #d9534f;
-  }
-  .search-form {
-    background-color: #f5f5f5;
-    padding: 15px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-  }
-  .customer-info td, .customer-info th {
-    padding: 8px;
-  }
-  .print-header {
-    display: none;
-  }
-  .company-header {
-    text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #333;
-    padding-bottom: 15px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-  }
-  
-  /* Styles pour le logo */
-  .company-logo {
-    margin-bottom: 15px;
-  }
-  .company-logo img {
-    max-width: 120px;
-    max-height: 80px;
-    object-fit: contain;
-  }
-  
-  /* Alternative: Logo et texte côte à côte */
-  .company-header-horizontal {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    text-align: left;
-  }
-  .company-header-horizontal .company-logo {
-    margin-bottom: 0;
-    margin-right: 20px;
-  }
-  .company-header-horizontal .company-info {
-    flex: 1;
-  }
-  
-  .company-title {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    text-transform: uppercase;
-  }
-  .company-subtitle {
-    font-size: 14px;
-    margin-bottom: 10px;
-  }
-  .company-contact {
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .company-contact .left-info {
-    text-align: left;
-    flex: 1;
-  }
-  .company-contact .right-info {
-    background-color: #333;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 3px;
-  }
-  .invoice-footer {
-    text-align: center;
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #ddd;
-    font-size: 12px;
-    color: #666;
-  }
-
-  /* Styles pour les signatures */
-  .signature-section {
-    margin-top: 40px;
-    margin-bottom: 30px;
-    padding: 20px 0;
-    border-top: 1px solid #ddd;
-  }
-  
-  .signature-box {
-    text-align: center;
-    padding: 15px;
-    margin: 0 5px;
-  }
-  
-  .signature-label {
-    font-weight: bold;
-    font-size: 14px;
-    margin-bottom: 15px;
-    color: #333;
-  }
-  
-  .signature-line {
-    border-bottom: 2px solid #333;
-    height: 50px;
-    margin-bottom: 10px;
-    position: relative;
-  }
-  
-  .signature-date {
-    font-size: 12px;
-    color: #666;
-    margin-top: 10px;
-  }
-  
-  /* Styles spécifiques pour l'impression */
-  @media print {
-    /* Cacher tous les éléments de navigation et UI */
-    header, #header, .header, 
-    #sidebar, .sidebar, 
-    #user-nav, #search, .navbar, 
-    footer, #footer, .footer,
-    .no-print, #breadcrumb, 
-    #content-header, .widget-title {
-      display: none !important;
+  <meta charset="UTF-8">
+  <title>Inventaire des Articles</title>
+  <?php include_once('includes/cs.php'); ?>
+  <?php include_once('includes/responsive.php'); ?>
+  <style>
+    .stock-critical { color: #c62828; font-weight: bold; }
+    .stock-low { color: #ef6c00; font-weight: bold; }
+    .stock-good { color: #2e7d32; }
+    
+    /* Styles pour l'impression */
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      .print-title {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .table {
+        font-size: 12px;
+      }
+      .table th,
+      .table td {
+        padding: 5px !important;
+      }
+      body {
+        margin: 0;
+        padding: 10px;
+      }
+      #content-header,
+      #breadcrumb {
+        display: none;
+      }
     }
     
-    /* Afficher l'en-tête d'impression qui est normalement caché */
     .print-header {
-      display: block;
-      text-align: center;
-      margin-bottom: 20px;
+      display: none;
     }
     
-    /* Ajuster la mise en page pour l'impression */
-    body {
-      background: white !important;
-      margin: 0 !important;
-      padding: 0 !important;
+    @media print {
+      .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #000;
+        padding-bottom: 10px;
+      }
     }
     
-    #content {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100% !important;
-      left: 0 !important;
-      position: relative !important;
+    .action-buttons {
+      white-space: nowrap;
     }
     
-    .container-fluid {
-      padding: 0 !important;
-      margin: 0 !important;
-      width: 100% !important;
+    .btn-print {
+      background-color: #5bc0de;
+      border-color: #46b8da;
+      color: white;
+      margin-bottom: 15px;
     }
     
-    .row-fluid .span12 {
-      width: 100% !important;
-      margin: 0 !important;
-      float: none !important;
+    .btn-print:hover {
+      background-color: #31b0d5;
+      border-color: #269abc;
+      color: white;
     }
-    
-    /* Retirer les bordures et couleurs de fond pour l'impression */
-    .widget-box, .invoice-box {
-      border: none !important;
-      box-shadow: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      background: none !important;
-    }
-    
-    /* S'assurer que le logo s'imprime correctement */
-    .company-logo img {
-      max-width: 100px !important;
-      max-height: 70px !important;
-      print-color-adjust: exact;
-      -webkit-print-color-adjust: exact;
-    }
-    
-    /* Assurer que les tableaux s'impriment correctement */
-    table { page-break-inside: auto; }
-    tr { page-break-inside: avoid; page-break-after: auto; }
-    thead { display: table-header-group; }
-    tfoot { display: table-footer-group; }
-    
-    /* Supprimer les marges et espacements inutiles */
-    hr, br.print-hidden {
-      display: none !important;
-    }
-    
-    /* Forcer l'impression en noir et blanc par défaut */
-    * {
-      color: black !important;
-      text-shadow: none !important;
-      filter: none !important;
-      -ms-filter: none !important;
-    }
-    
-    /* Sauf pour certains éléments spécifiques */
-    .invoice-total {
-      color: #d9534f !important;
-    }
-    
-    .company-contact .right-info {
-      background-color: #333 !important;
-      color: white !important;
-    }
-    
-    /* Assurer que les liens sont visibles et sans URL */
-    a, a:visited {
-      text-decoration: underline;
-    }
-    a[href]:after {
-      content: "";
-    }
-    
-    /* Masquer le bouton d'impression */
-    input[name="printbutton"] {
-      display: none !important;
-    }
-    
-    /* Styles d'impression pour les signatures */
-    .signature-section {
-      margin-top: 30px !important;
-      margin-bottom: 20px !important;
-      padding: 15px 0 !important;
-      border-top: 2px solid #000 !important;
-      page-break-inside: avoid;
-    }
-    
-    .signature-box {
-      padding: 10px !important;
-    }
-    
-    .signature-label {
-      color: black !important;
-      font-weight: bold !important;
-      font-size: 12px !important;
-    }
-    
-    .signature-line {
-      border-bottom: 2px solid #000 !important;
-      height: 40px !important;
-    }
-    
-    .signature-date {
-      color: black !important;
-      font-size: 10px !important;
-    }
-  }
-</style>
+  </style>
 </head>
 <body>
-<!-- Éléments qui seront cachés à l'impression -->
-<div class="no-print">
-  <?php include_once('includes/header.php');?>
-  <?php include_once('includes/sidebar.php');?>
-</div>
+<?php include_once('includes/header.php'); ?>
+<?php include_once('includes/sidebar.php'); ?>
 
 <div id="content">
-  <!-- En-tête de contenu - caché à l'impression -->
   <div id="content-header" class="no-print">
-    <div id="breadcrumb"> <a href="dashboard.php" title="Aller à l'accueil" class="tip-bottom"><i class="icon-home"></i> Accueil</a> <a href="manage-category.php" class="current">Facture</a> </div>
-    <h1>Facture</h1>
+    <div id="breadcrumb">
+      <a href="dashboard.php" class="tip-bottom">
+        <i class="icon-home"></i> Accueil
+      </a>
+      <strong>Voir l'Inventaire des Articles</strong>
+    </div>
+    <h1>Inventaire des Articles</h1>
+  </div>
+  
+  <!-- En-tête pour l'impression -->
+  <div class="print-header">
+    <h1>INVENTAIRE DES ARTICLES</h1>
+    <p>Date d'impression : <?= date('d/m/Y H:i') ?></p>
   </div>
   
   <div class="container-fluid">
     <hr class="no-print">
+    
+    <!-- Bouton d'impression -->
+    <div class="row-fluid no-print">
+      <div class="span12">
+        <button onclick="window.print()" class="btn btn-print">
+          <i class="icon-print"></i> Imprimer l'inventaire
+        </button>
+      </div>
+    </div>
+    
     <div class="row-fluid">
-      <div class="span12" id="printArea">
-        <!-- En-tête de l'entreprise avec logo -->
-        <div class="company-header">
-          <!-- Logo de l'entreprise -->
-          <div class="company-logo">
-        <img src="includes/img/logo.jpg" alt="Logo de l'entreprise" />
+      <div class="span12">
+        <div class="widget-box">
+          <div class="widget-title no-print">
+            <span class="icon"><i class="icon-th"></i></span>
+            <h5>Inventaire des Articles</h5>
           </div>
-          
-          <!-- Informations de l'entreprise -->
-          <div class="company-info">
-            <div class="company-title">VENTE DE MATERIEL DE CONSTRUCTION</div>
-            <div class="company-subtitle">Pointes, Contre plaque, Brouette, Fil d'attache, Peinture, et Divers</div>
-            <div class="company-contact">
-              <div class="left-info">
-                Sis à Bailobaya à côté du marché<br>
-                Tél 621 59 87 80 / 621 72 36 46
-              </div>
-              <div class="right-info">C Plaque</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="invoice-box">
-          <div class="invoice-header">
-            <h3>Facture #<?php echo $_SESSION['invoiceid']; ?></h3>
-          </div>
-
-          <?php     
-          $billingid = $_SESSION['invoiceid'];
-          $ret = mysqli_query($con, "SELECT DISTINCT 
-                                    tblcustomer.CustomerName,
-                                    tblcustomer.MobileNumber,
-                                    tblcustomer.ModeofPayment,
-                                    tblcustomer.BillingDate 
-                                  FROM 
-                                    tblcart 
-                                  JOIN 
-                                    tblcustomer ON tblcustomer.BillingNumber=tblcart.BillingId 
-                                  WHERE 
-                                    tblcustomer.BillingNumber='$billingid'");
-
-          while ($row = mysqli_fetch_array($ret)) {
-            $formattedDate = date("d/m/Y", strtotime($row['BillingDate']));
-          ?>
-          <div class="customer-info">
-            <table class="table" width="100%" border="1">
-              <tr>
-                <th width="25%">Nom du client:</th>
-                <td width="25%"><?php echo htmlspecialchars($row['CustomerName']); ?></td>
-                <th width="25%">Numéro du client:</th>
-                <td width="25%"><?php echo htmlspecialchars($row['MobileNumber']); ?></td>
-              </tr>
-              <tr>
-                <th>Mode de paiement:</th>
-                <td colspan="3"><?php echo htmlspecialchars($row['ModeofPayment']); ?></td>
-              </tr>
-              <tr>
-                <th>Date:</th>
-                <td colspan="3"><?php echo $formattedDate; ?></td>
-              </tr>
-            </table>
-          </div>
-          <?php } ?>
-          
-          <div class="widget-box">
-            <div class="widget-title no-print"> 
-              <span class="icon"><i class="icon-th"></i></span>
-              <h5>Inventaire des Articles</h5>
-            </div>
-            <div class="widget-content nopadding" width="100%" border="1">
-              <table class="table table-bordered data-table" style="font-size: 15px">
-                <thead>
-                  <tr>
-                    <th width="5%">N°</th>
-                    <th width="30%">Nom du Article</th>
-                    <th width="15%">Numéro de modèle</th>
-                    <th width="10%">Quantité</th>
-                    <th width="15%">Prix unitaire</th>
-                    <th width="15%">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <div class="widget-content nopadding">
+            <table class="table table-bordered data-table">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Nom du Article</th>
+                  <th>Catégorie</th>
+                  <th>Marque</th>
+                  <th>Modèle</th>
+                  <th>Stock Initial</th>
+                  <th>Vendus</th>
+                  <th>Retournés</th>
+                  <th>Stock Actuel</th>
+                  <th>Statut</th>
+                  <th class="no-print">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
                 <?php
-                $ret = mysqli_query($con, "SELECT 
-                                          tblproducts.ProductName,
-                                          tblproducts.ModelNumber,
-                                          tblproducts.Price,
-                                          tblcart.ProductQty,
-                                          tblcart.Price as CartPrice
-                                        FROM 
-                                          tblcart
-                                        JOIN 
-                                          tblproducts ON tblproducts.ID=tblcart.ProductId
-                                        WHERE 
-                                          tblcart.BillingId='$billingid'");
-                $cnt = 1;
-                $gtotal = 0;
+                // Requête pour récupérer l'inventaire (logique métier inchangée)
+                $sql = "
+                  SELECT 
+                    p.ID            AS pid,
+                    p.ProductName,
+                    COALESCE(c.CategoryName, 'N/A') AS CategoryName,
+                    p.BrandName,
+                    p.ModelNumber,
+                    p.Stock         AS current_stock,
+                    COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
+                    COALESCE(
+                      (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
+                      0
+                    ) AS returned_qty,
+                    p.Status
+                  FROM tblproducts p
+                  LEFT JOIN tblcategory c 
+                    ON c.ID = p.CatID
+                  LEFT JOIN tblcart cart 
+                    ON cart.ProductId = p.ID 
+                   AND cart.IsCheckOut = 1
+                  GROUP BY p.ID
+                  ORDER BY p.Stock ASC, p.ID DESC
+                ";
+                $ret = mysqli_query($con, $sql) 
+                  or die('Erreur SQL : ' . mysqli_error($con));
 
-                while ($row = mysqli_fetch_array($ret)) {
-                  $pq = $row['ProductQty'];
-                  $ppu = $row['CartPrice'] ?: $row['Price']; // Utiliser le prix du panier s'il existe
-                  $total = $pq * $ppu;
-                ?>
-                  <tr>
-                    <td><?php echo $cnt; ?></td>
-                    <td><?php echo htmlspecialchars($row['ProductName']); ?></td>
-                    <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
-                    <td><?php echo $pq; ?></td>
-                    <td><?php echo number_format($ppu, 2); ?></td>
-                    <td><?php echo number_format($total, 2); ?></td>
-                  </tr>
-                <?php 
-                  $cnt++;
-                  $gtotal += $total;
+                if (mysqli_num_rows($ret) > 0) {
+                  $cnt = 1;
+                  while ($row = mysqli_fetch_assoc($ret)) {
+                    // Le stock actuel est déjà dans la base de données
+                    $current_stock = intval($row['current_stock']);
+                    $sold = intval($row['sold_qty']);
+                    $returned = intval($row['returned_qty']);
+                    
+                    // Calcul du stock initial = stock actuel + vendu - retourné (logique inchangée)
+                    $initial_stock = $current_stock + $sold - $returned;
+                    
+                    // Déterminer la classe CSS pour le niveau de stock
+                    $stockClass = '';
+                    if ($current_stock == 0) {
+                        $stockClass = 'stock-critical';
+                    } elseif ($current_stock <= 5) {
+                        $stockClass = 'stock-low';
+                    } else {
+                        $stockClass = 'stock-good';
+                    }
+                    ?>
+                    <tr>
+                      <td><?= $cnt ?></td>
+                      <td><?= htmlspecialchars($row['ProductName']) ?></td>
+                      <td><?= htmlspecialchars($row['CategoryName']) ?></td>
+                      <td><?= htmlspecialchars($row['BrandName']) ?></td>
+                      <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
+                      <td><?= $initial_stock ?></td>
+                      <td><?= $sold ?></td>
+                      <td><?= $returned ?></td>
+                      <td class="<?= $stockClass ?>">
+                        <?= $current_stock === 0 ? 'Épuisé' : $current_stock ?>
+                      </td>
+                      <td><?= $row['Status'] == 1 ? 'Actif' : 'Inactif' ?></td>
+                      <td class="no-print">
+                        <div class="action-buttons">
+                          <a href="product-history.php?pid=<?= $row['pid'] ?>" 
+                             class="btn btn-info btn-mini tip-top" 
+                             title="Voir l'historique">
+                            <i class="icon-time"></i> Historique
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                    <?php
+                    $cnt++;
+                  }
+                } else {
+                  echo '<tr><td colspan="11" class="text-center">Aucun Article trouvé</td></tr>';
                 }
                 ?>
+              </tbody>
+            </table>
+          </div><!-- widget-content -->
+        </div><!-- widget-box -->
+      </div><!-- span12 -->
+    </div><!-- row-fluid -->
+    
+    <!-- Résumé pour l'impression -->
+    <div class="row-fluid" style="margin-top: 20px;">
+      <div class="span12">
+        <div class="print-summary">
+          <?php
+          // Statistiques globales
+          $statsQuery = "
+            SELECT 
+              COUNT(*) as total_products,
+              SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as products_out_of_stock,
+              SUM(CASE WHEN Stock <= 5 AND Stock > 0 THEN 1 ELSE 0 END) as products_low_stock,
+              SUM(Stock) as total_stock_units
+            FROM tblproducts 
+            WHERE Status = 1
+          ";
+          $statsResult = mysqli_query($con, $statsQuery);
+          $stats = mysqli_fetch_assoc($statsResult);
+          ?>
+          <div class="alert alert-info no-print">
+            <h4>Résumé de l'inventaire</h4>
+            <p><strong>Total produits actifs :</strong> <?= $stats['total_products'] ?></p>
+            <p><strong>Produits en rupture :</strong> <?= $stats['products_out_of_stock'] ?></p>
+            <p><strong>Produits en stock faible :</strong> <?= $stats['products_low_stock'] ?></p>
+            <p><strong>Total unités en stock :</strong> <?= $stats['total_stock_units'] ?></p>
+          </div>
+          
+          <!-- Version imprimable du résumé -->
+          <div style="display: none;">
+            <div class="print-summary-table">
+              <h3>Résumé de l'inventaire</h3>
+              <table style="width: 100%; margin-top: 20px; border: 1px solid #000;">
                 <tr>
-                  <th colspan="5" style="text-align: right; color: #d9534f; font-weight: bold; font-size: 15px" class="invoice-total">Total général</th>
-                  <th style="text-align: center; color: #d9534f; font-weight: bold; font-size: 15px" class="invoice-total"><?php echo number_format($gtotal, 2); ?></th>
+                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total produits actifs</strong></td>
+                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_products'] ?></td>
                 </tr>
-                </tbody>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en rupture</strong></td>
+                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_out_of_stock'] ?></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en stock faible</strong></td>
+                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_low_stock'] ?></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total unités en stock</strong></td>
+                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_stock_units'] ?></td>
+                </tr>
               </table>
-              
-              <!-- Pied de page de facture -->
-              <div class="row-fluid">
-                <div class="span12">
-                  <p style="margin-top: 20px;">Merci pour votre achat!</p>
-                  <p><small>Cette facture a été générée automatiquement par le système.</small></p>
-                </div>
-              </div>
             </div>
-          </div>
-        </div>
-        
-        <!-- Section des signatures -->
-        <div class="signature-section">
-          <div class="row-fluid">
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Vendeur:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
-            </div>
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Client:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
-            </div>
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Chauffeur:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Pied de page avec RCCM -->
-        <div class="invoice-footer">
-          <strong>RCCM GN.TCC.2023.A.14202</strong>
-        </div>
-        
-        <!-- Bouton d'impression - caché à l'impression -->
-        <div class="row-fluid no-print" style="margin-top: 20px;">
-          <div class="span12 text-center">
-            <button class="btn btn-primary" onclick="window.print();">
-              <i class="icon-print"></i> Imprimer Facture
-            </button>
           </div>
         </div>
       </div>
     </div>
-  </div>
-</div>
+    
+  </div><!-- container-fluid -->
+</div><!-- content -->
 
-<!-- Pied de page - caché à l'impression -->
-<div class="no-print">
-  <?php include_once('includes/footer.php');?>
-</div>
+<?php include_once('includes/footer.php'); ?>
 
-<!-- Scripts JS - ne s'exécutent pas lors de l'impression -->
-<script src="js/jquery.min.js"></script> 
-<script src="js/jquery.ui.custom.js"></script> 
-<script src="js/bootstrap.min.js"></script> 
-<script src="js/jquery.uniform.js"></script> 
-<script src="js/select2.min.js"></script> 
-<script src="js/jquery.dataTables.min.js"></script> 
-<script src="js/matrix.js"></script> 
+<!-- scripts pour DataTable si nécessaire -->
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialisation DataTable avec configuration pour l'impression
+    $('.data-table').dataTable({
+        "pageLength": 50,
+        "order": [[ 8, "asc" ]], // Trier par stock actuel croissant
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/French.json"
+        }
+    });
+    
+    // Gestion de l'impression
+    window.addEventListener('beforeprint', function() {
+        // Afficher le résumé dans la version imprimée
+        $('.print-summary-table').parent().show();
+        
+        // Masquer la pagination DataTable
+        $('.dataTables_wrapper .dataTables_paginate').hide();
+        $('.dataTables_wrapper .dataTables_info').hide();
+        $('.dataTables_wrapper .dataTables_length').hide();
+        $('.dataTables_wrapper .dataTables_filter').hide();
+        
+        // Afficher tous les éléments du tableau
+        $('.data-table').dataTable().fnSettings()._iDisplayLength = -1;
+        $('.data-table').dataTable().fnDraw();
+    });
+    
+    window.addEventListener('afterprint', function() {
+        // Restaurer l'affichage normal
+        $('.print-summary-table').parent().hide();
+        $('.dataTables_wrapper .dataTables_paginate').show();
+        $('.dataTables_wrapper .dataTables_info').show();
+        $('.dataTables_wrapper .dataTables_length').show();
+        $('.dataTables_wrapper .dataTables_filter').show();
+        
+        // Restaurer la pagination
+        $('.data-table').dataTable().fnSettings()._iDisplayLength = 50;
+        $('.data-table').dataTable().fnDraw();
+    });
+});
+
+// Fonction d'impression personnalisée
+function printInventory() {
+    window.print();
+}
+
+// Tooltip pour les boutons d'action
+$(document).ready(function() {
+    $('.tip-top').tooltip({
+        placement: 'top'
+    });
+});
+</script>
+
 </body>
 </html>
-<?php } ?>
