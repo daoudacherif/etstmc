@@ -23,27 +23,62 @@ if (empty($_SESSION['imsaid'])) {
     
     /* Styles pour l'impression */
     @media print {
-      .no-print {
+      .no-print,
+      #sidebar,
+      #header,
+      .dataTables_wrapper .dataTables_paginate,
+      .dataTables_wrapper .dataTables_info,
+      .dataTables_wrapper .dataTables_length,
+      .dataTables_wrapper .dataTables_filter,
+      .widget-title,
+      .widget-box,
+      #content-header,
+      #breadcrumb {
         display: none !important;
       }
-      .print-title {
-        text-align: center;
-        margin-bottom: 20px;
-      }
-      .table {
-        font-size: 12px;
-      }
-      .table th,
-      .table td {
-        padding: 5px !important;
-      }
+      
       body {
         margin: 0;
         padding: 10px;
+        background: white !important;
       }
-      #content-header,
-      #breadcrumb {
-        display: none;
+      
+      #content {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
+      .container-fluid {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      
+      .table {
+        font-size: 11px;
+        width: 100% !important;
+        margin: 0 !important;
+      }
+      
+      .table th,
+      .table td {
+        padding: 4px !important;
+        border: 1px solid #000 !important;
+      }
+      
+      .table thead th {
+        background-color: #f5f5f5 !important;
+        font-weight: bold;
+        text-align: center;
+      }
+      
+      .widget-content {
+        padding: 0 !important;
+        border: none !important;
+      }
+      
+      .print-title {
+        text-align: center;
+        margin-bottom: 20px;
       }
     }
     
@@ -223,56 +258,29 @@ if (empty($_SESSION['imsaid'])) {
       </div><!-- span12 -->
     </div><!-- row-fluid -->
     
-    <!-- Résumé pour l'impression -->
-    <div class="row-fluid" style="margin-top: 20px;">
+    <!-- Résumé pour affichage écran uniquement -->
+    <div class="row-fluid no-print" style="margin-top: 20px;">
       <div class="span12">
-        <div class="print-summary">
-          <?php
-          // Statistiques globales
-          $statsQuery = "
-            SELECT 
-              COUNT(*) as total_products,
-              SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as products_out_of_stock,
-              SUM(CASE WHEN Stock <= 5 AND Stock > 0 THEN 1 ELSE 0 END) as products_low_stock,
-              SUM(Stock) as total_stock_units
-            FROM tblproducts 
-            WHERE Status = 1
-          ";
-          $statsResult = mysqli_query($con, $statsQuery);
-          $stats = mysqli_fetch_assoc($statsResult);
-          ?>
-          <div class="alert alert-info no-print">
-            <h4>Résumé de l'inventaire</h4>
-            <p><strong>Total produits actifs :</strong> <?= $stats['total_products'] ?></p>
-            <p><strong>Produits en rupture :</strong> <?= $stats['products_out_of_stock'] ?></p>
-            <p><strong>Produits en stock faible :</strong> <?= $stats['products_low_stock'] ?></p>
-            <p><strong>Total unités en stock :</strong> <?= $stats['total_stock_units'] ?></p>
-          </div>
-          
-          <!-- Version imprimable du résumé -->
-          <div style="display: none;">
-            <div class="print-summary-table">
-              <h3>Résumé de l'inventaire</h3>
-              <table style="width: 100%; margin-top: 20px; border: 1px solid #000;">
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total produits actifs</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_products'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en rupture</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_out_of_stock'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Produits en stock faible</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['products_low_stock'] ?></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 5px;"><strong>Total unités en stock</strong></td>
-                  <td style="border: 1px solid #000; padding: 5px;"><?= $stats['total_stock_units'] ?></td>
-                </tr>
-              </table>
-            </div>
-          </div>
+        <?php
+        // Statistiques globales
+        $statsQuery = "
+          SELECT 
+            COUNT(*) as total_products,
+            SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as products_out_of_stock,
+            SUM(CASE WHEN Stock <= 5 AND Stock > 0 THEN 1 ELSE 0 END) as products_low_stock,
+            SUM(Stock) as total_stock_units
+          FROM tblproducts 
+          WHERE Status = 1
+        ";
+        $statsResult = mysqli_query($con, $statsQuery);
+        $stats = mysqli_fetch_assoc($statsResult);
+        ?>
+        <div class="alert alert-info">
+          <h4>Résumé de l'inventaire</h4>
+          <p><strong>Total produits actifs :</strong> <?= $stats['total_products'] ?></p>
+          <p><strong>Produits en rupture :</strong> <?= $stats['products_out_of_stock'] ?></p>
+          <p><strong>Produits en stock faible :</strong> <?= $stats['products_low_stock'] ?></p>
+          <p><strong>Total unités en stock :</strong> <?= $stats['total_stock_units'] ?></p>
         </div>
       </div>
     </div>
@@ -311,38 +319,25 @@ $(document).ready(function() {
     
     // Gestion de l'impression
     window.addEventListener('beforeprint', function() {
-        // Afficher le résumé dans la version imprimée
-        $('.print-summary-table').parent().show();
+        // Masquer tous les éléments non nécessaires
+        $('#sidebar, #header, .dataTables_wrapper .dataTables_paginate, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter, .widget-title').hide();
         
-        // Masquer la pagination DataTable
-        $('.dataTables_wrapper .dataTables_paginate').hide();
-        $('.dataTables_wrapper .dataTables_info').hide();
-        $('.dataTables_wrapper .dataTables_length').hide();
-        $('.dataTables_wrapper .dataTables_filter').hide();
-        
-        // Afficher tous les éléments du tableau
-        $('.data-table').dataTable().fnSettings()._iDisplayLength = -1;
-        $('.data-table').dataTable().fnDraw();
+        // Afficher tous les éléments du tableau sans pagination
+        if ($.fn.DataTable.isDataTable('.data-table')) {
+            $('.data-table').DataTable().page.len(-1).draw();
+        }
     });
     
     window.addEventListener('afterprint', function() {
-        // Restaurer l'affichage normal
-        $('.print-summary-table').parent().hide();
-        $('.dataTables_wrapper .dataTables_paginate').show();
-        $('.dataTables_wrapper .dataTables_info').show();
-        $('.dataTables_wrapper .dataTables_length').show();
-        $('.dataTables_wrapper .dataTables_filter').show();
+        // Restaurer l'affichage normal après impression
+        $('#sidebar, #header, .dataTables_wrapper .dataTables_paginate, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_filter, .widget-title').show();
         
-        // Restaurer la pagination
-        $('.data-table').dataTable().fnSettings()._iDisplayLength = 50;
-        $('.data-table').dataTable().fnDraw();
+        // Restaurer la pagination normale
+        if ($.fn.DataTable.isDataTable('.data-table')) {
+            $('.data-table').DataTable().page.len(50).draw();
+        }
     });
 });
-
-// Fonction d'impression personnalisée
-function printInventory() {
-    window.print();
-}
 
 // Tooltip pour les boutons d'action
 $(document).ready(function() {
