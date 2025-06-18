@@ -70,7 +70,7 @@ if (!$product) {
       <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
       </a>
-      <a href="manage-products.php" class="tip-bottom">Gestion Produits</a>
+      <a href="manage-product.php" class="tip-bottom">Gestion Produits</a>
       <strong>Historique du Produit</strong>
     </div>
     <h1>Historique du Produit</h1>
