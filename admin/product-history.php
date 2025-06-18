@@ -14,7 +14,7 @@ $productId = isset($_GET['pid']) ? intval($_GET['pid']) : 0;
 
 // Si aucun produit spécifié, rediriger vers la liste des produits
 if ($productId == 0) {
-    header('location:manage-products.php');
+    header('location:manage-product.php');
     exit;
 }
 
