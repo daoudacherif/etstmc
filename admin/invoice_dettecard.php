@@ -115,6 +115,57 @@ if (strlen($_SESSION['imsaid']==0)) {
     color: #666;
   }
   
+  /* Style spécifique pour facture à terme */
+  .dues-info {
+    background-color: #fff3cd;
+    padding: 10px;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .payment-label {
+    font-weight: bold;
+    color: #856404;
+  }
+
+  /* Styles pour les signatures */
+  .signature-section {
+    margin-top: 40px;
+    margin-bottom: 30px;
+    padding: 20px 0;
+    border-top: 1px solid #ddd;
+  }
+  
+  /* Conteneur pour l'affichage horizontal des signatures */
+  .signature-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .signature-box {
+    text-align: center;
+    padding: 15px;
+    flex: 1;
+    margin: 0 10px;
+  }
+  
+  .signature-label {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 30px;
+    color: #333;
+  }
+  
+  .signature-date {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+  }
+  
   /* Styles spécifiques pour l'impression */
   @media print {
     /* Cacher tous les éléments de navigation et UI */
@@ -219,58 +270,7 @@ if (strlen($_SESSION['imsaid']==0)) {
     input[name="printbutton"], .btn-print {
       display: none !important;
     }
-  }
 
-  /* Style spécifique pour facture à terme */
-  .dues-info {
-    background-color: #fff3cd;
-    padding: 10px;
-    border: 1px solid #ffeeba;
-    border-radius: 4px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-  }
-  
-  .payment-label {
-    font-weight: bold;
-    color: #856404;
-  }
-
-  /* Styles pour les signatures */
-  .signature-section {
-    margin-top: 40px;
-    margin-bottom: 30px;
-    padding: 20px 0;
-    border-top: 1px solid #ddd;
-  }
-  
-  .signature-box {
-    text-align: center;
-    padding: 15px;
-    margin: 0 5px;
-  }
-  
-  .signature-label {
-    font-weight: bold;
-    font-size: 14px;
-    margin-bottom: 15px;
-    color: #333;
-  }
-  
-  .signature-line {
-    border-bottom: 2px solid #333;
-    height: 50px;
-    margin-bottom: 10px;
-    position: relative;
-  }
-  
-  .signature-date {
-    font-size: 12px;
-    color: #666;
-    margin-top: 10px;
-  }
-
-  @media print {
     .dues-info {
       background-color: transparent !important;
       border: 1px dashed #000 !important;
@@ -289,19 +289,21 @@ if (strlen($_SESSION['imsaid']==0)) {
       page-break-inside: avoid;
     }
     
+    .signature-container {
+      display: flex !important;
+      justify-content: space-between !important;
+    }
+    
     .signature-box {
       padding: 10px !important;
+      flex: 1 !important;
     }
     
     .signature-label {
       color: black !important;
       font-weight: bold !important;
       font-size: 12px !important;
-    }
-    
-    .signature-line {
-      border-bottom: 2px solid #000 !important;
-      height: 40px !important;
+      margin-bottom: 20px !important;
     }
     
     .signature-date {
@@ -488,27 +490,18 @@ if (strlen($_SESSION['imsaid']==0)) {
         
         <!-- Section des signatures -->
         <div class="signature-section">
-          <div class="row-fluid">
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Vendeur:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
+          <div class="signature-container">
+            <div class="signature-box">
+              <p class="signature-label">Signature du Vendeur:</p>
+              <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
             </div>
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Client:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
+            <div class="signature-box">
+              <p class="signature-label">Signature du Client:</p>
+              <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
             </div>
-            <div class="span4">
-              <div class="signature-box">
-                <p class="signature-label">Signature du Chauffeur:</p>
-                <div class="signature-line"></div>
-                <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
-              </div>
+            <div class="signature-box">
+              <p class="signature-label">Signature du Chauffeur:</p>
+              <p class="signature-date">Date: <?php echo date("d/m/Y"); ?></p>
             </div>
           </div>
         </div>
