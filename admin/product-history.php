@@ -1,19 +1,24 @@
 <?php 
 session_start();
-// Affiche toutes les erreurs (à désactiver en production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
 
+// Vérifier si l'admin est connecté
 if (empty($_SESSION['imsaid'])) {
     header('location:logout.php');
     exit;
 }
 
-$productId = isset($_GET['id']) ? intval($_GET['id']) : 0;
+// Récupérer l'ID du produit depuis l'URL
+$productId = isset($_GET['pid']) ? intval($_GET['pid']) : 0;
 
-// Récupérer les infos du produit
+// Si aucun produit spécifié, rediriger vers la liste des produits
+if ($productId == 0) {
+    header('location:manage-products.php');
+    exit;
+}
+
+// Récupérer les informations du produit
 $productQuery = "SELECT * FROM tblproducts WHERE ID = ?";
 $stmt = mysqli_prepare($con, $productQuery);
 mysqli_stmt_bind_param($stmt, "i", $productId);
@@ -22,73 +27,37 @@ $productResult = mysqli_stmt_get_result($stmt);
 $product = mysqli_fetch_assoc($productResult);
 
 if (!$product) {
-    header('location:product-history.php');
+    echo "<script>alert('Produit non trouvé'); window.location.href='manage-products.php';</script>";
     exit;
-}
-
-// Enregistrer un mouvement de stock
-if (isset($_POST['add_movement'])) {
-    $movementType = $_POST['movement_type'];
-    $quantity = $_POST['quantity'];
-    $reason = $_POST['reason'];
-    $date = date('Y-m-d H:i:s');
-    
-    // Créer la table si elle n'existe pas
-    $createTableQuery = "
-        CREATE TABLE IF NOT EXISTS tblstock_movements (
-            ID INT AUTO_INCREMENT PRIMARY KEY,
-            ProductID INT,
-            MovementType VARCHAR(50),
-            Quantity INT,
-            Reason TEXT,
-            MovementDate DATETIME,
-            CreatedBy INT,
-            FOREIGN KEY (ProductID) REFERENCES tblproducts(ID)
-        )
-    ";
-    mysqli_query($con, $createTableQuery);
-    
-    // Insérer le mouvement
-    $insertQuery = "INSERT INTO tblstock_movements (ProductID, MovementType, Quantity, Reason, MovementDate, CreatedBy) 
-                    VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt = mysqli_prepare($con, $insertQuery);
-    mysqli_stmt_bind_param($stmt, "isissi", $productId, $movementType, $quantity, $reason, $date, $_SESSION['imsaid']);
-    
-    if (mysqli_stmt_execute($stmt)) {
-    // Mettre à jour le stock selon le type de mouvement
-    if ($movementType == 'entree') {
-        $updateQuery = "UPDATE tblproducts SET Stock = Stock + ? WHERE ID = ?";
-    } elseif ($movementType == 'sortie') {
-        $updateQuery = "UPDATE tblproducts SET Stock = Stock - ? WHERE ID = ?";
-    } elseif ($movementType == 'inventaire') {
-        // Pour un inventaire physique, on définit directement le nouveau stock
-        $updateQuery = "UPDATE tblproducts SET Stock = ? WHERE ID = ?";
-    }
-        $stmt2 = mysqli_prepare($con, $updateQuery);
-        mysqli_stmt_bind_param($stmt2, "ii", $quantity, $productId);
-        mysqli_stmt_execute($stmt2);
-        
-        $successMsg = "Mouvement de stock enregistré avec succès!";
-    }
 }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Historique - <?= htmlspecialchars($product['ProductName']) ?></title>
+  <title>Historique du Produit - <?= htmlspecialchars($product['ProductName']) ?></title>
   <?php include_once('includes/cs.php'); ?>
+  <?php include_once('includes/responsive.php'); ?>
   <style>
-    .product-header { background: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 5px; }
-    .movement-in { color: #4CAF50; font-weight: bold; }
-    .movement-out { color: #F44336; font-weight: bold; }
-    .movement-return { color: #2196F3; font-weight: bold; }
-    .timeline { position: relative; padding: 20px 0; }
-    .timeline-item { margin-bottom: 20px; padding-left: 40px; position: relative; }
-    .timeline-item:before { content: ''; position: absolute; left: 10px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: #ccc; }
-    .timeline-item.in:before { background: #4CAF50; }
-    .timeline-item.out:before { background: #F44336; }
-    .timeline-item.return:before { background: #2196F3; }
+    .product-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .movement-in { color: #28a745; font-weight: bold; }
+    .movement-out { color: #dc3545; font-weight: bold; }
+    .movement-return { color: #17a2b8; font-weight: bold; }
+    .current-stock {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #007bff;
+    }
+    .alert-low-stock {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
   </style>
 </head>
 <body>
@@ -98,296 +67,248 @@ if (isset($_POST['add_movement'])) {
 <div id="content">
   <div id="content-header">
     <div id="breadcrumb">
-      <a href="dashboard.php" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
-      <a href="inventory.php">Inventaire</a>
+      <a href="dashboard.php" class="tip-bottom">
+        <i class="icon-home"></i> Accueil
+      </a>
+      <a href="manage-products.php" class="tip-bottom">Gestion Produits</a>
       <strong>Historique du Produit</strong>
     </div>
-    <h1>Historique des Mouvements de Stock</h1>
+    <h1>Historique du Produit</h1>
   </div>
   
   <div class="container-fluid">
-    <hr>
-    
-    <?php if (isset($successMsg)): ?>
-    <div class="alert alert-success"><?= $successMsg ?></div>
-    <?php endif; ?>
-    
-    <!-- En-tête du produit -->
-    <div class="product-header">
-      <h2><?= htmlspecialchars($product['ProductName']) ?></h2>
-      <div class="row-fluid">
-        <div class="span3">
-          <strong>Marque:</strong> <?= htmlspecialchars($product['BrandName']) ?>
-        </div>
-        <div class="span3">
-          <strong>Modèle:</strong> <?= htmlspecialchars($product['ModelNumber']) ?>
-        </div>
-        <div class="span3">
-          <strong>Stock Actuel:</strong> 
-          <span class="badge badge-info" style="font-size: 16px;"><?= $product['Stock'] ?></span>
-        </div>
-        <div class="span3">
-          <strong>Prix:</strong> <?= number_format($product['Price'], 2) ?> €
-        </div>
-      </div>
-    </div>
-    
+    <!-- Informations du produit -->
     <div class="row-fluid">
-      <!-- Formulaire d'ajout de mouvement -->
-      <div class="span4">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-plus"></i></span>
-            <h5>Enregistrer un Mouvement</h5>
-          </div>
-          <div class="widget-content">
-            <form method="POST" action="">
-              <div class="control-group">
-                <label>Type de Mouvement:</label>
-                <select name="movement_type" class="form-control" required onchange="updateQuantityLabel(this.value)">
-                  <option value="">Sélectionner...</option>
-                  <option value="entree">Entrée (Réapprovisionnement)</option>
-                  <option value="sortie">Sortie (Ajustement négatif)</option>
-                  <option value="inventaire">Inventaire Physique (Définir le stock)</option>
-                </select>
-              </div>
-              
-              <div class="control-group">
-                <label id="quantity_label">Quantité:</label>
-                <input type="number" name="quantity" min="0" required class="form-control">
-                <small id="quantity_help" class="form-text text-muted"></small>
-              </div>
-              
-              <div class="control-group">
-                <label>Raison/Commentaire:</label>
-                <textarea name="reason" rows="3" class="form-control" required></textarea>
-              </div>
-              
-              <div class="control-group">
-                <button type="submit" name="add_movement" class="btn btn-primary">
-                  <i class="icon-save"></i> Enregistrer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Historique des mouvements -->
-      <div class="span8">
-        <div class="widget-box">
-          <div class="widget-title">
-            <span class="icon"><i class="icon-time"></i></span>
-            <h5>Historique Complet</h5>
-          </div>
-          <div class="widget-content">
-            <div class="timeline">
-              <?php
-              // Récupérer tous les mouvements
-              $query = "
-                SELECT 
-                  'vente' as type,
-                  c.ProductQty as quantity,
-                  CONCAT('Vente - Facture #', c.InvoiceId) as reason,
-                  c.CartDate as date,
-                  'Système' as created_by
-                FROM tblcart c
-                WHERE c.ProductId = ? AND c.IsCheckOut = 1
-                
-                UNION ALL
-                
-                SELECT 
-                  'retour' as type,
-                  r.Quantity as quantity,
-                  CONCAT('Retour - ', r.Reason) as reason,
-                  r.ReturnDate as date,
-                  'Système' as created_by
-                FROM tblreturns r
-                WHERE r.ProductID = ?
-                
-                UNION ALL
-                
-                SELECT 
-                  m.MovementType as type,
-                  m.Quantity as quantity,
-                  m.Reason as reason,
-                  m.MovementDate as date,
-                  CONCAT('Admin #', m.CreatedBy) as created_by
-                FROM tblstock_movements m
-                WHERE m.ProductID = ?
-                
-                ORDER BY date DESC
-                LIMIT 50
-              ";
-              
-              $stmt = mysqli_prepare($con, $query);
-              mysqli_stmt_bind_param($stmt, "iii", $productId, $productId, $productId);
-              mysqli_stmt_execute($stmt);
-              $result = mysqli_stmt_get_result($stmt);
-              
-              while ($movement = mysqli_fetch_assoc($result)) {
-                $class = '';
-                $icon = '';
-                $prefix = '';
-                
-                switch($movement['type']) {
-                  case 'entree':
-                    $class = 'in movement-in';
-                    $icon = 'icon-arrow-down';
-                    $prefix = '+';
-                    break;
-                  case 'sortie':
-                  case 'vente':
-                    $class = 'out movement-out';
-                    $icon = 'icon-arrow-up';
-                    $prefix = '-';
-                    break;
-                  case 'retour':
-                    $class = 'return movement-return';
-                    $icon = 'icon-refresh';
-                    $prefix = '+';
-                    break;
-                  default:
-                    $class = '';
-                    $icon = 'icon-edit';
-                    $prefix = '';
-                }
-                ?>
-                <div class="timeline-item <?= $class ?>">
-                  <div class="row-fluid">
-                    <div class="span2">
-                      <small><?= date('d/m/Y H:i', strtotime($movement['date'])) ?></small>
-                    </div>
-                    <div class="span2">
-                      <i class="<?= $icon ?>"></i> 
-                      <span class="<?= str_replace(' ', '-', $movement['type']) ?>"><?= $prefix ?><?= $movement['quantity'] ?></span>
-                    </div>
-                    <div class="span5">
-                      <?= htmlspecialchars($movement['reason']) ?>
-                    </div>
-                    <div class="span3">
-                      <small>Par: <?= $movement['created_by'] ?></small>
-                    </div>
-                  </div>
+      <div class="span12">
+        <div class="product-info">
+          <div class="row-fluid">
+            <div class="span8">
+              <h3><?= htmlspecialchars($product['ProductName']) ?></h3>
+              <p><strong>Marque:</strong> <?= htmlspecialchars($product['BrandName']) ?></p>
+              <p><strong>Modèle:</strong> <?= htmlspecialchars($product['ModelNumber']) ?></p>
+              <p><strong>Description:</strong> <?= htmlspecialchars($product['ProductDescription']) ?></p>
+            </div>
+            <div class="span4">
+              <p class="current-stock">Stock Actuel: <?= $product['Stock'] ?> unités</p>
+              <p><strong>Prix:</strong> <?= number_format($product['ProductPrice'], 2) ?> €</p>
+              <p><strong>Statut:</strong> 
+                <span class="badge <?= $product['Status'] == 1 ? 'badge-success' : 'badge-important' ?>">
+                  <?= $product['Status'] == 1 ? 'Actif' : 'Inactif' ?>
+                </span>
+              </p>
+              <?php if($product['Stock'] <= 5): ?>
+                <div class="alert alert-low-stock">
+                  <strong>Attention!</strong> Stock faible
                 </div>
-                <?php
-              }
-              ?>
+              <?php endif; ?>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <hr>
     
-    <!-- Graphique d'évolution du stock -->
+    <!-- Historique des mouvements -->
     <div class="row-fluid">
       <div class="span12">
         <div class="widget-box">
           <div class="widget-title">
-            <span class="icon"><i class="icon-signal"></i></span>
-            <h5>Évolution du Stock (30 derniers jours)</h5>
+            <span class="icon"><i class="icon-time"></i></span>
+            <h5>Historique des Mouvements de Stock</h5>
           </div>
-          <div class="widget-content">
-            <canvas id="stockChart" height="100"></canvas>
+          <div class="widget-content nopadding">
+            <table class="table table-bordered data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type de Mouvement</th>
+                  <th>Quantité</th>
+                  <th>Stock Avant</th>
+                  <th>Stock Après</th>
+                  <th>Référence</th>
+                  <th>Détails</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php
+                // Requête pour l'historique des mouvements
+                $historyQuery = "
+                    (SELECT 
+                        cart.IsCheckOut as date_transaction,
+                        'Vente' as movement_type,
+                        cart.ProductQty as quantity,
+                        cart.ProductQty as reference_id,
+                        CONCAT('Commande #', cart.ID) as details,
+                        cart.IsCheckOut as sort_date
+                    FROM tblcart cart 
+                    WHERE cart.ProductId = ? AND cart.IsCheckOut = 1)
+                    
+                    UNION ALL
+                    
+                    (SELECT 
+                        r.ReturnDate as date_transaction,
+                        'Retour' as movement_type,
+                        r.Quantity as quantity,
+                        r.ID as reference_id,
+                        CONCAT('Retour - ', r.Reason) as details,
+                        r.ReturnDate as sort_date
+                    FROM tblreturns r 
+                    WHERE r.ProductID = ?)
+                    
+                    ORDER BY sort_date DESC
+                ";
+                
+                $stmt = mysqli_prepare($con, $historyQuery);
+                if ($stmt) {
+                    mysqli_stmt_bind_param($stmt, "ii", $productId, $productId);
+                    mysqli_stmt_execute($stmt);
+                    $result = mysqli_stmt_get_result($stmt);
+                    
+                    if (mysqli_num_rows($result) > 0) {
+                        $current_stock = $product['Stock'];
+                        
+                        while ($row = mysqli_fetch_assoc($result)) {
+                            $quantity = intval($row['quantity']);
+                            $movement_type = $row['movement_type'];
+                            
+                            // Calculer le stock avant ce mouvement
+                            if ($movement_type == 'Vente') {
+                                $stock_before = $current_stock + $quantity;
+                                $stock_after = $current_stock;
+                                $css_class = 'movement-out';
+                                $quantity_display = '-' . $quantity;
+                            } else { // Retour
+                                $stock_before = $current_stock - $quantity;
+                                $stock_after = $current_stock;
+                                $css_class = 'movement-return';
+                                $quantity_display = '+' . $quantity;
+                            }
+                            
+                            // Ajuster le stock actuel pour le prochain calcul
+                            $current_stock = $stock_before;
+                            ?>
+                            <tr>
+                              <td><?= date('d/m/Y H:i', strtotime($row['date_transaction'])) ?></td>
+                              <td>
+                                <span class="badge <?= $movement_type == 'Vente' ? 'badge-important' : 'badge-info' ?>">
+                                  <?= $movement_type ?>
+                                </span>
+                              </td>
+                              <td class="<?= $css_class ?>"><?= $quantity_display ?></td>
+                              <td><?= $stock_before ?></td>
+                              <td><?= $stock_after ?></td>
+                              <td>#<?= $row['reference_id'] ?></td>
+                              <td><?= htmlspecialchars($row['details']) ?></td>
+                            </tr>
+                            <?php
+                        }
+                    } else {
+                        echo '<tr><td colspan="7" class="text-center">Aucun mouvement trouvé pour ce produit</td></tr>';
+                    }
+                    mysqli_stmt_close($stmt);
+                } else {
+                    echo '<tr><td colspan="7" class="text-center text-danger">Erreur lors du chargement de l\'historique</td></tr>';
+                }
+                ?>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Statistiques rapides -->
+    <div class="row-fluid">
+      <div class="span4">
+        <div class="widget-box">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-signal"></i></span>
+            <h5>Total Vendus</h5>
+          </div>
+          <div class="widget-content">
+            <?php
+            $salesQuery = "SELECT COALESCE(SUM(ProductQty), 0) as total_sold FROM tblcart WHERE ProductId = ? AND IsCheckOut = 1";
+            $stmt = mysqli_prepare($con, $salesQuery);
+            mysqli_stmt_bind_param($stmt, "i", $productId);
+            mysqli_stmt_execute($stmt);
+            $salesResult = mysqli_stmt_get_result($stmt);
+            $salesData = mysqli_fetch_assoc($salesResult);
+            ?>
+            <h2 class="text-success"><?= $salesData['total_sold'] ?> unités</h2>
+          </div>
+        </div>
+      </div>
+      
+      <div class="span4">
+        <div class="widget-box">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-repeat"></i></span>
+            <h5>Total Retournés</h5>
+          </div>
+          <div class="widget-content">
+            <?php
+            $returnsQuery = "SELECT COALESCE(SUM(Quantity), 0) as total_returned FROM tblreturns WHERE ProductID = ?";
+            $stmt = mysqli_prepare($con, $returnsQuery);
+            mysqli_stmt_bind_param($stmt, "i", $productId);
+            mysqli_stmt_execute($stmt);
+            $returnsResult = mysqli_stmt_get_result($stmt);
+            $returnsData = mysqli_fetch_assoc($returnsResult);
+            ?>
+            <h2 class="text-info"><?= $returnsData['total_returned'] ?> unités</h2>
+          </div>
+        </div>
+      </div>
+      
+      <div class="span4">
+        <div class="widget-box">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-euro"></i></span>
+            <h5>Chiffre d'Affaires</h5>
+          </div>
+          <div class="widget-content">
+            <?php
+            $revenueQuery = "
+                SELECT COALESCE(SUM(cart.ProductQty * p.ProductPrice), 0) as total_revenue 
+                FROM tblcart cart 
+                JOIN tblproducts p ON p.ID = cart.ProductId 
+                WHERE cart.ProductId = ? AND cart.IsCheckOut = 1
+            ";
+            $stmt = mysqli_prepare($con, $revenueQuery);
+            mysqli_stmt_bind_param($stmt, "i", $productId);
+            mysqli_stmt_execute($stmt);
+            $revenueResult = mysqli_stmt_get_result($stmt);
+            $revenueData = mysqli_fetch_assoc($revenueResult);
+            ?>
+            <h2 class="text-primary"><?= number_format($revenueData['total_revenue'], 2) ?> €</h2>
+          </div>
+        </div>
+      </div>
+    </div>
+    
   </div>
 </div>
 
 <?php include_once('includes/footer.php'); ?>
 
 <script src="js/jquery.min.js"></script>
+<script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/jquery.uniform.js"></script>
+<script src="js/select2.min.js"></script>
+<script src="js/jquery.dataTables.min.js"></script>
+<script src="js/matrix.js"></script>
+<script src="js/matrix.tables.js"></script>
 
 <script>
-// Fonction pour mettre à jour le label de quantité
-function updateQuantityLabel(movementType) {
-    var label = document.getElementById('quantity_label');
-    var help = document.getElementById('quantity_help');
-    var currentStock = <?= $product['Stock'] ?>;
-    
-    switch(movementType) {
-        case 'entree':
-            label.textContent = 'Quantité à ajouter:';
-            help.textContent = 'Nombre d\'unités à ajouter au stock actuel';
-            break;
-        case 'sortie':
-            label.textContent = 'Quantité à retirer:';
-            help.textContent = 'Nombre d\'unités à retirer du stock actuel (max: ' + currentStock + ')';
-            break;
-        case 'inventaire':
-            label.textContent = 'Nouveau stock total:';
-            help.textContent = 'Stock actuel: ' + currentStock + ' - Entrez le nouveau total après comptage physique';
-            break;
-        default:
-            label.textContent = 'Quantité:';
-            help.textContent = '';
-    }
-}
-
-// Graphique d'évolution du stock
-<?php
-// Préparer les données pour le graphique
-$chartQuery = "
-  SELECT 
-    DATE(date) as day,
-    SUM(CASE 
-      WHEN type IN ('entree', 'retour') THEN quantity 
-      WHEN type IN ('sortie', 'vente') THEN -quantity 
-      ELSE 0 
-    END) as movement
-  FROM (
-    SELECT 'vente' as type, ProductQty as quantity, CartDate as date
-    FROM tblcart WHERE ProductId = ? AND IsCheckOut = 1
-    UNION ALL
-    SELECT 'retour' as type, Quantity as quantity, ReturnDate as date
-    FROM tblreturns WHERE ProductID = ?
-    UNION ALL
-    SELECT MovementType as type, Quantity as quantity, MovementDate as date
-    FROM tblstock_movements WHERE ProductID = ?
-  ) as movements
-  WHERE date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-  GROUP BY DATE(date)
-  ORDER BY day
-";
-
-$stmt = mysqli_prepare($con, $chartQuery);
-mysqli_stmt_bind_param($stmt, "iii", $productId, $productId, $productId);
-mysqli_stmt_execute($stmt);
-$chartResult = mysqli_stmt_get_result($stmt);
-
-$dates = [];
-$movements = [];
-while ($row = mysqli_fetch_assoc($chartResult)) {
-    $dates[] = $row['day'];
-    $movements[] = $row['movement'];
-}
-?>
-
-var ctx = document.getElementById('stockChart').getContext('2d');
-var stockChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?= json_encode($dates) ?>,
-        datasets: [{
-            label: 'Mouvements de Stock',
-            data: <?= json_encode($movements) ?>,
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.2)',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
+$(document).ready(function() {
+    $('.data-table').dataTable({
+        "order": [[ 0, "desc" ]], // Trier par date décroissante
+        "pageLength": 25,
+        "language": {
+            "url": "//cdn.datatables.net/plug-ins/1.10.24/i18n/French.json"
         }
-    }
+    });
 });
 </script>
 
