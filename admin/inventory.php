@@ -294,8 +294,14 @@ if (empty($_SESSION['imsaid'])) {
 
 <script>
 $(document).ready(function() {
+    // Vérifier si DataTable existe déjà et le détruire si nécessaire
+    if ($.fn.DataTable.isDataTable('.data-table')) {
+        $('.data-table').DataTable().destroy();
+    }
+    
     // Initialisation DataTable avec configuration pour l'impression
     $('.data-table').dataTable({
+        "destroy": true, // Permet de réinitialiser automatiquement
         "pageLength": 50,
         "order": [[ 8, "asc" ]], // Trier par stock actuel croissant
         "language": {
