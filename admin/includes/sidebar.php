@@ -115,6 +115,7 @@ try {
         <li><a href="stock-report.php">Stock</a></li>
         <li><a href="sales-report.php">Ventes</a></li>
         <li><a href="daily-repport.php">Journalier</a></li>
+        <li><a href="audit.php">Journalier</a></li>
       </ul>
     </li>
    
