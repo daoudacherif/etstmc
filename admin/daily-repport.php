@@ -32,12 +32,17 @@ $export = isset($_GET['export']) ? $_GET['export'] : '';
 // Récupération des données (utilisé pour tous les cas : affichage et exports)
 // --- Calculer les totaux (Ventes, Dépôts, Retraits, Retours) ---
 
-// Ventes Régulières
+// CORRECTION : Ventes Régulières - Utilise FinalAmount avec remises
 $sqlSalesRegular = "
-  SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalSales
-  FROM tblcart c
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN ? AND ?
+  SELECT COALESCE(SUM(cust.FinalAmount), 0) AS totalSales
+  FROM tblcustomer cust
+  WHERE cust.ModeofPayment != 'credit'
+    AND EXISTS (
+      SELECT 1 FROM tblcart c 
+      WHERE c.BillingId = cust.BillingNumber 
+        AND c.CartDate BETWEEN ? AND ?
+        AND c.IsCheckOut = '1'
+    )
 ";
 $stmtSalesRegular = $con->prepare($sqlSalesRegular);
 $stmtSalesRegular->bind_param('ss', $startDateTime, $endDateTime);
@@ -47,12 +52,17 @@ $rowSalesRegular = $resultSalesRegular->fetch_assoc();
 $totalSalesRegular = $rowSalesRegular['totalSales'];
 $stmtSalesRegular->close();
 
-// Ventes à Crédit
+// CORRECTION : Ventes à Crédit - Utilise FinalAmount avec remises
 $sqlSalesCredit = "
-  SELECT COALESCE(SUM(c.ProductQty * c.Price), 0) AS totalSales
-  FROM tblcreditcart c
-  WHERE c.IsCheckOut='1'
-    AND c.CartDate BETWEEN ? AND ?
+  SELECT COALESCE(SUM(cust.FinalAmount), 0) AS totalSales
+  FROM tblcustomer cust
+  WHERE cust.ModeofPayment = 'credit'
+    AND EXISTS (
+      SELECT 1 FROM tblcart c 
+      WHERE c.BillingId = cust.BillingNumber 
+        AND c.CartDate BETWEEN ? AND ?
+        AND c.IsCheckOut = '1'
+    )
 ";
 $stmtSalesCredit = $con->prepare($sqlSalesCredit);
 $stmtSalesCredit->bind_param('ss', $startDateTime, $endDateTime);
@@ -135,25 +145,31 @@ $stmtReturns->close();
 // Solde final (SANS les ventes à crédit, uniquement montants payés)
 $netBalance = ($totalSalesRegular + $totalPaid + $totalDeposits) - ($totalWithdrawals + $totalReturns);
 
-// --- 3) Récupérer la liste unifiée pour l'affichage / export --- MODIFIED with COLLATE fix
+// --- 3) CORRECTION : Liste unifiée pour l'affichage / export ---
 $sqlList = "
-  -- Ventes régulières
-  SELECT 'Vente' AS Type, (c.ProductQty * c.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName COLLATE utf8mb4_unicode_ci AS Comment
-  FROM tblcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
+  -- Ventes régulières (CORRIGÉ - utilise FinalAmount)
+  SELECT 'Vente' AS Type, cust.FinalAmount AS Amount,
+       c.CartDate AS Date, 
+       CONCAT('Facture #', cust.BillingNumber, ' - ', cust.CustomerName) COLLATE utf8mb4_unicode_ci AS Comment
+  FROM tblcustomer cust
+  JOIN tblcart c ON c.BillingId = cust.BillingNumber
   WHERE c.IsCheckOut='1'
     AND c.CartDate BETWEEN ? AND ?
+    AND cust.ModeofPayment != 'credit'
+  GROUP BY cust.BillingNumber
   
   UNION ALL
   
-  -- Ventes à crédit
-  SELECT 'Vente à Terme' AS Type, (c.ProductQty * c.Price) AS Amount,
-       c.CartDate AS Date, p.ProductName COLLATE utf8mb4_unicode_ci AS Comment
-  FROM tblcreditcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
+  -- Ventes à crédit (CORRIGÉ - utilise FinalAmount)
+  SELECT 'Vente à Terme' AS Type, cust.FinalAmount AS Amount,
+       c.CartDate AS Date, 
+       CONCAT('Facture #', cust.BillingNumber, ' - ', cust.CustomerName) COLLATE utf8mb4_unicode_ci AS Comment
+  FROM tblcustomer cust
+  JOIN tblcart c ON c.BillingId = cust.BillingNumber
   WHERE c.IsCheckOut='1'
     AND c.CartDate BETWEEN ? AND ?
+    AND cust.ModeofPayment = 'credit'
+  GROUP BY cust.BillingNumber
   
   UNION ALL
   
@@ -253,10 +269,10 @@ if ($export === 'pdf' && $dompdf_available) {
   <div class="summary">
     <h3>Résumé</h3>
     <table>
-      <tr><th>Ventes Régulières</th><td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td></tr>
+      <tr><th>Ventes Régulières (avec remises)</th><td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td></tr>
       <tr><th>Paiements reçus des clients</th><td class="text-right"><?php echo number_format($totalPaid, 2); ?></td></tr>
       <tr><th>Total Encaissé (Ventes+Paiements)</th><td class="text-right"><strong><?php echo number_format($totalSalesRegular + $totalPaid, 2); ?></strong></td></tr>
-      <tr><th>Ventes à terme (non incluses dans le solde)</th><td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td></tr>
+      <tr><th>Ventes à terme (avec remises, non incluses dans le solde)</th><td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td></tr>
       <tr><th>Dépôts</th><td class="text-right"><?php echo number_format($totalDeposits, 2); ?></td></tr>
       <tr><th>Retraits</th><td class="text-right"><?php echo number_format($totalWithdrawals, 2); ?></td></tr>
       <tr><th>Retours</th><td class="text-right"><?php echo number_format($totalReturns, 2); ?></td></tr>
@@ -370,10 +386,10 @@ if ($export === 'excel') {
   
   echo "<h3>Résumé</h3>";
   echo "<table border='1'>";
-  echo "<tr><th>Ventes Régulières</th><td class='text-right'>".number_format($totalSalesRegular, 2)."</td></tr>";
+  echo "<tr><th>Ventes Régulières (avec remises)</th><td class='text-right'>".number_format($totalSalesRegular, 2)."</td></tr>";
   echo "<tr><th>Paiements reçus des clients</th><td class='text-right'>".number_format($totalPaid, 2)."</td></tr>";
   echo "<tr><th>Total Encaissé (Ventes+Paiements)</th><td class='text-right'><strong>".number_format($totalSalesRegular + $totalPaid, 2)."</strong></td></tr>";
-  echo "<tr><th>Ventes à terme (non incluses dans le solde)</th><td class='text-right'>".number_format($totalSalesCredit, 2)."</td></tr>";
+  echo "<tr><th>Ventes à terme (avec remises, non incluses dans le solde)</th><td class='text-right'>".number_format($totalSalesCredit, 2)."</td></tr>";
   echo "<tr><th>Dépôts</th><td class='text-right'>".number_format($totalDeposits, 2)."</td></tr>";
   echo "<tr><th>Retraits</th><td class='text-right'>".number_format($totalWithdrawals, 2)."</td></tr>";
   echo "<tr><th>Retours</th><td class='text-right'>".number_format($totalReturns, 2)."</td></tr>";
@@ -640,6 +656,15 @@ if ($export === 'excel') {
       margin: 5px 0;
       font-size: 24px;
     }
+    
+    .correction-notice {
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 15px;
+      color: #155724;
+    }
   </style>
 </head>
 <body>
@@ -661,6 +686,11 @@ if ($export === 'excel') {
 
   <div class="container-fluid">
     <hr class="no-print">
+
+    <!-- Notice de correction -->
+    <div class="correction-notice no-print">
+      <strong>✅ Rapport Corrigé:</strong> Les ventes incluent maintenant les remises appliquées lors de la facturation pour des calculs précis.
+    </div>
 
     <!-- Formulaire de filtre par dates - caché à l'impression -->
     <div class="row-fluid no-print">
@@ -729,7 +759,7 @@ if ($export === 'excel') {
                 <div class="span12">
                   <table class="table table-bordered">
                     <tr>
-                      <th>Ventes régulières</th>
+                      <th>Ventes régulières (avec remises)</th>
                       <td class="text-right"><?php echo number_format($totalSalesRegular, 2); ?></td>
                     </tr>
                     <tr>
@@ -741,7 +771,7 @@ if ($export === 'excel') {
                       <td class="text-right"><strong><?php echo number_format($totalSalesRegular + $totalPaid, 2); ?></strong></td>
                     </tr>
                     <tr>
-                      <th>Ventes à terme (non incluses dans le solde)</th>
+                      <th>Ventes à terme (avec remises, non incluses dans le solde)</th>
                       <td class="text-right"><?php echo number_format($totalSalesCredit, 2); ?></td>
                     </tr>
                     <tr>
