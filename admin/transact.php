@@ -13,25 +13,33 @@ if (strlen($_SESSION['imsaid'] == 0)) {
 // 1) CALCULER LE SOLDE DU JOUR UNIQUEMENT (Période de 24h)
 // ---------------------------------------------------------------------
 
-// 1.1 Ventes régulières du jour (from tblcart) - POUR AFFICHAGE UNIQUEMENT
+// 1.1 CORRECTION : Ventes régulières du jour - Utilise FinalAmount (AVEC remises)
 $sqlRegularSales = "
-  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
-  FROM tblcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut = '1'
-    AND DATE(c.CartDate) = CURDATE()
+  SELECT COALESCE(SUM(cust.FinalAmount), 0) AS totalSales
+  FROM tblcustomer cust
+  WHERE cust.ModeofPayment != 'credit'
+    AND EXISTS (
+      SELECT 1 FROM tblcart c 
+      WHERE c.BillingId = cust.BillingNumber 
+        AND DATE(c.CartDate) = CURDATE()
+        AND c.IsCheckOut = '1'
+    )
 ";
 $resRegularSales = mysqli_query($con, $sqlRegularSales);
 $rowRegularSales = mysqli_fetch_assoc($resRegularSales);
 $todayRegularSales = floatval($rowRegularSales['totalSales']);
 
-// 1.2 Ventes à crédit du jour - pour affichage uniquement (from tblcreditcart)
+// 1.2 CORRECTION : Ventes à crédit du jour - Utilise FinalAmount (AVEC remises)
 $sqlCreditSales = "
-  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSales
-  FROM tblcreditcart c
-  JOIN tblproducts p ON p.ID = c.ProductId
-  WHERE c.IsCheckOut = '1'
-    AND DATE(c.CartDate) = CURDATE()
+  SELECT COALESCE(SUM(cust.FinalAmount), 0) AS totalSales
+  FROM tblcustomer cust
+  WHERE cust.ModeofPayment = 'credit'
+    AND EXISTS (
+      SELECT 1 FROM tblcart c 
+      WHERE c.BillingId = cust.BillingNumber 
+        AND DATE(c.CartDate) = CURDATE()
+        AND c.IsCheckOut = '1'
+    )
 ";
 $resCreditSales = mysqli_query($con, $sqlCreditSales);
 $rowCreditSales = mysqli_fetch_assoc($resCreditSales);
@@ -97,6 +105,21 @@ $todayBalance = $todayDeposits + $todayRegularSales + $cashPayments - ($todayWit
 
 // 1.7 Calcul du solde total théorique si toutes les ventes et paiements étaient inclus
 $todayTotalTheoretical = $todayDeposits + $todayRegularSales + $todayCustomerPayments - ($todayWithdrawals + $todayReturns);
+
+// 1.8 NOUVEAU : Calcul de la différence due aux remises (pour information)
+$sqlRegularSalesBeforeDiscount = "
+  SELECT COALESCE(SUM(c.ProductQty * p.Price), 0) AS totalSalesBeforeDiscount
+  FROM tblcart c
+  JOIN tblproducts p ON p.ID = c.ProductId
+  WHERE c.IsCheckOut = '1'
+    AND DATE(c.CartDate) = CURDATE()
+";
+$resRegularSalesBeforeDiscount = mysqli_query($con, $sqlRegularSalesBeforeDiscount);
+$rowRegularSalesBeforeDiscount = mysqli_fetch_assoc($resRegularSalesBeforeDiscount);
+$todayRegularSalesBeforeDiscount = floatval($rowRegularSalesBeforeDiscount['totalSalesBeforeDiscount']);
+
+// Calcul de la remise totale accordée aujourd'hui
+$todayDiscountGiven = $todayRegularSalesBeforeDiscount - $todayRegularSales;
 
 // ---------------------------------------------------------------------
 // 2) GÉRER UNE NOUVELLE TRANSACTION MANUELLE
@@ -208,6 +231,22 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
       margin-bottom: 15px;
       border-radius: 4px;
     }
+    .correction-notice {
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 15px;
+      color: #155724;
+    }
+    .discount-info {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 10px;
+      color: #856404;
+    }
   </style>
 </head>
 <body>
@@ -225,6 +264,11 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
 
   <div class="container-fluid">
     <hr>
+    
+    <!-- Notice de correction -->
+    <div class="correction-notice">
+      <strong>✅ Calculs Corrigés:</strong> Les ventes régulières incluent maintenant les remises appliquées (cohérent avec le rapport financier).
+    </div>
     
     <div class="alert-info">
       <strong>Information importante:</strong> Les ventes régulières (<?php echo number_format($todayRegularSales, 2); ?>) et paiements clients en espèces (<?php echo number_format($cashPayments, 2); ?>) sont automatiquement inclus dans le calcul du solde de caisse. 
@@ -247,11 +291,23 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
               <h4>Détail du jour:</h4>
               <table class="table table-bordered table-striped" style="width: auto;">
                 <tr>
-                  <td>Ventes régulières (incluses dans le solde):</td>
+                  <td>Ventes régulières (avec remises, incluses dans le solde):</td>
                   <td style="text-align: right;">
                     <strong>+<?php echo number_format($todayRegularSales, 2); ?></strong>
                   </td>
                 </tr>
+                <?php if ($todayDiscountGiven > 0): ?>
+                <tr>
+                  <td colspan="2" class="discount-info">
+                    <small>
+                      <strong>Info remises:</strong> 
+                      Avant remises: <?php echo number_format($todayRegularSalesBeforeDiscount, 2); ?> | 
+                      Remises accordées: -<?php echo number_format($todayDiscountGiven, 2); ?> | 
+                      Après remises: <?php echo number_format($todayRegularSales, 2); ?>
+                    </small>
+                  </td>
+                </tr>
+                <?php endif; ?>
                 <tr>
                   <td>Paiements clients en espèces (inclus dans le solde):</td>
                   <td style="text-align: right;">
@@ -290,10 +346,10 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
             <div class="span5">
               <div style="padding: 20px; background-color: #eee; border-radius: 5px;">
                 <h4>Guide d'utilisation:</h4>
-                <p><strong>Calcul du solde de caisse:</strong><br>
+                <p><strong>Calcul du solde de caisse (CORRIGÉ):</strong><br>
                 Le solde inclut automatiquement:
                 <ul>
-                  <li>Les ventes régulières du jour: <?php echo number_format($todayRegularSales, 2); ?></li>
+                  <li>Les ventes régulières du jour (AVEC remises): <?php echo number_format($todayRegularSales, 2); ?></li>
                   <li>Les paiements clients en espèces: <?php echo number_format($cashPayments, 2); ?></li>
                   <li>Les dépôts manuels: <?php echo number_format($todayDeposits, 2); ?></li>
                 </ul>
@@ -311,6 +367,14 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
                 <?php else: ?>
                   <p><strong>Montant max. retirable aujourd'hui:</strong><br>
                      <?php echo number_format($maxWithdrawal, 2); ?></p>
+                <?php endif; ?>
+                
+                <?php if ($todayDiscountGiven > 0): ?>
+                <div class="discount-info">
+                  <strong>💡 Info Remises:</strong><br>
+                  Remises accordées aujourd'hui: <?php echo number_format($todayDiscountGiven, 2); ?><br>
+                  <small>Les calculs utilisent maintenant les montants réellement facturés (après remises)</small>
+                </div>
                 <?php endif; ?>
               </div>
             </div>
@@ -600,11 +664,11 @@ $(document).ready(function() {
     return true;
   });
   
-  // Suggérer des montants prédéfinis
+  // Suggérer des montants prédéfinis (CORRIGÉ - utilise les montants avec remises)
   $('#comments_preset').on('change', function() {
     var preset = $(this).val();
     if (preset === 'Ventes du jour') {
-      $('#amount').val(<?php echo $todayRegularSales; ?>);
+      $('#amount').val(<?php echo $todayRegularSales; ?>);  // Maintenant avec remises
       $('#transtype').val('IN');
     } else if (preset === 'Paiements clients') {
       $('#amount').val(<?php echo $cashPayments; ?>);  // Updated to use Cash payments only
