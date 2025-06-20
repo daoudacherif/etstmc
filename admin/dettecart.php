@@ -1,4 +1,4 @@
-<?php 
+<?php
 session_start();
 error_reporting(E_ALL);
 include('includes/dbconnection.php');
@@ -149,17 +149,17 @@ if (isset($_POST['addtocart'])) {
     if ($row = mysqli_fetch_assoc($stockCheck)) {
         // Vérification que le stock est strictement supérieur à 0
         if ($row['Stock'] <= 0) {
-            echo "<script>alert(" . json_encode("Article \"{$row['ProductName']}\" en rupture de stock.") . "); window.location='dettecart.php';</script>";
+            echo "<script>alert('Article \"" . htmlspecialchars($row['ProductName']) . "\" en rupture de stock.'); window.location='dettecart.php';</script>";
             exit;
         }
         
         // Vérification que la quantité demandée est disponible
         if ($row['Stock'] < $quantity) {
-            echo "<script>alert(" . json_encode("Stock insuffisant pour \"{$row['ProductName']}\". Stock disponible: {$row['Stock']}") . "); window.location='dettecart.php';</script>";
+            echo "<script>alert('Stock insuffisant pour \"" . htmlspecialchars($row['ProductName']) . "\". Stock disponible: " . $row['Stock'] . "'); window.location='dettecart.php';</script>";
             exit;
         }
     } else {
-        echo "<script>alert(" . json_encode("Article introuvable.") . "); window.location='dettecart.php';</script>";
+        echo "<script>alert('Article introuvable.'); window.location='dettecart.php';</script>";
         exit;
     }
 
@@ -170,7 +170,7 @@ if (isset($_POST['addtocart'])) {
         $newQty = $c['ProductQty'] + $quantity;
         // Vérification que la nouvelle quantité totale ne dépasse pas le stock disponible
         if ($newQty > $row['Stock']) {
-            echo "<script>alert(" . json_encode("Quantité totale demandée ($newQty) supérieure au stock disponible ({$row['Stock']}) pour \"{$row['ProductName']}\".") . "); window.location='dettecart.php';</script>";
+            echo "<script>alert('Quantité totale demandée (" . $newQty . ") supérieure au stock disponible (" . $row['Stock'] . ") pour \"" . htmlspecialchars($row['ProductName']) . "\".'); window.location='dettecart.php';</script>";
             exit;
         }
         mysqli_query($con, "UPDATE tblcreditcart SET ProductQty='$newQty', Price='$price' WHERE ID='{$c['ID']}'") or die(mysqli_error($con));
@@ -278,7 +278,7 @@ if (isset($_POST['submit'])) {
     }
     
     if (!empty($stockErrors)) {
-        $errorMsg = "Impossible de finaliser la commande:\\n- " . implode("\\n- ", $stockErrors);
+        $errorMsg = "Impossible de finaliser la commande:\n- " . implode("\n- ", $stockErrors);
         echo "<script>alert(" . json_encode($errorMsg) . "); window.location='dettecart.php';</script>";
         exit;
     }
@@ -343,7 +343,7 @@ if (isset($_POST['submit'])) {
         $_SESSION['invoiceid'] = $billingnum;
 
         // Afficher le message avec le statut SMS approprié
-        echo "<script>alert(" . json_encode("Facture créée: $billingnum$smsStatusMessage") . "); window.location='invoice_dettecard.php?print=auto';</script>";
+        echo "<script>alert('Facture créée: $billingnum$smsStatusMessage'); window.location='invoice_dettecard.php?print=auto';</script>";
         exit;
     } else {
         die('Erreur SQL : ' . mysqli_error($con));
@@ -747,80 +747,79 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                                             if ($stock <= 0) {
                                                 $stockStatus = '<span class="stock-warning">RUPTURE</span>';
                                             } elseif ($stock < $pq) {
-                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';
+                                                $stockStatus = '<span class="stock-warning">INSUFFISANT</span>';}
+                                                ?>
+                                                <tr <?php echo $rowClass; ?>>
+                                                    <td><?php echo $cnt; ?></td>
+                                                    <td><?php echo $row['ProductName']; ?></td>
+                                                    <td><?php echo $pq; ?></td>
+                                                    <td>
+                                                        <?php echo $stock; ?>
+                                                        <?php echo $stockStatus; ?>
+                                                    </td>
+                                                    <td><?php echo number_format($ppu, 2); ?></td>
+                                                    <td><?php echo number_format($lineTotal, 2); ?></td>
+                                                    <td>
+                                                        <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
+                                                           onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
+                                                            <i class="icon-trash"></i>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                                <?php
+                                                $cnt++;
+                                            }
+                                            $netTotal = $grandTotal - $discount;
+                                            if ($netTotal < 0) {
+                                                $netTotal = 0;
                                             }
                                             ?>
-                                            <tr <?php echo $rowClass; ?>>
-                                                <td><?php echo $cnt; ?></td>
-                                                <td><?php echo $row['ProductName']; ?></td>
-                                                <td><?php echo $pq; ?></td>
-                                                <td>
-                                                    <?php echo $stock; ?>
-                                                    <?php echo $stockStatus; ?>
-                                                </td>
-                                                <td><?php echo number_format($ppu, 2); ?></td>
-                                                <td><?php echo number_format($lineTotal, 2); ?></td>
-                                                <td>
-                                                    <a href="dettecart.php?delid=<?php echo $row['cid']; ?>"
-                                                       onclick="return confirm('Voulez-vous vraiment supprimer cet article ?');">
-                                                        <i class="icon-trash"></i>
-                                                    </a>
-                                                </td>
+                                           <!-- Affichage de la remise dans le tableau des totaux -->
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold;">
+                                                    Remise
+                                                    <?php if ($discountType == 'percentage'): ?>
+                                                        (<?php echo $discountValue; ?>%)
+                                                    <?php endif; ?>
+                                                </th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
+                                                <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
                                             </tr>
                                             <?php
-                                            $cnt++;
-                                        }
-                                        $netTotal = $grandTotal - $discount;
-                                        if ($netTotal < 0) {
-                                            $netTotal = 0;
+                                        } else {
+                                            ?>
+                                            <tr>
+                                                <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
+                                            </tr>
+                                            <?php
                                         }
                                         ?>
-                                       <!-- Affichage de la remise dans le tableau des totaux -->
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">Total Général</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($grandTotal, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold;">
-                                                Remise
-                                                <?php if ($discountType == 'percentage'): ?>
-                                                    (<?php echo $discountValue; ?>%)
-                                                <?php endif; ?>
-                                            </th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold;"><?php echo number_format($discount, 2); ?></th>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="5" style="text-align: right; font-weight: bold; color: green;">Total Net</th>
-                                            <th colspan="2" style="text-align: center; font-weight: bold; color: green;"><?php echo number_format($netTotal, 2); ?></th>
-                                        </tr>
-                                        <?php
-                                    } else {
-                                        ?>
-                                        <tr>
-                                            <td colspan="7" style="color:red; text-align:center;">Aucun article trouvé dans le panier</td>
-                                        </tr>
-                                        <?php
-                                    }
-                                    ?>
-                                </tbody>
-                            </table>
-                        </div><!-- widget-content -->
-                    </div><!-- widget-box -->
-                </div>
-            </div><!-- row-fluid -->
-        </div><!-- container-fluid -->
-    </div><!-- content -->
-  
-    <!-- Footer -->
-    <?php include_once('includes/footer.php'); ?>
-    <!-- SCRIPTS -->
-    <script src="js/jquery.min.js"></script>
-    <script src="js/jquery.ui.custom.js"></script>
-    <script src="js/bootstrap.min.js"></script>
-    <script src="js/jquery.uniform.js"></script>
-    <script src="js/select2.min.js"></script>
-    <script src="js/jquery.dataTables.min.js"></script>
-    <script src="js/matrix.js"></script>
-    <script src="js/matrix.tables.js"></script>
-</body>
-</html>
+                                    </tbody>
+                                </table>
+                            </div><!-- widget-content -->
+                        </div><!-- widget-box -->
+                    </div>
+                </div><!-- row-fluid -->
+            </div><!-- container-fluid -->
+        </div><!-- content -->
+      
+        <!-- Footer -->
+        <?php include_once('includes/footer.php'); ?>
+        <!-- SCRIPTS -->
+        <script src="js/jquery.min.js"></script>
+        <script src="js/jquery.ui.custom.js"></script>
+        <script src="js/bootstrap.min.js"></script>
+        <script src="js/jquery.uniform.js"></script>
+        <script src="js/select2.min.js"></script>
+        <script src="js/jquery.dataTables.min.js"></script>
+        <script src="js/matrix.js"></script>
+        <script src="js/matrix.tables.js"></script>
+    </body>
+    </html>
