@@ -9,34 +9,65 @@ if (empty($_SESSION['imsaid'])) {
     exit;
 }
 
-// Désactivation d'un produit
-if (isset($_GET['delid'])) {
-    $delid = intval($_GET['delid']);
-    mysqli_query($con, "UPDATE tblproducts SET Status = 0 WHERE ID = $delid");
-    echo "<script>alert('Produit désactivé avec succès');</script>";
-    echo "<script>window.location.href='manage-inventory.php';</script>";
+// Vérifier si un ID de produit est fourni
+if (!isset($_GET['pid']) || empty($_GET['pid'])) {
+    header('location:manage-inventory.php');
     exit;
 }
 
-// Activation d'un produit
-if (isset($_GET['actid'])) {
-    $actid = intval($_GET['actid']);
-    mysqli_query($con, "UPDATE tblproducts SET Status = 1 WHERE ID = $actid");
-    echo "<script>alert('Produit activé avec succès');</script>";
-    echo "<script>window.location.href='manage-inventory.php';</script>";
+$productId = intval($_GET['pid']);
+
+// Récupérer les informations du produit
+$productQuery = mysqli_query($con, "
+    SELECT p.*, c.CategoryName 
+    FROM tblproducts p
+    LEFT JOIN tblcategory c ON c.ID = p.CatID
+    WHERE p.ID = $productId
+");
+
+if (mysqli_num_rows($productQuery) == 0) {
+    echo "<script>alert('Produit non trouvé'); window.location.href='manage-inventory.php';</script>";
     exit;
 }
+
+$product = mysqli_fetch_assoc($productQuery);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Gestion des Articles</title>
+  <title>Historique du produit - <?= htmlspecialchars($product['ProductName']) ?></title>
   <?php include_once('includes/cs.php'); ?>
   <?php include_once('includes/responsive.php'); ?>
   <style>
-    .text-danger { color: #d9534f; }
-    .btn-action { margin: 2px; }
+    .movement-in { color: #5cb85c; }
+    .movement-out { color: #d9534f; }
+    .timeline-badge { 
+      width: 50px; 
+      height: 50px; 
+      line-height: 50px; 
+      font-size: 1.4em; 
+      text-align: center; 
+      position: absolute; 
+      top: 16px; 
+      left: 50%; 
+      margin-left: -25px; 
+      background-color: #999999; 
+      z-index: 100; 
+      border-top-right-radius: 50%; 
+      border-top-left-radius: 50%; 
+      border-bottom-right-radius: 50%; 
+      border-bottom-left-radius: 50%; 
+    }
+    .timeline-badge.success { background-color: #5cb85c; }
+    .timeline-badge.danger { background-color: #d9534f; }
+    .timeline-badge.warning { background-color: #f0ad4e; }
+    .product-info {
+      background-color: #f8f8f8;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
   </style>
 </head>
 <body>
@@ -49,145 +80,196 @@ if (isset($_GET['actid'])) {
       <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
       </a>
-      <strong>Gestion des Articles</strong>
+      <a href="manage-inventory.php">Gestion des Articles</a>
+      <strong>Historique</strong>
     </div>
-    <h1>Gestion des Articles</h1>
+    <h1>Historique du produit</h1>
   </div>
+  
   <div class="container-fluid">
     <hr>
+    
+    <!-- Informations du produit -->
+    <div class="product-info">
+      <h3><?= htmlspecialchars($product['ProductName']) ?></h3>
+      <div class="row-fluid">
+        <div class="span3"><strong>Catégorie:</strong> <?= htmlspecialchars($product['CategoryName'] ?? 'N/A') ?></div>
+        <div class="span3"><strong>Marque:</strong> <?= htmlspecialchars($product['BrandName']) ?></div>
+        <div class="span3"><strong>Modèle:</strong> <?= htmlspecialchars($product['ModelNumber']) ?></div>
+        <div class="span3"><strong>Prix:</strong> <?= number_format($product['Price'], 2) ?> GNF</div>
+      </div>
+    </div>
+    
     <div class="row-fluid">
       <div class="span12">
+        <!-- Statistiques -->
         <div class="widget-box">
           <div class="widget-title">
-            <span class="icon"><i class="icon-th"></i></span>
-            <h5>Gestion des Articles</h5>
-            <span class="icon">
-              <a href="add-product.php" class="btn btn-mini btn-success" style="margin: 5px;">
-                <i class="icon-plus"></i> Ajouter un article
-              </a>
-            </span>
+            <span class="icon"><i class="icon-signal"></i></span>
+            <h5>Résumé des mouvements</h5>
+          </div>
+          <div class="widget-content">
+            <?php
+            // Calculer les statistiques
+            $stats = mysqli_query($con, "
+                SELECT 
+                    p.Stock as initial_stock,
+                    COALESCE(SUM(c.ProductQty), 0) as total_sold,
+                    COALESCE((SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = $productId), 0) as total_returned
+                FROM tblproducts p
+                LEFT JOIN tblcart c ON c.ProductId = p.ID AND c.IsCheckOut = 1
+                WHERE p.ID = $productId
+                GROUP BY p.ID
+            ");
+            $stat = mysqli_fetch_assoc($stats);
+            $remaining = $stat['initial_stock'] - $stat['total_sold'] + $stat['total_returned'];
+            ?>
+            <div class="row-fluid">
+              <div class="span3">
+                <div class="well well-small">
+                  <h4>Stock Initial</h4>
+                  <h2><?= $stat['initial_stock'] ?></h2>
+                </div>
+              </div>
+              <div class="span3">
+                <div class="well well-small">
+                  <h4>Total Vendu</h4>
+                  <h2 class="movement-out"><?= $stat['total_sold'] ?></h2>
+                </div>
+              </div>
+              <div class="span3">
+                <div class="well well-small">
+                  <h4>Total Retourné</h4>
+                  <h2 class="movement-in"><?= $stat['total_returned'] ?></h2>
+                </div>
+              </div>
+              <div class="span3">
+                <div class="well well-small">
+                  <h4>Stock Restant</h4>
+                  <h2 class="<?= $remaining <= 0 ? 'movement-out' : ($remaining < 5 ? 'text-warning' : 'movement-in') ?>">
+                    <?= $remaining ?>
+                  </h2>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Historique des mouvements -->
+        <div class="widget-box">
+          <div class="widget-title">
+            <span class="icon"><i class="icon-time"></i></span>
+            <h5>Historique détaillé des mouvements</h5>
           </div>
           <div class="widget-content nopadding">
-            <table class="table table-bordered data-table">
+            <table class="table table-bordered table-striped">
               <thead>
                 <tr>
-                  <th>N°</th>
-                  <th>Nom</th>
-                  <th>Catégorie</th>
-                  <th>Marque</th>
-                  <th>Modèle</th>
-                  <th>Stock Initial</th>
-                  <th>Vendus</th>
-                  <th>Stock Restant</th>
-                  <th>Prix</th>
-                  <th>Statut</th>
-                  <th>Actions</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Quantité</th>
+                  <th>Client/Référence</th>
+                  <th>Prix unitaire</th>
+                  <th>Total</th>
+                  <th>Stock après mouvement</th>
                 </tr>
               </thead>
               <tbody>
                 <?php
-                // Requête SQL avec ajout du champ Prix
-                $sql = "
-                  SELECT 
-                    p.ID            AS pid,
-                    p.ProductName,
-                    COALESCE(c.CategoryName, 'N/A') AS CategoryName,
-                    p.BrandName,
-                    p.ModelNumber,
-                    p.Stock         AS initial_stock,
-                    p.Price,
-                    COALESCE(SUM(cart.ProductQty), 0) AS sold_qty,
-                    COALESCE(
-                      (SELECT SUM(Quantity) FROM tblreturns WHERE ProductID = p.ID),
-                      0
-                    ) AS returned_qty,
-                    p.Status
-                  FROM tblproducts p
-                  LEFT JOIN tblcategory c 
-                    ON c.ID = p.CatID
-                  LEFT JOIN tblcart cart 
-                    ON cart.ProductId = p.ID 
-                   AND cart.IsCheckOut = 1
-                  GROUP BY p.ID
-                  ORDER BY p.ID DESC
-                ";
-                $ret = mysqli_query($con, $sql) 
-                  or die('Erreur SQL : ' . mysqli_error($con));
-
-                if (mysqli_num_rows($ret) > 0) {
-                  $cnt = 1;
-                  while ($row = mysqli_fetch_assoc($ret)) {
-                    // Calcul du stock restant en tenant compte des ventes
-                    $sold = intval($row['sold_qty']);
-                    $initial = intval($row['initial_stock']);
+                // Stock initial
+                $currentStock = $stat['initial_stock'];
+                echo "<tr class='info'>";
+                echo "<td>-</td>";
+                echo "<td><span class='label label-info'>Stock Initial</span></td>";
+                echo "<td class='movement-in'>+" . $stat['initial_stock'] . "</td>";
+                echo "<td>-</td>";
+                echo "<td>-</td>";
+                echo "<td>-</td>";
+                echo "<td><strong>" . $currentStock . "</strong></td>";
+                echo "</tr>";
+                
+                // Récupérer tous les mouvements (ventes et retours) triés par date
+                $movements = mysqli_query($con, "
+                    SELECT 
+                        'sale' as type,
+                        c.BillingDate as date,
+                        c.ProductQty as quantity,
+                        c.Price as unit_price,
+                        cu.CustomerName as reference,
+                        c.BillingId
+                    FROM tblcart c
+                    LEFT JOIN tblcustomer cu ON cu.BillingNumber = c.BillingId
+                    WHERE c.ProductId = $productId AND c.IsCheckOut = 1
                     
-                    // Le stock restant est: initial - vendu
-                    $remaining = $initial - $sold;
-                    $remaining = max(0, $remaining);
+                    UNION ALL
                     
-                    // Préparation du label de statut
-                    $statusLabel = $row['Status'] == 1
-                        ? '<span class="label label-success">Actif</span>'
-                        : '<span class="label label-important">Inactif</span>';
-                    ?>
-                    <tr>
-                      <td><?= $cnt ?></td>
-                      <td><?= htmlspecialchars($row['ProductName']) ?></td>
-                      <td><?= htmlspecialchars($row['CategoryName']) ?></td>
-                      <td><?= htmlspecialchars($row['BrandName']) ?></td>
-                      <td><?= htmlspecialchars($row['ModelNumber']) ?></td>
-                      <td><?= $initial ?></td>
-                      <td><?= $sold ?></td>
-                      <td class="<?= $remaining === 0 ? 'text-danger' : '' ?>">
-                        <?= $remaining === 0 ? 'Épuisé' : $remaining ?>
-                      </td>
-                      <td><?= number_format(floatval($row['Price']), 2) ?></td>
-                      <td class="center"><?= $statusLabel ?></td>
-                      <td class="center">
-                          <a href="editproducts.php?editid=<?= $row['pid'] ?>" class="btn btn-mini btn-info btn-action">
-                              <i class="icon-edit"></i>
-                          </a>
-                          <?php if ($row['Status'] == 1): ?>
-                              <a href="manage-inventory.php?delid=<?= $row['pid'] ?>" 
-                                 onclick="return confirm('Voulez-vous désactiver cet article ?')" 
-                                 class="btn btn-mini btn-danger btn-action">
-                                  <i class="icon-unlock"></i> Désactiver
-                              </a>
-                          <?php else: ?>
-                              <a href="manage-inventory.php?actid=<?= $row['pid'] ?>" 
-                                 onclick="return confirm('Voulez-vous activer cet article ?')" 
-                                 class="btn btn-mini btn-success btn-action">
-                                  <i class="icon-lock"></i> Activer
-                              </a>
-                          <?php endif; ?>
-                      </td>
-                    </tr>
-                    <?php
-                    $cnt++;
-                  }
-                } else {
-                  echo '<tr><td colspan="11" class="text-center">Aucun article trouvé</td></tr>';
+                    SELECT 
+                        'return' as type,
+                        r.ReturnDate as date,
+                        r.Quantity as quantity,
+                        r.RefundAmount / r.Quantity as unit_price,
+                        CONCAT('Retour #', r.ID, ' - ', r.ReturnReason) as reference,
+                        r.BillingNumber as BillingId
+                    FROM tblreturns r
+                    WHERE r.ProductID = $productId
+                    
+                    ORDER BY date DESC
+                ");
+                
+                while ($movement = mysqli_fetch_assoc($movements)) {
+                    if ($movement['type'] == 'sale') {
+                        $currentStock -= $movement['quantity'];
+                        $moveClass = 'movement-out';
+                        $moveSign = '-';
+                        $labelClass = 'label-important';
+                        $labelText = 'Vente';
+                    } else {
+                        $currentStock += $movement['quantity'];
+                        $moveClass = 'movement-in';
+                        $moveSign = '+';
+                        $labelClass = 'label-success';
+                        $labelText = 'Retour';
+                    }
+                    
+                    echo "<tr>";
+                    echo "<td>" . date('d/m/Y H:i', strtotime($movement['date'])) . "</td>";
+                    echo "<td><span class='label $labelClass'>$labelText</span></td>";
+                    echo "<td class='$moveClass'><strong>$moveSign" . $movement['quantity'] . "</strong></td>";
+                    echo "<td>" . htmlspecialchars($movement['reference']) . "</td>";
+                    echo "<td>" . number_format($movement['unit_price'], 2) . " GNF</td>";
+                    echo "<td>" . number_format($movement['quantity'] * $movement['unit_price'], 2) . " GNF</td>";
+                    echo "<td><strong>" . $currentStock . "</strong></td>";
+                    echo "</tr>";
+                }
+                
+                if (mysqli_num_rows($movements) == 0) {
+                    echo "<tr><td colspan='7' class='text-center'>Aucun mouvement enregistré</td></tr>";
                 }
                 ?>
               </tbody>
             </table>
-          </div><!-- widget-content -->
-        </div><!-- widget-box -->
-      </div><!-- span12 -->
-    </div><!-- row-fluid -->
-  </div><!-- container-fluid -->
-</div><!-- content -->
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <a href="manage-inventory.php" class="btn btn-primary">
+            <i class="icon-arrow-left"></i> Retour à la liste
+          </a>
+          <a href="editproducts.php?editid=<?= $productId ?>" class="btn btn-info">
+            <i class="icon-edit"></i> Modifier le produit
+          </a>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
 
 <?php include_once('includes/footer.php'); ?>
 
-<!-- scripts pour DataTable -->
 <script src="js/jquery.min.js"></script>
 <script src="js/jquery.ui.custom.js"></script>
 <script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.uniform.js"></script>
-<script src="js/select2.min.js"></script>
-<script src="js/jquery.dataTables.min.js"></script>
 <script src="js/matrix.js"></script>
-<script src="js/matrix.tables.js"></script>
 </body>
 </html>
