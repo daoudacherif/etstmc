@@ -72,37 +72,32 @@ function getAccessToken() {
 }
 
 /**
- * Function to send an SMS via the Nimba API.
- * The message content is passed via the $message parameter.
- * The payload sent is logged so you can verify the SMS content.
+ * FONCTION SMS CORRIGÉE - Version exacte de cart.php qui fonctionne
  */
 function sendSmsNotification($to, $message) {
-    // Nimba API endpoint for sending SMS
+    // URL de l'API d'envoi de SMS (même que cart.php qui fonctionne)
     $url = "https://api.nimbasms.com/v1/messages";
     
-    // Replace with your actual service credentials (as provided by Nimba)
-    $service_id    = "1608e90e20415c7edf0226bf86e7effd";    
+    // Identifiants (mêmes que cart.php qui fonctionne)
+    $service_id    = "1608e90e20415c7edf0226bf86e7effd";
     $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
     
-    // Build the Basic Auth string (Base64 of "service_id:secret_token")
+    // Calcul de l'authentification (même que cart.php)
     $authString = base64_encode($service_id . ":" . $secret_token);
     
-    // Prepare the JSON payload with recipient, message and sender_name
-    $payload = array(
+    // Structure exacte de cart.php qui fonctionne
+    $postData = json_encode(array(
         "to"          => array($to),
         "message"     => $message,
-        "sender_name" => "SMS 9080"   // Replace with your approved sender name with Nimba
-    );
-    $postData = json_encode($payload);
-    
-    // Log the payload for debugging (check your server error logs)
-    error_log("Nimba SMS Payload: " . $postData);
+        "sender_name" => "SMS 9080"
+    ));
     
     $headers = array(
         "Authorization: Basic " . $authString,
         "Content-Type: application/json"
     );
     
+    // Options exactes de cart.php
     $options = array(
         "http" => array(
             "method"        => "POST",
@@ -115,27 +110,23 @@ function sendSmsNotification($to, $message) {
     $context = stream_context_create($options);
     $response = file_get_contents($url, false, $context);
     
-    // Log complete API response for debugging
-    error_log("Nimba API SMS Response: " . $response);
+    // Log de la réponse (même que cart.php)
+    error_log("Réponse API SMS: " . $response);
     
-    // Retrieve HTTP status code from response headers
+    // Gestion des headers - VERSION SIMPLIFIÉE QUI FONCTIONNE dans cart.php
     $http_response_header = isset($http_response_header) ? $http_response_header : array();
-    if (empty($http_response_header)) {
-        error_log("No HTTP response headers - SMS send failed");
-        return false;
-    }
-    
     $status_line = $http_response_header[0];
     preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
     $status_code = isset($match[1]) ? $match[1] : 0;
     
     if ($status_code != 201) {
-        error_log("SMS send failed. HTTP Code: $status_code. Details: " . print_r(json_decode($response, true), true));
+        error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
         return false;
     }
     
     return true;
 }
+
 // ----------- Gestion Panier -----------
 
 // Ajout au panier
@@ -227,6 +218,7 @@ if (isset($_POST['applyDiscount'])) {
 $discount = $_SESSION['credit_discount'] ?? 0;
 $discountType = $_SESSION['credit_discountType'] ?? 'absolute';
 $discountValue = $_SESSION['credit_discountValue'] ?? 0;
+
 // Vérifier les stocks pour l'affichage
 $hasStockIssue = false;
 $stockIssueProducts = [];
@@ -308,11 +300,11 @@ if (isset($_POST['submit'])) {
         
         // Envoyer SMS seulement si l'utilisateur l'a choisi
         if ($sendSms) {
-            // SMS personnalisé avec vérification du statut d'envoi
+            // Message SMS simplifié comme dans cart.php qui fonctionne
             if ($dues > 0) {
-                $smsMessage = "Bonjour $custname, votre commande est enregistrée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF.";
+                $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF. Merci.";
             } else {
-                $smsMessage = "Bonjour $custname, votre commande est confirmée. Merci pour votre confiance !";
+                $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
             }
 
             // Envoyer le SMS et stocker le résultat (true/false)
@@ -632,9 +624,6 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
                     </form>
                     <hr>
 
-
-                    
-  
                     <!-- FORMULAIRE DE CHECKOUT (informations client + montant payé) -->
                     <form method="post" class="form-horizontal" name="submit">
                         <div class="control-group">
