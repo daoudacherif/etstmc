@@ -18,72 +18,10 @@ $adminData = mysqli_fetch_assoc($adminQuery);
 $currentAdminName = $adminData['AdminName'];
 
 /**
- * Fonction de test pour débugger l'API SMS
- */
-function testSmsApi() {
-    echo "<div style='background:#f8f9fa; border:1px solid #dee2e6; padding:20px; margin:20px; border-radius:5px;'>";
-    echo "<h3>🔧 Test de l'API SMS Nimba</h3>";
-    
-    // Test 1: Vérifier si cURL est disponible
-    if (!function_exists('curl_init')) {
-        echo "<p style='color:red'>❌ cURL n'est pas installé sur ce serveur!</p>";
-        echo "<p>Solution: Demandez à votre hébergeur d'activer l'extension cURL PHP.</p>";
-        return;
-    } else {
-        echo "<p style='color:green'>✅ cURL est disponible</p>";
-    }
-    
-    // Test 2: Vérifier allow_url_fopen
-    if (!ini_get('allow_url_fopen')) {
-        echo "<p style='color:orange'>⚠️ allow_url_fopen est désactivé (pas critique si cURL fonctionne)</p>";
-    } else {
-        echo "<p style='color:green'>✅ allow_url_fopen est activé</p>";
-    }
-    
-    // Test 3: Vérifier la connectivité vers l'API
-    echo "<h4>Test de connectivité vers api.nimbasms.com:</h4>";
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "https://api.nimbasms.com");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    $testResponse = curl_exec($ch);
-    $testHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $testError = curl_error($ch);
-    curl_close($ch);
-    
-    if ($testError) {
-        echo "<p style='color:red'>❌ Erreur de connexion: " . htmlspecialchars($testError) . "</p>";
-    } else {
-        echo "<p style='color:green'>✅ Connexion réussie (Code HTTP: $testHttpCode)</p>";
-    }
-    
-    // Test 4: Tester l'envoi d'un SMS
-    echo "<h4>Test d'envoi SMS:</h4>";
-    $testNumber = "+224622000000"; // Numéro de test
-    $testMessage = "Test SMS Nimba API - " . date('Y-m-d H:i:s');
-    
-    echo "<p>📱 Numéro de test: $testNumber</p>";
-    echo "<p>💬 Message: $testMessage</p>";
-    
-    // Appel de la fonction avec mode debug activé
-    $result = sendSmsNotification($testNumber, $testMessage, true);
-    
-    if ($result) {
-        echo "<p style='color:green'>✅ SMS envoyé avec succès!</p>";
-    } else {
-        echo "<p style='color:red'>❌ Échec de l'envoi du SMS</p>";
-        echo "<p>Consultez les détails ci-dessus pour identifier le problème.</p>";
-    }
-    
-    echo "</div>";
-}
-
-/**
  * Obtenir un access token OAuth2 de Nimba using cURL.
  */
-function getAccessToken($debug = false) {
-    $url = "https://api.nimbasms.com/v1/oauth/token";
+function getAccessToken() {
+    $url = "https://api.nimbasms.com/v1/oauth/token";  // Verify this URL with your Nimba documentation.
     
     // Replace with your real credentials
     $client_id     = "1608e90e20415c7edf0226bf86e7effd";      
@@ -101,11 +39,6 @@ function getAccessToken($debug = false) {
         "grant_type" => "client_credentials"
     ));
     
-    if ($debug) {
-        echo "<h5>🔐 Tentative d'obtention du token OAuth2...</h5>";
-        echo "<pre>URL: $url</pre>";
-    }
-    
     // Use cURL for the POST request
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -113,27 +46,17 @@ function getAccessToken($debug = false) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_VERBOSE, $debug);
-    
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);  // For development only!
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
     
-    if ($debug) {
-        echo "<p>Code HTTP: $httpCode</p>";
-        if ($error) {
-            echo "<p style='color:red'>Erreur cURL: $error</p>";
-        }
-        echo "<p>Réponse brute:</p>";
-        echo "<pre style='background:#f0f0f0; padding:10px; overflow:auto;'>" . htmlspecialchars($response) . "</pre>";
-    }
-    
-    if ($error) {
+    if ($response === FALSE) {
+        $error = curl_error($ch);
         error_log("cURL error while obtaining token: " . $error);
+        curl_close($ch);
         return false;
     }
+    curl_close($ch);
     
     if ($httpCode != 200) {
         error_log("Error obtaining access token. HTTP Code: $httpCode. Response: $response");
@@ -145,123 +68,64 @@ function getAccessToken($debug = false) {
         error_log("API error (token): " . print_r($decoded, true));
         return false;
     }
-    
-    if ($debug) {
-        echo "<p style='color:green'>✅ Token obtenu avec succès!</p>";
-    }
-    
     return $decoded['access_token'];
 }
 
 /**
- * FONCTION SMS CORRIGÉE avec cURL et mode debug
+ * FONCTION SMS CORRIGÉE - Version exacte de cart.php qui fonctionne
  */
-function sendSmsNotification($to, $message, $debug = false) {
-    // URL de l'API d'envoi de SMS
+function sendSmsNotification($to, $message) {
+    // URL de l'API d'envoi de SMS (même que cart.php qui fonctionne)
     $url = "https://api.nimbasms.com/v1/messages";
     
-    // Identifiants
+    // Identifiants (mêmes que cart.php qui fonctionne)
     $service_id    = "1608e90e20415c7edf0226bf86e7effd";
     $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
     
-    // Calcul de l'authentification
+    // Calcul de l'authentification (même que cart.php)
     $authString = base64_encode($service_id . ":" . $secret_token);
     
-    // Structure des données
+    // Structure exacte de cart.php qui fonctionne
     $postData = json_encode(array(
         "to"          => array($to),
         "message"     => $message,
         "sender_name" => "SMS 9080"
     ));
     
-    if ($debug) {
-        echo "<h5>📤 Envoi du SMS...</h5>";
-        echo "<pre>URL: $url</pre>";
-        echo "<p>Données envoyées:</p>";
-        echo "<pre style='background:#f0f0f0; padding:10px;'>" . htmlspecialchars($postData) . "</pre>";
-    }
-    
-    // Initialisation de cURL
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+    $headers = array(
         "Authorization: Basic " . $authString,
-        "Content-Type: application/json",
-        "Accept: application/json"
-    ));
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_VERBOSE, $debug);
+        "Content-Type: application/json"
+    );
     
-    // Pour capturer les informations de débogage
-    if ($debug) {
-        $verbose = fopen('php://temp', 'w+');
-        curl_setopt($ch, CURLOPT_STDERR, $verbose);
-    }
+    // Options exactes de cart.php
+    $options = array(
+        "http" => array(
+            "method"        => "POST",
+            "header"        => implode("\r\n", $headers),
+            "content"       => $postData,
+            "ignore_errors" => true
+        )
+    );
     
-    // Exécution de la requête
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlInfo = curl_getinfo($ch);
-    $curlError = curl_error($ch);
-    curl_close($ch);
+    $context = stream_context_create($options);
+    $response = file_get_contents($url, false, $context);
     
-    // Affichage des informations de débogage
-    if ($debug) {
-        echo "<p>Code HTTP reçu: $httpCode</p>";
-        
-        if ($curlError) {
-            echo "<p style='color:red'>Erreur cURL: " . htmlspecialchars($curlError) . "</p>";
-        }
-        
-        echo "<p>Réponse de l'API:</p>";
-        echo "<pre style='background:#f0f0f0; padding:10px; overflow:auto;'>" . htmlspecialchars($response) . "</pre>";
-        
-        // Décoder la réponse JSON si possible
-        $decoded = json_decode($response, true);
-        if ($decoded) {
-            echo "<p>Réponse décodée:</p>";
-            echo "<pre style='background:#f0f0f0; padding:10px;'>" . print_r($decoded, true) . "</pre>";
-        }
-        
-        // Afficher les détails de la requête cURL
-        if (isset($verbose)) {
-            rewind($verbose);
-            $verboseLog = stream_get_contents($verbose);
-            echo "<details><summary>Détails techniques cURL (cliquez pour afficher)</summary>";
-            echo "<pre style='background:#000; color:#0f0; padding:10px; font-size:12px;'>" . htmlspecialchars($verboseLog) . "</pre>";
-            echo "</details>";
-        }
-    }
+    // Log de la réponse (même que cart.php)
+    error_log("Réponse API SMS: " . $response);
     
-    // Log pour la production
-    error_log("SMS API Response Code: " . $httpCode);
-    error_log("SMS API Response Body: " . $response);
-    if ($curlError) {
-        error_log("cURL Error: " . $curlError);
-    }
+    // Gestion des headers - VERSION SIMPLIFIÉE QUI FONCTIONNE dans cart.php
+    $http_response_header = isset($http_response_header) ? $http_response_header : array();
+    $status_line = $http_response_header[0];
+    preg_match('{HTTP\/\S*\s(\d{3})}', $status_line, $match);
+    $status_code = isset($match[1]) ? $match[1] : 0;
     
-    // Vérification du succès (201 = Created pour Nimba)
-    if ($httpCode == 201 || $httpCode == 200) {
-        if ($debug) {
-            echo "<p style='color:green'>✅ SMS envoyé avec succès!</p>";
-        }
-        return true;
-    } else {
-        error_log("Échec de l'envoi du SMS. Code HTTP: $httpCode");
-        if ($response) {
-            $decoded = json_decode($response, true);
-            error_log("Détails de l'erreur: " . print_r($decoded, true));
-        }
+    if ($status_code != 201) {
+        error_log("Échec de l'envoi du SMS. Code HTTP: $status_code. Détails: " . print_r(json_decode($response, true), true));
         return false;
     }
+    
+    return true;
 }
-
-// MODE DEBUG : Décommentez la ligne suivante pour activer le test de l'API
-// testSmsApi(); exit;
 
 // ----------- Gestion Panier -----------
 
@@ -411,7 +275,7 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-    $billingnum = mt_rand(1000, 9999);
+   $billingnum = mt_rand(1000, 9999);
 
     // Validation du panier + Création facture
     $queries = "
@@ -436,14 +300,14 @@ if (isset($_POST['submit'])) {
         
         // Envoyer SMS seulement si l'utilisateur l'a choisi
         if ($sendSms) {
-            // Message SMS simplifié
+            // Message SMS simplifié comme dans cart.php qui fonctionne
             if ($dues > 0) {
                 $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée. Solde dû: " . number_format($dues, 0, ',', ' ') . " GNF. Merci.";
             } else {
                 $smsMessage = "Bonjour $custname, votre commande (Facture No: $billingnum) a été validée avec succès. Merci pour votre confiance.";
             }
 
-            // Envoyer le SMS et stocker le résultat
+            // Envoyer le SMS et stocker le résultat (true/false)
             $smsResult = sendSmsNotification($custmobile, $smsMessage);
 
             // Journal de l'envoi SMS (si la table existe)
@@ -459,10 +323,10 @@ if (isset($_POST['submit'])) {
             if ($smsResult) {
                 $smsStatusMessage = " - SMS envoyé avec succès";
             } else {
-                $smsStatusMessage = " - ÉCHEC de l'envoi du SMS (vérifiez les logs)";
+                $smsStatusMessage = " - ÉCHEC de l'envoi du SMS";
             }
         } else {
-            $smsStatusMessage = " - SMS non envoyé (non sélectionné)";
+            $smsStatusMessage = " - SMS non envoyé (choix utilisateur)";
         }
 
         unset($_SESSION['credit_discount']);
@@ -501,7 +365,7 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
     
-    <!-- Style pour les problèmes de stock et debug -->
+    <!-- Style pour les problèmes de stock -->
     <style>
         .stock-warning {
             color: #d9534f;
@@ -579,27 +443,6 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
             color: #6c757d;
             margin-left: 20px;
             margin-top: 5px;
-        }
-        
-        /* Style pour le bouton de debug */
-        .debug-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #dc3545;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            z-index: 1000;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-        }
-        
-        .debug-button:hover {
-            background: #c82333;
-            color: white;
-            text-decoration: none;
         }
     </style>
 </head>
@@ -957,20 +800,6 @@ while ($product = mysqli_fetch_assoc($cartProducts)) {
         </div><!-- container-fluid -->
     </div><!-- content -->
   
-    <!-- Bouton de debug (visible seulement pour les admins) -->
-    <a href="dettecart.php?debug=sms" class="debug-button" onclick="return confirm('Activer le mode debug SMS? Cela affichera des informations techniques.');">
-        🐛 Debug SMS
-    </a>
-    
-    <?php
-    // Mode debug SMS si demandé
-    if (isset($_GET['debug']) && $_GET['debug'] == 'sms') {
-        echo '<div style="margin: 20px;">';
-        testSmsApi();
-        echo '</div>';
-    }
-    ?>
-    
     <!-- Footer -->
     <?php include_once('includes/footer.php'); ?>
     <!-- SCRIPTS -->
