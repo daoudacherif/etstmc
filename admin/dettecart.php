@@ -80,7 +80,7 @@ function sendSmsNotification($to, $message) {
     
     // Identifiants (mêmes que cart.php qui fonctionne)
     $service_id    = "1608e90e20415c7edf0226bf86e7effd";
-    $secret_token  = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
+    $secret_token  = "z-CGraFPHVC3Yx4ET-c1HD4qt9Udohz94_epflnFBSpHXHxm-_Pyut0jFmMu7hDBkT21XGBJgFIN6IUhzRxOLUJEdZYcSMJctf5G_qTa3O0";
     
     // Calcul de l'authentification (même que cart.php)
     $authString = base64_encode($service_id . ":" . $secret_token);
