@@ -25,7 +25,7 @@ function getAccessToken() {
     
     // Replace with your real credentials
     $client_id     = "1608e90e20415c7edf0226bf86e7effd";      
-    $client_secret = "kokICa68N6NJESoJt09IAFXjO05tYwdVV-Xjrql7o8pTi29ssdPJyNgPBdRIeLx6_690b_wzM27foyDRpvmHztN7ep6ICm36CgNggEzGxRs";
+    $client_secret = "z-CGraFPHVC3Yx4ET-c1HD4qt9Udohz94_epflnFBSpHXHxm-_Pyut0jFmMu7hDBkT21XGBJgFIN6IUhzRxOLUJEdZYcSMJctf5G_qTa3O0";
     
     // Encode the credentials in Base64 ("client_id:client_secret")
     $credentials = base64_encode($client_id . ":" . $client_secret);
