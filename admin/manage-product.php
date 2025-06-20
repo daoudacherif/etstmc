@@ -11,7 +11,7 @@ if (empty($_SESSION['imsaid'])) {
 
 // Vérifier si un ID de produit est fourni
 if (!isset($_GET['pid']) || empty($_GET['pid'])) {
-    header('location:manage-inventory.php');
+    header('location:manage-product.php');
     exit;
 }
 
@@ -26,7 +26,7 @@ $productQuery = mysqli_query($con, "
 ");
 
 if (mysqli_num_rows($productQuery) == 0) {
-    echo "<script>alert('Produit non trouvé'); window.location.href='manage-inventory.php';</script>";
+    echo "<script>alert('Produit non trouvé'); window.location.href='manage-product.php';</script>";
     exit;
 }
 
@@ -80,7 +80,7 @@ $product = mysqli_fetch_assoc($productQuery);
       <a href="dashboard.php" class="tip-bottom">
         <i class="icon-home"></i> Accueil
       </a>
-      <a href="manage-inventory.php">Gestion des Articles</a>
+      <a href="manage-product.php">Gestion des Articles</a>
       <strong>Historique</strong>
     </div>
     <h1>Historique du produit</h1>
@@ -252,7 +252,7 @@ $product = mysqli_fetch_assoc($productQuery);
         </div>
         
         <div class="form-actions">
-          <a href="manage-inventory.php" class="btn btn-primary">
+          <a href="manage-product.php">Gestion des Articles</a> class="btn btn-primary">
             <i class="icon-arrow-left"></i> Retour à la liste
           </a>
           <a href="editproducts.php?editid=<?= $productId ?>" class="btn btn-info">
