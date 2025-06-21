@@ -230,7 +230,7 @@ while ($row = mysqli_fetch_assoc($productQuery)) {
     $productNames[] = $row['ProductName'];
 }
 
-// Checkout + Facturation
+// Checkout + Facturation - FIXED VERSION WITH PAYMENT TRACKING
 if (isset($_POST['submit'])) {
     $custname = mysqli_real_escape_string($con, trim($_POST['customername']));
     $custmobile = preg_replace('/[^0-9+]/', '', $_POST['mobilenumber']);
@@ -275,26 +275,52 @@ if (isset($_POST['submit'])) {
         exit;
     }
 
-   $billingnum = mt_rand(1000, 9999);
+    $billingnum = mt_rand(1000, 9999);
 
-    // Validation du panier + Création facture
-    $queries = "
-        UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0;
-        INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
-        VALUES('$billingnum', '$custname', '$custmobile', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues');
-    ";
-    if (mysqli_multi_query($con, $queries)) {
-        while (mysqli_more_results($con) && mysqli_next_result($con)) {}
-
-        // Décrémentation du stock
-        mysqli_query($con, "
+    // Start transaction for data consistency
+    mysqli_autocommit($con, FALSE);
+    
+    try {
+        // 1. Update cart with billing number
+        $updateCart = mysqli_query($con, "UPDATE tblcreditcart SET BillingId='$billingnum', IsCheckOut=1 WHERE IsCheckOut=0");
+        if (!$updateCart) throw new Exception('Failed to update cart');
+        
+        // 2. Insert customer record
+        $insertCustomer = mysqli_query($con, "
+            INSERT INTO tblcustomer(BillingNumber, CustomerName, MobileNumber, ModeOfPayment, BillingDate, FinalAmount, Paid, Dues)
+            VALUES('$billingnum', '$custname', '$custmobile', '$modepayment', NOW(), '$netTotal', '$paidNow', '$dues')
+        ");
+        if (!$insertCustomer) throw new Exception('Failed to insert customer record');
+        
+        // Get the customer ID for the payment record
+        $customerId = mysqli_insert_id($con);
+        
+        // 3. Insert payment record ONLY if there was an actual payment
+        if ($paidNow > 0) {
+            $paymentReference = "INV-$billingnum-INITIAL"; // Generate a reference for initial payment
+            $paymentComments = "Paiement initial lors de la facturation";
+            
+            $insertPayment = mysqli_query($con, "
+                INSERT INTO tblpayments(CustomerID, BillingNumber, PaymentAmount, PaymentDate, PaymentMethod, ReferenceNumber, Comments)
+                VALUES('$customerId', '$billingnum', '$paidNow', NOW(), '$modepayment', '$paymentReference', '$paymentComments')
+            ");
+            if (!$insertPayment) throw new Exception('Failed to insert payment record');
+        }
+        
+        // 4. Update product stock
+        $updateStock = mysqli_query($con, "
             UPDATE tblproducts p
             JOIN tblcreditcart c ON p.ID = c.ProductId
             SET p.Stock = p.Stock - c.ProductQty
             WHERE c.BillingId='$billingnum'
               AND c.IsCheckOut = 1
-        ") or die(mysqli_error($con));
-
+        ");
+        if (!$updateStock) throw new Exception('Failed to update stock');
+        
+        // Commit transaction
+        mysqli_commit($con);
+        mysqli_autocommit($con, TRUE);
+        
         // Variable pour le message de résultat
         $smsStatusMessage = "";
         
@@ -329,16 +355,27 @@ if (isset($_POST['submit'])) {
             $smsStatusMessage = " - SMS non envoyé (choix utilisateur)";
         }
 
+        // Clear session variables
         unset($_SESSION['credit_discount']);
         unset($_SESSION['credit_discountType']);
         unset($_SESSION['credit_discountValue']);
         $_SESSION['invoiceid'] = $billingnum;
 
+        // Prepare success message with payment info
+        $paymentInfo = "";
+        if ($paidNow > 0) {
+            $paymentInfo = " - Paiement initial: " . number_format($paidNow, 0, ',', ' ') . " GNF enregistré";
+        }
+
         // Afficher le message avec le statut SMS approprié
-        echo "<script>alert(" . json_encode("Facture créée: $billingnum$smsStatusMessage") . "); window.location='invoice_dettecard.php?print=auto';</script>";
+        echo "<script>alert(" . json_encode("Facture créée: $billingnum$paymentInfo$smsStatusMessage") . "); window.location='invoice_dettecard.php?print=auto';</script>";
         exit;
-    } else {
-        die('Erreur SQL : ' . mysqli_error($con));
+        
+    } catch (Exception $e) {
+        // Rollback transaction on error
+        mysqli_rollback($con);
+        mysqli_autocommit($con, TRUE);
+        die('Erreur lors de la création de la facture: ' . $e->getMessage() . ' - ' . mysqli_error($con));
     }
 }
 
