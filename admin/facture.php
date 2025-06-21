@@ -10,7 +10,7 @@ if (strlen($_SESSION['imsaid']) == 0) {
 }
 
 // ==========================
-// 1) Gérer la suppression d'une facture
+// 1) Gérer la suppression d'une facture COMPLÈTE
 // ==========================
 if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
   $billingId = intval($_GET['delete_id']);
@@ -18,34 +18,115 @@ if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
   
   // Table à utiliser selon le type
   $tableToUse = ($type == 'credit') ? 'tblcreditcart' : 'tblcart';
+  $customerTable = ($type == 'credit') ? 'tblcustomer' : 'tblcustumer'; // Note: you might have both tblcustomer and tblcustumer tables
   
-  // 1. Récupérer les données de la facture pour mettre à jour le stock
-  $sqlCartItems = "SELECT ProductId, ProductQty FROM $tableToUse WHERE BillingId='$billingId'";
-  $cartQuery = mysqli_query($con, $sqlCartItems);
+  // Start transaction for complete deletion
+  mysqli_autocommit($con, FALSE);
   
-  // 2. Mettre à jour le stock pour chaque produit
-  $updateSuccess = true;
-  while ($item = mysqli_fetch_assoc($cartQuery)) {
-    $productId = $item['ProductId'];
-    $quantity = $item['ProductQty'];
+  try {
+    // 1. Récupérer TOUS les articles de cette facture pour restaurer le stock
+    $sqlCartItems = "SELECT ProductId, ProductQty FROM $tableToUse WHERE BillingId='$billingId'";
+    $cartQuery = mysqli_query($con, $sqlCartItems);
     
-    // Mettre à jour le stock dans tblproducts (augmenter le stock)
-    $updateStock = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID='$productId'";
-    if (!mysqli_query($con, $updateStock)) {
-      $updateSuccess = false;
-      break;
+    if (!$cartQuery) {
+      throw new Exception('Failed to fetch cart items: ' . mysqli_error($con));
     }
-  }
-  
-  // 3. Supprimer les données de la facture
-  if ($updateSuccess) {
-    // Supprimer de la table appropriée
-    $deleteQuery = "DELETE FROM $tableToUse WHERE BillingId='$billingId'";
-    mysqli_query($con, $deleteQuery);
     
-    echo "<script>alert('Facture supprimée avec succès et stock mis à jour!');</script>";
-  } else {
-    echo "<script>alert('Erreur lors de la mise à jour du stock.');</script>";
+    // 2. Restaurer le stock pour TOUS les produits de cette facture
+    while ($item = mysqli_fetch_assoc($cartQuery)) {
+      $productId = $item['ProductId'];
+      $quantity = $item['ProductQty'];
+      
+      // Mettre à jour le stock dans tblproducts (augmenter le stock)
+      $updateStock = "UPDATE tblproducts SET Stock = Stock + $quantity WHERE ID='$productId'";
+      $updateResult = mysqli_query($con, $updateStock);
+      
+      if (!$updateResult) {
+        throw new Exception('Failed to update stock for product ' . $productId . ': ' . mysqli_error($con));
+      }
+    }
+    
+    // 3. Supprimer TOUS les articles du panier avec ce BillingId
+    $deleteCartQuery = "DELETE FROM $tableToUse WHERE BillingId='$billingId'";
+    $deleteCartResult = mysqli_query($con, $deleteCartQuery);
+    
+    if (!$deleteCartResult) {
+      throw new Exception('Failed to delete cart items: ' . mysqli_error($con));
+    }
+    
+    $deletedCartItems = mysqli_affected_rows($con);
+    
+    // 4. Supprimer les paiements liés à cette facture (si la table existe)
+    $checkPaymentTable = mysqli_query($con, "SHOW TABLES LIKE 'tblpayments'");
+    if (mysqli_num_rows($checkPaymentTable) > 0) {
+      $deletePaymentsQuery = "DELETE FROM tblpayments WHERE BillingNumber='$billingId'";
+      $deletePaymentsResult = mysqli_query($con, $deletePaymentsQuery);
+      
+      if (!$deletePaymentsResult) {
+        throw new Exception('Failed to delete payment records: ' . mysqli_error($con));
+      }
+      
+      $deletedPayments = mysqli_affected_rows($con);
+    } else {
+      $deletedPayments = 0;
+    }
+    
+    // 5. Supprimer le client/facture de la table customer
+    // First check which customer table exists and has the record
+    $customerTableToUse = '';
+    $customerId = 0;
+    
+    // Check tblcustomer first
+    $checkCustomer1 = mysqli_query($con, "SELECT ID FROM tblcustomer WHERE BillingNumber='$billingId' LIMIT 1");
+    if ($checkCustomer1 && mysqli_num_rows($checkCustomer1) > 0) {
+      $customerTableToUse = 'tblcustomer';
+      $customerRow = mysqli_fetch_assoc($checkCustomer1);
+      $customerId = $customerRow['ID'];
+    } else {
+      // Check tblcustumer (if it exists)
+      $checkTable = mysqli_query($con, "SHOW TABLES LIKE 'tblcustumer'");
+      if (mysqli_num_rows($checkTable) > 0) {
+        $checkCustomer2 = mysqli_query($con, "SELECT ID FROM tblcustumer WHERE BillingNumber='$billingId' LIMIT 1");
+        if ($checkCustomer2 && mysqli_num_rows($checkCustomer2) > 0) {
+          $customerTableToUse = 'tblcustumer';
+          $customerRow = mysqli_fetch_assoc($checkCustomer2);
+          $customerId = $customerRow['ID'];
+        }
+      }
+    }
+    
+    $deletedCustomer = 0;
+    if (!empty($customerTableToUse)) {
+      $deleteCustomerQuery = "DELETE FROM $customerTableToUse WHERE BillingNumber='$billingId'";
+      $deleteCustomerResult = mysqli_query($con, $deleteCustomerQuery);
+      
+      if (!$deleteCustomerResult) {
+        throw new Exception('Failed to delete customer record: ' . mysqli_error($con));
+      }
+      
+      $deletedCustomer = mysqli_affected_rows($con);
+    }
+    
+    // Commit all changes
+    mysqli_commit($con);
+    mysqli_autocommit($con, TRUE);
+    
+    // Success message with details
+    $successMsg = "Facture $billingId supprimée avec succès!\\n";
+    $successMsg .= "- Articles supprimés: $deletedCartItems\\n";
+    $successMsg .= "- Client supprimé: $deletedCustomer\\n";
+    $successMsg .= "- Paiements supprimés: $deletedPayments\\n";
+    $successMsg .= "- Stock restauré pour tous les produits";
+    
+    echo "<script>alert('$successMsg');</script>";
+    
+  } catch (Exception $e) {
+    // Rollback on error
+    mysqli_rollback($con);
+    mysqli_autocommit($con, TRUE);
+    
+    $errorMsg = "Erreur lors de la suppression: " . $e->getMessage();
+    echo "<script>alert('$errorMsg');</script>";
   }
   
   echo "<script>window.location.href='facture.php'</script>";
@@ -130,14 +211,14 @@ if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
                       <td><?php echo $row['BillingId']; ?></td>
                       <td><?php echo $row['CartDate']; ?></td>
                       <td><?php echo $row['ItemCount']; ?></td>
-                      <td><?php echo number_format($row['Total'], 2); ?> €</td>
+                      <td><?php echo number_format($row['Total'], 2); ?> GNF</td>
                       <td>
                         <a href="facture-details.php?id=<?php echo $row['BillingId']; ?>&type=cart" class="btn btn-info btn-mini">
                           <i class="icon-eye-open"></i> Détails
                         </a>
                         <a href="facture.php?delete_id=<?php echo $row['BillingId']; ?>&type=cart" 
                           class="btn btn-danger btn-mini" 
-                          onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
+                          onclick="return confirm('ATTENTION: Cette action va supprimer COMPLÈTEMENT cette facture:\\n\\n- Tous les articles de la facture\\n- Le dossier client\\n- Tous les paiements liés\\n- Le stock sera restauré\\n\\nÊtes-vous absolument sûr?')">
                           <i class="icon-trash"></i> Supprimer
                         </a>
                       </td>
@@ -173,35 +254,46 @@ if (isset($_GET['delete_id']) && !empty($_GET['delete_id'])) {
                 </thead>
                 <tbody>
                   <?php
-                  // Récupérer la liste des factures à crédit
+                  // Récupérer la liste des factures à crédit avec informations client
                   $sqlFacturesCredit = "
                     SELECT 
-                      BillingId, 
-                      CartDate,
-                      COUNT(*) as ItemCount,
-                      SUM(Price * ProductQty) as Total
-                    FROM tblcreditcart 
-                    WHERE IsCheckOut = 1
-                    GROUP BY BillingId, CartDate
-                    ORDER BY CartDate DESC
+                      c.BillingId, 
+                      c.CartDate,
+                      COUNT(c.ID) as ItemCount,
+                      SUM(c.Price * c.ProductQty) as Total,
+                      cust.CustomerName,
+                      cust.Dues
+                    FROM tblcreditcart c
+                    LEFT JOIN tblcustomer cust ON cust.BillingNumber = c.BillingId
+                    WHERE c.IsCheckOut = 1
+                    GROUP BY c.BillingId, c.CartDate, cust.CustomerName, cust.Dues
+                    ORDER BY c.CartDate DESC
                   ";
                   $factureCreditQuery = mysqli_query($con, $sqlFacturesCredit);
                   $cnt = 1;
                   while ($row = mysqli_fetch_assoc($factureCreditQuery)) {
+                    $duesClass = ($row['Dues'] > 0) ? 'text-warning' : 'text-success';
+                    $duesText = ($row['Dues'] > 0) ? 'Impayé: ' . number_format($row['Dues'], 2) . ' GNF' : 'Soldé';
                     ?>
                     <tr>
                       <td><?php echo $cnt; ?></td>
                       <td><?php echo $row['BillingId']; ?></td>
                       <td><?php echo $row['CartDate']; ?></td>
                       <td><?php echo $row['ItemCount']; ?></td>
-                      <td><?php echo number_format($row['Total'], 2); ?> €</td>
+                      <td>
+                        <?php echo number_format($row['Total'], 2); ?> GNF
+                        <br><small class="<?php echo $duesClass; ?>"><?php echo $duesText; ?></small>
+                        <?php if ($row['CustomerName']): ?>
+                          <br><small class="text-muted">Client: <?php echo $row['CustomerName']; ?></small>
+                        <?php endif; ?>
+                      </td>
                       <td>
                         <a href="facture-details.php?id=<?php echo $row['BillingId']; ?>&type=credit" class="btn btn-info btn-mini">
                           <i class="icon-eye-open"></i> Détails
                         </a>
                         <a href="facture.php?delete_id=<?php echo $row['BillingId']; ?>&type=credit" 
                           class="btn btn-danger btn-mini" 
-                          onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette facture? Cette action mettra à jour le stock des produits.')">
+                          onclick="return confirm('ATTENTION: Cette action va supprimer COMPLÈTEMENT cette facture:\\n\\n- Tous les articles de la facture (<?php echo $row['ItemCount']; ?> articles)\\n- Le dossier client <?php echo $row['CustomerName'] ? '(' . $row['CustomerName'] . ')' : ''; ?>\\n- Tous les paiements liés\\n- Le stock sera restauré\\n\\nÊtes-vous absolument sûr?')">
                           <i class="icon-trash"></i> Supprimer
                         </a>
                       </td>
