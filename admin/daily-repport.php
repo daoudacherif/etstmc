@@ -687,11 +687,6 @@ if ($export === 'excel') {
   <div class="container-fluid">
     <hr class="no-print">
 
-    <!-- Notice de correction -->
-    <div class="correction-notice no-print">
-      <strong>✅ Rapport Corrigé:</strong> Les ventes incluent maintenant les remises appliquées lors de la facturation pour des calculs précis.
-    </div>
-
     <!-- Formulaire de filtre par dates - caché à l'impression -->
     <div class="row-fluid no-print">
       <div class="span12">

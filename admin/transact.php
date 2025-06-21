@@ -265,10 +265,7 @@ $maxWithdrawal = ($todayBalance > 0) ? $todayBalance : 0;
   <div class="container-fluid">
     <hr>
     
-    <!-- Notice de correction -->
-    <div class="correction-notice">
-      <strong>✅ Calculs Corrigés:</strong> Les ventes régulières incluent maintenant les remises appliquées (cohérent avec le rapport financier).
-    </div>
+   
     
     <div class="alert-info">
       <strong>Information importante:</strong> Les ventes régulières (<?php echo number_format($todayRegularSales, 2); ?>) et paiements clients en espèces (<?php echo number_format($cashPayments, 2); ?>) sont automatiquement inclus dans le calcul du solde de caisse. 
