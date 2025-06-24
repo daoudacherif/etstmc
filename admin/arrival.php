@@ -336,6 +336,26 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
   </div>
 
   <div class="container-fluid">
+    <!-- WIDGET TOTAL PANIER FIXE -->
+    <?php if (isset($_SESSION['temp_arrivals']) && count($_SESSION['temp_arrivals']) > 0) {
+      $totalPanierWidget = 0;
+      foreach ($_SESSION['temp_arrivals'] as $item) {
+        $totalPanierWidget += $item['customcost'];
+      }
+    ?>
+    <div class="alert alert-success" style="margin-bottom: 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <div class="row-fluid">
+        <div class="span8">
+          <strong><i class="icon-shopping-cart"></i> PANIER D'ARRIVAGE:</strong> 
+          <?php echo count($_SESSION['temp_arrivals']); ?> produit(s) en attente
+        </div>
+        <div class="span4" style="text-align: right;">
+          <strong>TOTAL: <span class="cart-total" style="font-size: 18px; color: #2d6987;"><?php echo number_format($totalPanierWidget, 2); ?></span> FCFA</strong>
+        </div>
+      </div>
+    </div>
+    <?php } ?>
+    
     <hr>
     
     <!-- FORMULAIRE DE RECHERCHE DE PRODUITS -->
@@ -526,31 +546,60 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                   <?php
                   }
                   ?>
+                  <?php
+                  // Calcul du total du panier
+                  $totalPanier = 0;
+                  foreach ($_SESSION['temp_arrivals'] as $item) {
+                    $totalPanier += $item['customcost'];
+                  }
+                  ?>
+                  <tr style="background-color: #f8f9fa; border-top: 2px solid #007bff;">
+                    <td colspan="6" style="text-align: right; font-weight: bold; font-size: 16px; padding: 10px;">
+                      <strong>TOTAL DU PANIER:</strong>
+                    </td>
+                    <td style="font-weight: bold; font-size: 18px; color: #007bff; padding: 10px;">
+                      <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FCFA</strong>
+                    </td>
+                    <td></td>
+                  </tr>
                   <tr>
-                    <td colspan="8">
-                      <div class="control-group">
-                        <label class="control-label">Date d'Arrivage:</label>
-                        <div class="controls">
-                          <input type="date" name="arrivaldate" value="<?php echo date('Y-m-d'); ?>" required />
+                    <td colspan="8" style="padding: 15px;">
+                      <div class="row-fluid">
+                        <div class="span6">
+                          <div class="control-group">
+                            <label class="control-label">Date d'Arrivage:</label>
+                            <div class="controls">
+                              <input type="date" name="arrivaldate" value="<?php echo date('Y-m-d'); ?>" required />
+                            </div>
+                          </div>
+                        </div>
+                        <div class="span6">
+                          <div class="control-group">
+                            <label class="control-label">Sélectionner Fournisseur:</label>
+                            <div class="controls">
+                              <select name="supplierid" required>
+                                <option value="">-- Choisir Fournisseur --</option>
+                                <?php
+                                $suppQ = mysqli_query($con, "SELECT ID, SupplierName FROM tblsupplier ORDER BY SupplierName ASC");
+                                while ($sRow = mysqli_fetch_assoc($suppQ)) {
+                                  echo '<option value="'.$sRow['ID'].'">'.$sRow['SupplierName'].'</option>';
+                                }
+                                ?>
+                              </select>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div class="control-group">
-                        <label class="control-label">Sélectionner Fournisseur:</label>
-                        <div class="controls">
-                          <select name="supplierid" required>
-                            <option value="">-- Choisir Fournisseur --</option>
-                            <?php
-                            $suppQ = mysqli_query($con, "SELECT ID, SupplierName FROM tblsupplier ORDER BY SupplierName ASC");
-                            while ($sRow = mysqli_fetch_assoc($suppQ)) {
-                              echo '<option value="'.$sRow['ID'].'">'.$sRow['SupplierName'].'</option>';
-                            }
-                            ?>
-                          </select>
+                      <div style="text-align: center; margin-top: 15px;">
+                        <div class="alert alert-info" style="margin-bottom: 15px;">
+                          <strong><i class="icon-info-sign"></i> Résumé:</strong> 
+                          <?php echo count($_SESSION['temp_arrivals']); ?> produit(s) • 
+                          Total: <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FCFA</strong>
                         </div>
+                        <button type="submit" name="submit" class="btn btn-success btn-large">
+                          <i class="icon-check"></i> Enregistrer Tous les Arrivages (<span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FCFA)
+                        </button>
                       </div>
-                      <button type="submit" name="submit" class="btn btn-success btn-large">
-                        <i class="icon-check"></i> Enregistrer Tous les Arrivages (Stock + Coût)
-                      </button>
                     </td>
                   </tr>
                 <?php } else { ?>
@@ -743,6 +792,29 @@ function fillCustomCost() {
   }
 }
 
+// Fonction pour mettre à jour le total du panier en temps réel
+function updateCartTotal() {
+  const costInputs = document.querySelectorAll('input[name="customcost[]"]');
+  let total = 0;
+  
+  costInputs.forEach(function(input) {
+    const value = parseFloat(input.value) || 0;
+    total += value;
+  });
+  
+  // Mettre à jour l'affichage du total
+  const totalDisplays = document.querySelectorAll('.cart-total');
+  totalDisplays.forEach(function(display) {
+    display.textContent = total.toFixed(2);
+  });
+  
+  // Mettre à jour le bouton
+  const submitButton = document.querySelector('button[name="submit"]');
+  if (submitButton) {
+    submitButton.innerHTML = '<i class="icon-check"></i> Enregistrer Tous les Arrivages (' + total.toFixed(2) + ' FCFA)';
+  }
+}
+
 // Listen for changes
 document.addEventListener('DOMContentLoaded', function() {
   // On product select
@@ -756,6 +828,12 @@ document.addEventListener('DOMContentLoaded', function() {
   if (quantityInput) {
     quantityInput.addEventListener('input', fillCustomCost);
   }
+  
+  // On cost changes in cart
+  const costInputs = document.querySelectorAll('input[name="customcost[]"]');
+  costInputs.forEach(function(input) {
+    input.addEventListener('input', updateCartTotal);
+  });
 });
 </script>
 </body>
