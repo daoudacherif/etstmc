@@ -360,7 +360,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
           <?php echo count($_SESSION['temp_arrivals']); ?> produit(s) en attente
         </div>
         <div class="span4" style="text-align: right;">
-          <strong>TOTAL: <span class="cart-total" style="font-size: 18px; color: #2d6987;"><?php echo number_format($totalPanierWidget, 2); ?></span> FG</strong>
+          <strong>TOTAL: <span class="cart-total" style="font-size: 18px; color: #2d6987;"><?php echo number_format($totalPanierWidget, 2); ?></span> Gnf</strong>
         </div>
       </div>
     </div>
@@ -563,7 +563,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                       <strong>TOTAL DU PANIER:</strong>
                     </td>
                     <td style="font-weight: bold; font-size: 18px; color: #007bff; padding: 10px;">
-                      <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FG</strong>
+                      <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> Gnf</strong>
                     </td>
                     <td colspan="2"></td>
                   </tr>
@@ -599,10 +599,10 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                         <div class="alert alert-info" style="margin-bottom: 15px;">
                           <strong><i class="icon-info-sign"></i> Résumé:</strong> 
                           <?php echo count($_SESSION['temp_arrivals']); ?> produit(s) • 
-                          Total: <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FG</strong>
+                          Total: <strong><span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> Gnf</strong>
                         </div>
                         <button type="submit" name="submit" class="btn btn-success btn-large">
-                          <i class="icon-check"></i> Enregistrer Tous les Arrivages (<span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> FG)
+                          <i class="icon-check"></i> Enregistrer Tous les Arrivages (<span class="cart-total"><?php echo number_format($totalPanier, 2); ?></span> Gnf)
                         </button>
                       </div>
                     </td>
