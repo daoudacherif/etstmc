@@ -117,7 +117,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               }
               ?>
               <li class="bg_lh">
-                <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($todysale,2); ?></strong>
+                <font style="font-size:22px; font-weight:bold">FG</font><strong><?php echo number_format($todysale,2); ?></strong>
                 <small>Ventes d'aujourd'hui</small>
               </li>
               
@@ -144,7 +144,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               }
               ?>
               <li class="bg_lh">
-                <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($yesterdaysale,2); ?></strong>
+                <font style="font-size:22px; font-weight:bold">FG</font><strong><?php echo number_format($yesterdaysale,2); ?></strong>
                 <small>Ventes d'hier</small>
               </li>
               
@@ -171,7 +171,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               }
               ?>
               <li class="bg_lh">
-                <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($tseven,2); ?></strong>
+                <font style="font-size:22px; font-weight:bold">FG</font><strong><?php echo number_format($tseven,2); ?></strong>
                 <small>Ventes des sept derniers jours</small>
               </li>
               
@@ -196,7 +196,7 @@ if (strlen($_SESSION['imsaid']==0)) {
               }
               ?>
               <li class="bg_lh">
-                <font style="font-size:22px; font-weight:bold">$</font><strong><?php echo number_format($totalsale,2); ?></strong>
+                <font style="font-size:22px; font-weight:bold">FG</font><strong><?php echo number_format($totalsale,2); ?></strong>
                 <small>Ventes totales</small>
               </li>
             </ul>
