@@ -41,7 +41,7 @@ if (isset($_POST['submit'])) {
     if(isset($_POST['productid']) && is_array($_POST['productid'])) {
         $productIDs = $_POST['productid'];
         $quantities = $_POST['quantity'];
-        $newPrices = $_POST['newprice']; // NOUVEAU : récupérer les nouveaux prix
+        $customCosts = $_POST['customcost']; // NOUVEAU : récupérer les coûts personnalisés
         $comments = isset($_POST['comments']) ? $_POST['comments'] : array();
         
         $successCount = 0;
@@ -52,13 +52,13 @@ if (isset($_POST['submit'])) {
         foreach($productIDs as $index => $productID) {
             $productID = intval($productID);
             $quantity = intval($quantities[$index]);
-            $newPrice = floatval($newPrices[$index]); // NOUVEAU : nouveau prix
+            $customCost = floatval($customCosts[$index]); // NOUVEAU : coût personnalisé
             $comment = isset($comments[$index]) ? mysqli_real_escape_string($con, $comments[$index]) : '';
             
             // Validate data
-            if ($productID <= 0 || $quantity <= 0 || $newPrice <= 0) {
+            if ($productID <= 0 || $quantity <= 0 || $customCost <= 0) {
                 $errorCount++;
-                $errorDetails[] = "Produit ID $productID invalide, quantité nulle ou prix invalide";
+                $errorDetails[] = "Produit ID $productID invalide, quantité nulle ou coût invalide";
                 continue;
             }
             
@@ -79,13 +79,10 @@ if (isset($_POST['submit'])) {
             $stockR = mysqli_fetch_assoc($stockQ);
             $currentStock = isset($stockR[$stockColumnName]) ? intval($stockR[$stockColumnName]) : 0;
             
-            // Calculate total cost with new price
-            $cost = $newPrice * $quantity;
-            
-            // Insert into tblproductarrivals
+            // Insert into tblproductarrivals avec le coût personnalisé
             $sqlInsert = "
               INSERT INTO tblproductarrivals(ProductID, SupplierID, ArrivalDate, Quantity, Cost, Comments)
-              VALUES('$productID', '$supplierID', '$arrivalDate', '$quantity', '$cost', '$comment')
+              VALUES('$productID', '$supplierID', '$arrivalDate', '$quantity', '$customCost', '$comment')
             ";
             $queryInsert = mysqli_query($con, $sqlInsert);
             
@@ -93,8 +90,8 @@ if (isset($_POST['submit'])) {
                 // Calcul du nouveau stock
                 $newStock = $currentStock + $quantity;
                 
-                // NOUVEAU : Mise à jour du stock ET du prix
-                $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock, Price = $newPrice WHERE ID=$productID";
+                // Mise à jour du stock SEULEMENT (pas le prix)
+                $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock WHERE ID=$productID";
                 $updateResult = mysqli_query($con, $sqlUpdate);
                 
                 if ($updateResult) {
@@ -102,11 +99,11 @@ if (isset($_POST['submit'])) {
                         $successCount++;
                     } else {
                         $errorCount++;
-                        $errorDetails[] = "Produit ID $productID trouvé mais aucune mise à jour effectuée. Stock actuel: $currentStock";
+                        $errorDetails[] = "Produit ID $productID trouvé mais stock non mis à jour. Stock actuel: $currentStock";
                     }
                 } else {
                     $errorCount++;
-                    $errorDetails[] = "Erreur mise à jour stock/prix pour ID $productID: " . mysqli_error($con);
+                    $errorDetails[] = "Erreur mise à jour stock pour ID $productID: " . mysqli_error($con);
                 }
             } else {
                 $errorCount++;
@@ -116,7 +113,7 @@ if (isset($_POST['submit'])) {
         
         // Display result message with details
         if ($successCount > 0) {
-            echo "<script>alert('$successCount arrivages de produits enregistrés avec succès! Stock et prix mis à jour! " . 
+            echo "<script>alert('$successCount arrivages de produits enregistrés avec succès! Stock mis à jour! " . 
                   ($errorCount > 0 ? "$errorCount avec erreurs." : "") . "');</script>";
         } else {
             $errorMsg = "Erreur lors de l\\'enregistrement des arrivages de produits!\\n" . implode("\\n", $errorDetails);
@@ -136,13 +133,12 @@ if (isset($_POST['submit_single'])) {
     $supplierID = intval($_POST['supplierid']);
     $productID = intval($_POST['productid']);
     $quantity = intval($_POST['quantity']);
-    $newPrice = floatval($_POST['newprice']); // NOUVEAU : nouveau prix
+    $customCost = floatval($_POST['customcost']); // NOUVEAU : coût personnalisé
     $comment = mysqli_real_escape_string($con, $_POST['comments'] ?? '');
-    $cost = floatval($_POST['cost']);
     
     // Validate data
-    if ($productID <= 0 || $quantity <= 0 || $supplierID <= 0 || $newPrice <= 0) {
-        echo "<script>alert('Données invalides! Vérifiez que le prix est supérieur à 0.');</script>";
+    if ($productID <= 0 || $quantity <= 0 || $supplierID <= 0 || $customCost <= 0) {
+        echo "<script>alert('Données invalides! Vérifiez que le coût est supérieur à 0.');</script>";
         echo "<script>window.location.href='arrival.php'</script>";
         exit;
     }
@@ -159,27 +155,27 @@ if (isset($_POST['submit_single'])) {
     $currentStock = isset($stockRow[$stockColumnName]) ? intval($stockRow[$stockColumnName]) : 0;
     $newStock = $currentStock + $quantity;
     
-    // Insert into tblproductarrivals
+    // Insert into tblproductarrivals avec le coût personnalisé
     $sqlInsert = "
       INSERT INTO tblproductarrivals(ProductID, SupplierID, ArrivalDate, Quantity, Cost, Comments)
-      VALUES('$productID', '$supplierID', '$arrivalDate', '$quantity', '$cost', '$comment')
+      VALUES('$productID', '$supplierID', '$arrivalDate', '$quantity', '$customCost', '$comment')
     ";
     $queryInsert = mysqli_query($con, $sqlInsert);
     
     if ($queryInsert) {
-        // NOUVEAU : Update product stock AND price
-        $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock, Price = $newPrice WHERE ID=$productID";
+        // Mise à jour du stock SEULEMENT (pas le prix)
+        $sqlUpdate = "UPDATE tblproducts SET $stockColumnName = $newStock WHERE ID=$productID";
         $updateResult = mysqli_query($con, $sqlUpdate);
         
         if ($updateResult) {
             // Check if any rows were actually updated
             if (mysqli_affected_rows($con) > 0) {
-                echo "<script>alert('Arrivage enregistré avec succès! Stock: $currentStock -> $newStock et Prix mis à jour: $newPrice');</script>";
+                echo "<script>alert('Arrivage enregistré avec succès! Stock mis à jour: $currentStock -> $newStock. Coût enregistré: $customCost');</script>";
             } else {
-                echo "<script>alert('Produit trouvé mais aucune modification effectuée. Vérifiez les données.');</script>";
+                echo "<script>alert('Produit trouvé mais stock non modifié. Vérifiez que l\\'ID du produit est correct.');</script>";
             }
         } else {
-            echo "<script>alert('Erreur lors de la mise à jour du stock/prix: " . mysqli_error($con) . "');</script>";
+            echo "<script>alert('Erreur lors de la mise à jour du stock: " . mysqli_error($con) . "');</script>";
         }
     } else {
         echo "<script>alert('Erreur lors de l\\'enregistrement de l\\'arrivage: " . mysqli_error($con) . "');</script>";
@@ -193,10 +189,10 @@ if (isset($_POST['submit_single'])) {
 if (isset($_POST['addtoarrival'])) {
     $productId = intval($_POST['productid']);
     $quantity = max(1, intval($_POST['quantity']));
-    $newPrice = floatval($_POST['newprice']); // NOUVEAU : récupérer le nouveau prix
+    $customCost = floatval($_POST['customcost']); // NOUVEAU : récupérer le coût personnalisé
     
-    // Check if valid product and price
-    if ($productId > 0 && $newPrice > 0) {
+    // Check if valid product and cost
+    if ($productId > 0 && $customCost > 0) {
         // Get product info
         $prodInfo = mysqli_query($con, "SELECT ProductName, Price FROM tblproducts WHERE ID='$productId' LIMIT 1");
         if (mysqli_num_rows($prodInfo) > 0) {
@@ -212,7 +208,7 @@ if (isset($_POST['addtoarrival'])) {
             foreach ($_SESSION['temp_arrivals'] as $key => $item) {
                 if ($item['productid'] == $productId) {
                     $_SESSION['temp_arrivals'][$key]['quantity'] += $quantity;
-                    $_SESSION['temp_arrivals'][$key]['newprice'] = $newPrice; // Mettre à jour le prix
+                    $_SESSION['temp_arrivals'][$key]['customcost'] = $customCost; // Mettre à jour le coût
                     $found = true;
                     break;
                 }
@@ -223,16 +219,16 @@ if (isset($_POST['addtoarrival'])) {
                     'productid' => $productId,
                     'productname' => $productData['ProductName'],
                     'unitprice' => $productData['Price'], // Prix actuel (pour référence)
-                    'newprice' => $newPrice, // NOUVEAU : nouveau prix
+                    'customcost' => $customCost, // NOUVEAU : coût personnalisé
                     'quantity' => $quantity,
                     'comments' => ''
                 );
             }
             
-            echo "<script>alert('Produit ajouté à la liste d\'arrivage avec le nouveau prix!');</script>";
+            echo "<script>alert('Produit ajouté à la liste d\'arrivage avec le coût personnalisé!');</script>";
         }
     } else {
-        echo "<script>alert('Produit invalide ou prix invalide!');</script>";
+        echo "<script>alert('Produit invalide ou coût invalide!');</script>";
     }
     
     echo "<script>window.location.href='arrival.php'</script>";
@@ -336,7 +332,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
       <a href="dashboard.php" class="tip-bottom"><i class="icon-home"></i> Accueil</a>
       <a href="arrival.php" class="current">Arrivages de Produits</a>
     </div>
-    <h1>Gérer les Arrivages de Produits (Entrée Stock + Mise à jour Prix)</h1>
+    <h1>Gérer les Arrivages de Produits (Entrée Stock + Coût Personnalisé)</h1>
   </div>
 
   <div class="container-fluid">
@@ -407,7 +403,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
               <th>Nom du Produit</th>
               <th>Catégorie</th>
               <th>Prix Actuel</th>
-              <th>Nouveau Prix</th>
+              <th>Coût Personnalisé</th>
               <th>Stock</th>
               <th>Quantité</th>
               <th>Ajouter à l'Arrivage</th>
@@ -435,9 +431,9 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
               <td>
                 <form method="post" action="arrival.php" style="margin:0;">
                   <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
-                  <input type="number" name="newprice" value="<?php echo $row['Price']; ?>" 
+                  <input type="number" name="customcost" value="<?php echo $row['Price']; ?>" 
                          step="0.01" min="0.01" style="width:80px;" class="price-update" 
-                         placeholder="Nouveau prix" title="Nouveau prix du produit" />
+                         placeholder="Coût total" title="Coût total pour cet arrivage" />
               </td>
               <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
               <td>
@@ -484,9 +480,10 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                   <th>#</th>
                   <th>Nom du Produit</th>
                   <th>Prix Actuel</th>
-                  <th>Nouveau Prix</th>
+                  <th>Coût Total</th>
+                  <th>Coût Total</th>
                   <th>Quantité</th>
-                  <th>Prix Total</th>
+                  <th>Coût Enregistré</th>
                   <th>Commentaires</th>
                   <th>Action</th>
                 </tr>
@@ -496,7 +493,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                 if (isset($_SESSION['temp_arrivals']) && count($_SESSION['temp_arrivals']) > 0) {
                   $cnt = 1;
                   foreach ($_SESSION['temp_arrivals'] as $index => $item) {
-                    $totalPrice = $item['newprice'] * $item['quantity']; // Calculer avec le nouveau prix
+                    $totalCost = $item['customcost']; // Utiliser le coût personnalisé directement
                   ?>
                   <tr>
                     <td><?php echo $cnt++; ?></td>
@@ -506,14 +503,14 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                     </td>
                     <td><small><?php echo number_format($item['unitprice'], 2); ?></small></td>
                     <td>
-                      <input type="number" name="newprice[]" value="<?php echo $item['newprice']; ?>" 
-                             step="0.01" min="0.01" style="width:80px;" class="price-update" required />
+                      <input type="number" name="customcost[]" value="<?php echo $item['customcost']; ?>" 
+                             step="0.01" min="0.01" style="width:100px;" class="price-update" required />
                     </td>
                     <td>
                       <input type="number" name="quantity[]" value="<?php echo $item['quantity']; ?>" 
                              min="1" style="width:60px;" required />
                     </td>
-                    <td><?php echo number_format($totalPrice, 2); ?></td>
+                    <td><?php echo number_format($totalCost, 2); ?></td>
                     <td>
                       <input type="text" name="comments[]" 
                              value="<?php echo htmlspecialchars($item['comments']); ?>"
@@ -552,7 +549,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                         </div>
                       </div>
                       <button type="submit" name="submit" class="btn btn-success btn-large">
-                        <i class="icon-check"></i> Enregistrer Tous les Arrivages (Stock + Prix)
+                        <i class="icon-check"></i> Enregistrer Tous les Arrivages (Stock + Coût)
                       </button>
                     </td>
                   </tr>
@@ -622,13 +619,13 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                 </div>
               </div>
 
-              <!-- NOUVEAU : Nouveau Prix -->
+              <!-- NOUVEAU : Coût Total Personnalisé -->
               <div class="control-group">
-                <label class="control-label">Nouveau Prix Unitaire:</label>
+                <label class="control-label">Coût Total Personnalisé:</label>
                 <div class="controls">
-                  <input type="number" name="newprice" id="newPrice" step="0.01" min="0.01" value="0" 
-                         class="price-update" placeholder="Nouveau prix" required />
-                  <span class="help-inline">Ce prix sera mis à jour dans la base de données</span>
+                  <input type="number" name="customcost" id="customCost" step="0.01" min="0.01" value="0" 
+                         class="price-update" placeholder="Coût total" required />
+                  <span class="help-inline">Coût total à enregistrer dans tblproductarrivals</span>
                 </div>
               </div>
 
@@ -637,14 +634,6 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                 <label class="control-label">Quantité:</label>
                 <div class="controls">
                   <input type="number" name="quantity" id="quantity" min="1" value="1" required />
-                </div>
-              </div>
-
-              <!-- Cost (auto-calculated) -->
-              <div class="control-group">
-                <label class="control-label">Coût Total (auto):</label>
-                <div class="controls">
-                  <input type="number" name="cost" id="cost" step="any" min="0" value="0" readonly />
                 </div>
               </div>
 
@@ -658,7 +647,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
 
               <div class="form-actions">
                 <button type="submit" name="submit_single" class="btn btn-success">
-                  Enregistrer l'Arrivage (Stock + Prix)
+                  Enregistrer l'Arrivage (Stock + Coût)
                 </button>
               </div>
             </form>
@@ -687,8 +676,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                   <th>Fournisseur</th>
                   <th>Qté</th>
                   <th>Prix Unitaire Actuel</th>
-                  <th>Prix Total</th>
-                  <th>Coût (Saisi)</th>
+                  <th>Coût Enregistré</th>
                   <th>Commentaires</th>
                 </tr>
               </thead>
@@ -698,7 +686,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                 while ($row = mysqli_fetch_assoc($resArrivals)) {
                   $unitPrice = floatval($row['UnitPrice']);
                   $qty       = floatval($row['Quantity']);
-                  $lineTotal = $unitPrice * $qty;
+                  $costRecorded = floatval($row['Cost']); // Coût enregistré
                   ?>
                   <tr>
                     <td><?php echo $cnt; ?></td>
@@ -707,8 +695,7 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
                     <td><?php echo $row['SupplierName']; ?></td>
                     <td><?php echo $qty; ?></td>
                     <td><?php echo number_format($unitPrice,2); ?></td>
-                    <td><?php echo number_format($lineTotal,2); ?></td>
-                    <td><?php echo number_format($row['Cost'],2); ?></td>
+                    <td><?php echo number_format($costRecorded,2); ?></td>
                     <td><?php echo $row['Comments']; ?></td>
                   </tr>
                   <?php
@@ -736,31 +723,24 @@ $resArrivals = mysqli_query($con, $sqlArrivals);
 <script src="js/matrix.js"></script>
 <script src="js/matrix.tables.js"></script>
 <script>
-// Auto-calc cost and set price for single product form
-function updateCostAndPrice() {
+// Auto-fill cost for single product form
+function fillCustomCost() {
   const productSelect = document.getElementById('productSelect');
   const quantityInput = document.getElementById('quantity');
-  const newPriceInput = document.getElementById('newPrice');
-  const costInput     = document.getElementById('cost');
+  const customCostInput = document.getElementById('customCost');
 
-  if (!productSelect || !quantityInput || !newPriceInput || !costInput) return;
+  if (!productSelect || !quantityInput || !customCostInput) return;
 
-  // Get unit price from data-price and set it as new price if not already set
+  // Get unit price from data-price
   const selectedOption = productSelect.options[productSelect.selectedIndex];
   const currentPrice = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+  const qty = parseFloat(quantityInput.value) || 1;
   
-  // If new price is 0 or empty, set it to current price
-  if (parseFloat(newPriceInput.value) <= 0) {
-    newPriceInput.value = currentPrice.toFixed(2);
+  // Pre-fill with calculated cost if cost is 0 or empty
+  if (parseFloat(customCostInput.value) <= 0) {
+    const suggestedCost = currentPrice * qty;
+    customCostInput.value = suggestedCost.toFixed(2);
   }
-
-  // Get values for calculation
-  const newPrice = parseFloat(newPriceInput.value) || 0;
-  const qty = parseFloat(quantityInput.value) || 0;
-
-  // Calculate total cost
-  const total = newPrice * qty;
-  costInput.value = total.toFixed(2);
 }
 
 // Listen for changes
@@ -768,19 +748,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // On product select
   const productSelect = document.getElementById('productSelect');
   if (productSelect) {
-    productSelect.addEventListener('change', updateCostAndPrice);
+    productSelect.addEventListener('change', fillCustomCost);
   }
 
-  // On quantity change
+  // On quantity change  
   const quantityInput = document.getElementById('quantity');
   if (quantityInput) {
-    quantityInput.addEventListener('input', updateCostAndPrice);
-  }
-
-  // On new price change
-  const newPriceInput = document.getElementById('newPrice');
-  if (newPriceInput) {
-    newPriceInput.addEventListener('input', updateCostAndPrice);
+    quantityInput.addEventListener('input', fillCustomCost);
   }
 });
 </script>
