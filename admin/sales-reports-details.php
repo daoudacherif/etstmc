@@ -541,7 +541,7 @@ $previous_end = date('Y-m-d', strtotime($fdate . " -1 day"));
 </div>
 
 <script src="js/jquery.min.js"></script> 
-<script src="js/jquery.ui.custom.js"></script> 
+<script src="js/jquery.ui.custom.js"></script> a
 <script src="js/bootstrap.min.js"></script> 
 <script src="js/jquery.uniform.js"></script> 
 <script src="js/select2.min.js"></script> 
