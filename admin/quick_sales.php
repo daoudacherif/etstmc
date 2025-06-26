@@ -135,108 +135,257 @@ $productsQuery = mysqli_query($con, "
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
     <style>
+        /* Formulaire de vente rapide - Design amélioré */
         .quick-sale-form {
-            background: #f8f9fa;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border: 2px solid #27a9e3;
-            border-radius: 8px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 25px;
             margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(39, 169, 227, 0.1);
         }
         
-        .quick-sale-item {
-            border-left: 4px solid #5cb85c;
-            padding-left: 10px;
-            margin-bottom: 5px;
-            background-color: #f0fff0;
-        }
-        
-        .price-highlight {
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 3px;
-            padding: 2px 5px;
-            font-weight: bold;
-        }
-        
-        .user-cart-indicator {
-            background-color: #f8f8f8;
-            border-left: 4px solid #27a9e3;
-            padding: 10px;
+        .quick-sale-form h3 {
+            margin-top: 0;
             margin-bottom: 15px;
-        }
-        .user-cart-indicator i {
-            margin-right: 5px;
             color: #27a9e3;
+            font-size: 18px;
+            border-bottom: 2px solid #27a9e3;
+            padding-bottom: 8px;
         }
         
-        .form-row {
-            display: flex;
-            gap: 10px;
-            align-items: end;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .form-group {
-            flex: 1;
-            min-width: 150px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
+        .quick-sale-form p {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
             border-radius: 4px;
         }
         
+        /* Ligne de formulaire responsive */
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 120px;
+            gap: 15px;
+            align-items: end;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+        
+        @media (max-width: 1024px) and (min-width: 769px) {
+            .form-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+        }
+        
+        /* Groupes de champs */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        
+        .form-group input, 
+        .form-group select {
+            padding: 10px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .form-group input:focus, 
+        .form-group select:focus {
+            outline: none;
+            border-color: #27a9e3;
+            box-shadow: 0 0 0 3px rgba(39, 169, 227, 0.1);
+        }
+        
+        .form-group select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        
+        /* Bouton d'ajout */
         .btn-quick-add {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            padding: 12px 20px;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
-            min-width: 120px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
         
+        .btn-quick-add:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-quick-add:active {
+            transform: translateY(0);
+        }
+        
+        /* Informations de stock */
+        .stock-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+            padding: 4px 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #28a745;
+        }
+        
+        /* Indicateur utilisateur */
+        .user-cart-indicator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+        }
+        
+        .user-cart-indicator i {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        /* Éléments du tableau */
+        .quick-sale-item {
+            border-left: 4px solid #5cb85c;
+            background-color: #f0fff0 !important;
+            transition: all 0.3s ease;
+        }
+        
+        .quick-sale-item:hover {
+            background-color: #e8f5e8 !important;
+        }
+        
+        .price-highlight {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-weight: 600;
+            color: #856404;
+        }
+        
+        /* Panel d'actions */
         .actions-panel {
-            background: #f1f1f1;
-            padding: 15px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            padding: 20px;
             border-radius: 8px;
             margin-top: 20px;
             text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .actions-panel h4 {
+            margin-bottom: 15px;
+            color: #495057;
         }
         
         .btn-action {
-            margin: 0 5px;
-            padding: 10px 20px;
+            margin: 0 8px 10px 8px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         
         .btn-finalize {
-            background: #5cb85c;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
+        }
+        
+        .btn-finalize:hover {
+            background: linear-gradient(135deg, #218838 0%, #1aa085 100%);
+            transform: translateY(-1px);
         }
         
         .btn-clear {
-            background: #d9534f;
+            background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
             color: white;
         }
         
-        .stock-info {
-            font-size: 11px;
-            color: #666;
+        .btn-clear:hover {
+            background: linear-gradient(135deg, #c82333 0%, #dc2f2f 100%);
+            transform: translateY(-1px);
+        }
+        
+        /* Responsive pour mobile */
+        @media (max-width: 576px) {
+            .quick-sale-form {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            .form-row {
+                gap: 10px;
+            }
+            
+            .btn-action {
+                display: block;
+                width: 100%;
+                margin: 5px 0;
+            }
+            
+            .user-cart-indicator {
+                padding: 12px;
+                margin: 10px;
+            }
+            
+            .user-cart-indicator span {
+                display: block;
+                margin-top: 8px;
+                font-size: 12px;
+            }
+        }
+        
+        /* Animation pour les alertes de stock */
+        .stock-warning {
+            animation: pulse-warning 2s infinite;
+        }
+        
+        @keyframes pulse-warning {
+            0% { background-color: #fff3cd; }
+            50% { background-color: #ffeaa7; }
+            100% { background-color: #fff3cd; }
         }
     </style>
 </head>
