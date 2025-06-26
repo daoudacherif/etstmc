@@ -409,10 +409,7 @@ $productsQuery = mysqli_query($con, "
             <div class="user-cart-indicator">
                 <i class="icon-user"></i> 
                 <strong>Ventes gérées par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
-                <span style="margin-left: 20px; color: #27a9e3;">
-                    <i class="icon-info-sign"></i> 
-                    Version simplifiée - Fonctionne avec votre base existante
-                </span>
+                
             </div>
 
             <!-- Formulaire de vente rapide -->
