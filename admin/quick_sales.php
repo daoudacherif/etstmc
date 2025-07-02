@@ -283,7 +283,7 @@ if ($productNamesQuery) {
             <!-- Indicateur utilisateur -->
             <div class="user-cart-indicator">
                 <i class="icon-user"></i> 
-                <strong>Ventes gérées par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
+                <strong>Ventes gérées par: <?php echo htmlspecialchars($currentAdminName ?? ''); ?></strong>
             </div>
 
             <!-- Section de recherche -->
@@ -293,10 +293,10 @@ if ($productNamesQuery) {
                     <input type="text" name="searchTerm" class="span4" 
                            placeholder="Nom du Article, modèle..." 
                            list="productsList"
-                           value="<?php echo isset($_GET['searchTerm']) ? htmlspecialchars($_GET['searchTerm']) : ''; ?>" />
+                           value="<?php echo isset($_GET['searchTerm']) ? htmlspecialchars($_GET['searchTerm'] ?? '') : ''; ?>" />
                     <datalist id="productsList">
                         <?php foreach ($productNames as $pname): ?>
-                            <option value="<?php echo htmlspecialchars($pname); ?>"></option>
+                            <option value="<?php echo htmlspecialchars($pname ?? ''); ?>"></option>
                         <?php endforeach; ?>
                     </datalist>
                     <button type="submit" class="btn btn-primary">
@@ -321,14 +321,12 @@ if ($productNamesQuery) {
                         p.ModelNumber,
                         p.Price,
                         p.Stock,
-                        p.BrandName,
                         c.CategoryName
                     FROM tblproducts p
                     LEFT JOIN tblcategory c ON c.ID = p.CatID
                     WHERE 
                         p.ProductName LIKE ?
                         OR p.ModelNumber LIKE ?
-                        OR p.BrandName LIKE ?
                 ";
 
                 $stmt = mysqli_prepare($con, $sql);
@@ -337,7 +335,7 @@ if ($productNamesQuery) {
                 }
                 
                 $searchParam = "%$searchTerm%";
-                mysqli_stmt_bind_param($stmt, "sss", $searchParam, $searchParam, $searchParam);
+                mysqli_stmt_bind_param($stmt, "ss", $searchParam, $searchParam);
                 mysqli_stmt_execute($stmt);
                 $res = mysqli_stmt_get_result($stmt);
                 
@@ -347,7 +345,7 @@ if ($productNamesQuery) {
             <div class="widget-box">
                 <div class="widget-title">
                     <span class="icon"><i class="icon-search"></i></span>
-                    <h5>Résultats de recherche pour "<?php echo htmlspecialchars($_GET['searchTerm']); ?>"</h5>
+                    <h5>Résultats de recherche pour "<?php echo htmlspecialchars($_GET['searchTerm'] ?? ''); ?>"</h5>
                 </div>
                 <div class="widget-content nopadding">
                     <?php if ($count > 0): ?>
@@ -357,7 +355,6 @@ if ($productNamesQuery) {
                                     <th>#</th>
                                     <th>Nom du Article</th>
                                     <th>Catégorie</th>
-                                    <th>Marque</th>
                                     <th>Modèle</th>
                                     <th>Prix par Défaut</th>
                                     <th>Stock</th>
@@ -384,10 +381,9 @@ if ($productNamesQuery) {
                                 ?>
                                 <tr <?php echo $rowClass; ?>>
                                     <td><?php echo $i++; ?></td>
-                                    <td><strong><?php echo htmlspecialchars($row['ProductName']); ?></strong></td>
-                                    <td><?php echo htmlspecialchars($row['CategoryName']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
-                                    <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
+                                    <td><strong><?php echo htmlspecialchars($row['ProductName'] ?? ''); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($row['CategoryName'] ?? ''); ?></td>
+                                    <td><?php echo htmlspecialchars($row['ModelNumber'] ?? ''); ?></td>
                                     <td><?php echo number_format($row['Price'], 2); ?> GNF</td>
                                     <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
                                     <td>
@@ -479,7 +475,7 @@ if ($productNamesQuery) {
                                     <tr class="quick-sale-item">
                                         <td><?php echo $cnt++; ?></td>
                                         <td>
-                                            <strong><?php echo htmlspecialchars($sale['ProductName']); ?></strong>
+                                            <strong><?php echo htmlspecialchars($sale['ProductName'] ?? ''); ?></strong>
                                         </td>
                                         <td>
                                             <span class="<?php echo $priceClass; ?>">
