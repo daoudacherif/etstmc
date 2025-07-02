@@ -42,6 +42,14 @@ if (isset($_POST['addQuickSale'])) {
     $currentStock = intval($row['Stock']);
     $productName = $row['ProductName'];
     
+    if ($currentStock <= 0) {
+        echo "<script>
+                alert('Article \"" . addslashes($productName) . "\" en rupture de stock.');
+                window.location.href='quick_sales.php';
+              </script>";
+        exit;
+    }
+    
     if ($currentStock < $quantity) {
         echo "<script>
                 alert('Stock insuffisant pour \"" . addslashes($productName) . "\". Stock disponible: " . $currentStock . "');
@@ -113,19 +121,14 @@ if (isset($_POST['clearQuickSales'])) {
     exit;
 }
 
-// Récupérer tous les produits pour la liste déroulante
-$productsQuery = mysqli_query($con, "
-    SELECT 
-        p.ID, 
-        p.ProductName, 
-        p.Price, 
-        p.Stock, 
-        p.BrandName,
-        p.ModelNumber
-    FROM tblproducts p
-    WHERE p.Stock > 0
-    ORDER BY p.ProductName ASC
-");
+// Récupérer les noms de produits pour le datalist
+$productNamesQuery = mysqli_query($con, "SELECT DISTINCT ProductName FROM tblproducts ORDER BY ProductName ASC");
+$productNames = array();
+if ($productNamesQuery) {
+    while ($row = mysqli_fetch_assoc($productNamesQuery)) {
+        $productNames[] = $row['ProductName'];
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -135,7 +138,7 @@ $productsQuery = mysqli_query($con, "
     <?php include_once('includes/cs.php'); ?>
     <?php include_once('includes/responsive.php'); ?>
     <style>
-        /* Formulaire de vente rapide - Design amélioré */
+        /* Styles existants */
         .quick-sale-form {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             border: 2px solid #27a9e3;
@@ -145,127 +148,6 @@ $productsQuery = mysqli_query($con, "
             box-shadow: 0 4px 12px rgba(39, 169, 227, 0.1);
         }
         
-        .quick-sale-form h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            color: #27a9e3;
-            font-size: 18px;
-            border-bottom: 2px solid #27a9e3;
-            padding-bottom: 8px;
-        }
-        
-        .quick-sale-form p {
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            border-radius: 4px;
-        }
-        
-        /* Ligne de formulaire responsive */
-        .form-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr 120px;
-            gap: 15px;
-            align-items: end;
-            margin-bottom: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .form-row {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-        }
-        
-        @media (max-width: 1024px) and (min-width: 769px) {
-            .form-row {
-                grid-template-columns: 1fr 1fr;
-                gap: 15px;
-            }
-        }
-        
-        /* Groupes de champs */
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .form-group label {
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 6px;
-            font-size: 14px;
-        }
-        
-        .form-group input, 
-        .form-group select {
-            padding: 10px 12px;
-            border: 2px solid #e1e5e9;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            background: white;
-        }
-        
-        .form-group input:focus, 
-        .form-group select:focus {
-            outline: none;
-            border-color: #27a9e3;
-            box-shadow: 0 0 0 3px rgba(39, 169, 227, 0.1);
-        }
-        
-        .form-group select {
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            background-size: 16px;
-            padding-right: 40px;
-        }
-        
-        /* Bouton d'ajout */
-        .btn-quick-add {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-        
-        .btn-quick-add:hover {
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-quick-add:active {
-            transform: translateY(0);
-        }
-        
-        /* Informations de stock */
-        .stock-info {
-            font-size: 12px;
-            color: #666;
-            margin-top: 4px;
-            padding: 4px 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            border-left: 3px solid #28a745;
-        }
-        
-        /* Indicateur utilisateur */
         .user-cart-indicator {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -280,7 +162,55 @@ $productsQuery = mysqli_query($con, "
             font-size: 16px;
         }
         
-        /* Éléments du tableau */
+        /* Nouveaux styles pour la recherche */
+        .search-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .search-section h4 {
+            color: #27a9e3;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        /* Styles pour les indicateurs de stock */
+        .stock-warning {
+            color: #d9534f;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        tr.stock-error {
+            background-color: #f2dede !important;
+        }
+        
+        .stock-status {
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .stock-ok {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        
+        .stock-warning {
+            background-color: #fcf8e3;
+            color: #8a6d3b;
+        }
+        
+        .stock-danger {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        
+        /* Liste des ventes rapides existantes */
         .quick-sale-item {
             border-left: 4px solid #5cb85c;
             background-color: #f0fff0 !important;
@@ -311,11 +241,6 @@ $productsQuery = mysqli_query($con, "
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         
-        .actions-panel h4 {
-            margin-bottom: 15px;
-            color: #495057;
-        }
-        
         .btn-action {
             margin: 0 8px 10px 8px;
             padding: 12px 24px;
@@ -333,59 +258,9 @@ $productsQuery = mysqli_query($con, "
             color: white;
         }
         
-        .btn-finalize:hover {
-            background: linear-gradient(135deg, #218838 0%, #1aa085 100%);
-            transform: translateY(-1px);
-        }
-        
         .btn-clear {
             background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
             color: white;
-        }
-        
-        .btn-clear:hover {
-            background: linear-gradient(135deg, #c82333 0%, #dc2f2f 100%);
-            transform: translateY(-1px);
-        }
-        
-        /* Responsive pour mobile */
-        @media (max-width: 576px) {
-            .quick-sale-form {
-                padding: 15px;
-                margin: 10px;
-            }
-            
-            .form-row {
-                gap: 10px;
-            }
-            
-            .btn-action {
-                display: block;
-                width: 100%;
-                margin: 5px 0;
-            }
-            
-            .user-cart-indicator {
-                padding: 12px;
-                margin: 10px;
-            }
-            
-            .user-cart-indicator span {
-                display: block;
-                margin-top: 8px;
-                font-size: 12px;
-            }
-        }
-        
-        /* Animation pour les alertes de stock */
-        .stock-warning {
-            animation: pulse-warning 2s infinite;
-        }
-        
-        @keyframes pulse-warning {
-            0% { background-color: #fff3cd; }
-            50% { background-color: #ffeaa7; }
-            100% { background-color: #fff3cd; }
         }
     </style>
 </head>
@@ -401,7 +276,7 @@ $productsQuery = mysqli_query($con, "
                 </a>
                 <a href="quick_sales.php" class="current">Ventes Rapides</a>
             </div>
-            <h1>🚀 Ventes Rapides - Version Simplifiée</h1>
+            <h1>🚀 Ventes Rapides</h1>
         </div>
 
         <div class="container-fluid">
@@ -409,68 +284,157 @@ $productsQuery = mysqli_query($con, "
             <div class="user-cart-indicator">
                 <i class="icon-user"></i> 
                 <strong>Ventes gérées par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
-                
             </div>
 
-            <!-- Formulaire de vente rapide -->
-            <div class="quick-sale-form">
-                <h3><i class="icon-plus-sign"></i> Ajouter une vente rapide</h3>
-                <p style="color: #666; margin-bottom: 15px;">
-                    <i class="icon-lightbulb"></i> 
-                    <strong>Astuce :</strong> Chaque ajout crée une nouvelle ligne, même pour le même produit.
-                </p>
-                
-                <form method="post" action="quick_sales.php">
-                    <div class="form-row">
-                        <div class="form-group" style="flex: 2;">
-                            <label for="productSelect">Produit :</label>
-                            <select name="productid" id="productSelect" required onchange="updateProductInfo()">
-                                <option value="">-- Sélectionner un produit --</option>
-                                <?php
-                                while ($product = mysqli_fetch_assoc($productsQuery)) {
-                                    $displayName = $product['ProductName'];
-                                    if (!empty($product['BrandName'])) {
-                                        $displayName .= " - " . $product['BrandName'];
-                                    }
-                                    if (!empty($product['ModelNumber'])) {
-                                        $displayName .= " (" . $product['ModelNumber'] . ")";
-                                    }
-                                    
-                                    echo "<option value='{$product['ID']}' 
-                                            data-price='{$product['Price']}' 
-                                            data-stock='{$product['Stock']}'>
-                                            {$displayName} - Stock: {$product['Stock']}
-                                          </option>";
-                                }
-                                ?>
-                            </select>
-                            <div id="stockInfo" class="stock-info"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="priceInput">Prix de vente :</label>
-                            <input type="number" name="price" id="priceInput" step="0.01" min="0" required />
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="quantityInput">Quantité :</label>
-                            <input type="number" name="quantity" id="quantityInput" value="1" min="1" required />
-                        </div>
-                        
-                        <div class="form-group">
-                            <button type="submit" name="addQuickSale" class="btn-quick-add">
-                                <i class="icon-plus"></i> Ajouter
-                            </button>
-                        </div>
-                    </div>
+            <!-- Section de recherche -->
+            <div class="search-section">
+                <h4><i class="icon-search"></i> Rechercher des Articles</h4>
+                <form method="get" action="quick_sales.php" class="form-inline">
+                    <input type="text" name="searchTerm" class="span4" 
+                           placeholder="Nom du Article, modèle..." 
+                           list="productsList"
+                           value="<?php echo isset($_GET['searchTerm']) ? htmlspecialchars($_GET['searchTerm']) : ''; ?>" />
+                    <datalist id="productsList">
+                        <?php foreach ($productNames as $pname): ?>
+                            <option value="<?php echo htmlspecialchars($pname); ?>"></option>
+                        <?php endforeach; ?>
+                    </datalist>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="icon-search"></i> Rechercher
+                    </button>
+                    <?php if (!empty($_GET['searchTerm'])): ?>
+                        <a href="quick_sales.php" class="btn">
+                            <i class="icon-remove"></i> Effacer
+                        </a>
+                    <?php endif; ?>
                 </form>
             </div>
 
-            <!-- Liste des ventes rapides -->
+            <?php
+            // Affichage des résultats de recherche
+            if (!empty($_GET['searchTerm'])) {
+                $searchTerm = mysqli_real_escape_string($con, $_GET['searchTerm']);
+                $sql = "
+                    SELECT 
+                        p.ID,
+                        p.ProductName,
+                        p.ModelNumber,
+                        p.Price,
+                        p.Stock,
+                        p.BrandName,
+                        c.CategoryName
+                    FROM tblproducts p
+                    LEFT JOIN tblcategory c ON c.ID = p.CatID
+                    WHERE 
+                        p.ProductName LIKE ?
+                        OR p.ModelNumber LIKE ?
+                        OR p.BrandName LIKE ?
+                ";
+
+                $stmt = mysqli_prepare($con, $sql);
+                if (!$stmt) {
+                    die("MySQL prepare error: " . mysqli_error($con));
+                }
+                
+                $searchParam = "%$searchTerm%";
+                mysqli_stmt_bind_param($stmt, "sss", $searchParam, $searchParam, $searchParam);
+                mysqli_stmt_execute($stmt);
+                $res = mysqli_stmt_get_result($stmt);
+                
+                $count = mysqli_num_rows($res);
+            ?>
+
             <div class="widget-box">
                 <div class="widget-title">
+                    <span class="icon"><i class="icon-search"></i></span>
+                    <h5>Résultats de recherche pour "<?php echo htmlspecialchars($_GET['searchTerm']); ?>"</h5>
+                </div>
+                <div class="widget-content nopadding">
+                    <?php if ($count > 0): ?>
+                        <table class="table table-bordered table-striped">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Nom du Article</th>
+                                    <th>Catégorie</th>
+                                    <th>Marque</th>
+                                    <th>Modèle</th>
+                                    <th>Prix par Défaut</th>
+                                    <th>Stock</th>
+                                    <th>Prix Personnalisé</th>
+                                    <th>Quantité</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php
+                            $i = 1;
+                            while ($row = mysqli_fetch_assoc($res)) {
+                                $disableAdd = ($row['Stock'] <= 0);
+                                $rowClass = $disableAdd ? 'class="stock-error"' : '';
+                                $stockStatus = '';
+                                
+                                if ($row['Stock'] <= 0) {
+                                    $stockStatus = '<span class="stock-status stock-danger">Rupture</span>';
+                                } elseif ($row['Stock'] < 5) {
+                                    $stockStatus = '<span class="stock-status stock-warning">Faible</span>';
+                                } else {
+                                    $stockStatus = '<span class="stock-status stock-ok">Disponible</span>';
+                                }
+                                ?>
+                                <tr <?php echo $rowClass; ?>>
+                                    <td><?php echo $i++; ?></td>
+                                    <td><strong><?php echo htmlspecialchars($row['ProductName']); ?></strong></td>
+                                    <td><?php echo htmlspecialchars($row['CategoryName']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['BrandName']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['ModelNumber']); ?></td>
+                                    <td><?php echo number_format($row['Price'], 2); ?> GNF</td>
+                                    <td><?php echo $row['Stock'] . ' ' . $stockStatus; ?></td>
+                                    <td>
+                                        <form method="post" action="quick_sales.php" style="margin:0; display: inline-flex; align-items: center;">
+                                            <input type="hidden" name="productid" value="<?php echo $row['ID']; ?>" />
+                                            <input type="number" name="price" step="any" 
+                                                   value="<?php echo $row['Price']; ?>" 
+                                                   style="width:100px;" 
+                                                   <?php echo $disableAdd ? 'disabled' : ''; ?> />
+                                    </td>
+                                    <td>
+                                        <input type="number" name="quantity" value="1" min="1" 
+                                               max="<?php echo $row['Stock']; ?>" 
+                                               style="width:60px;" 
+                                               <?php echo $disableAdd ? 'disabled' : ''; ?> />
+                                    </td>
+                                    <td>
+                                        <button type="submit" name="addQuickSale" 
+                                                class="btn btn-success btn-small" 
+                                                <?php echo $disableAdd ? 'disabled' : ''; ?>>
+                                            <i class="icon-plus"></i> Ajouter
+                                        </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php
+                            }
+                            ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <div style="padding: 20px; text-align: center; color: #999;">
+                            <i class="icon-info-sign"></i> Aucun article correspondant trouvé.
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php 
+            } // Fin de l'affichage des résultats de recherche
+            ?>
+
+            <!-- Liste des ventes rapides en cours -->
+            <div class="widget-box" style="margin-top: 20px;">
+                <div class="widget-title">
                     <span class="icon"><i class="icon-shopping-cart"></i></span>
-                    <h5>Ventes Rapides Accumulées</h5>
+                    <h5>Ventes Rapides en Cours</h5>
                 </div>
                 <div class="widget-content nopadding">
                     <table class="table table-bordered">
@@ -486,7 +450,6 @@ $productsQuery = mysqli_query($con, "
                         </thead>
                         <tbody>
                             <?php
-                            // REQUÊTE SIMPLIFIÉE sans les colonnes qui n'existent pas
                             $salesQuery = mysqli_query($con, "
                                 SELECT 
                                     c.ID,
@@ -594,35 +557,5 @@ $productsQuery = mysqli_query($con, "
     <script src="js/jquery.min.js"></script>
     <script src="js/bootstrap.min.js"></script>
     <script src="js/matrix.js"></script>
-    
-    <script>
-        function updateProductInfo() {
-            const select = document.getElementById('productSelect');
-            const priceInput = document.getElementById('priceInput');
-            const quantityInput = document.getElementById('quantityInput');
-            const stockInfo = document.getElementById('stockInfo');
-            
-            if (select.value) {
-                const option = select.options[select.selectedIndex];
-                const price = option.getAttribute('data-price');
-                const stock = option.getAttribute('data-stock');
-                
-                priceInput.value = price;
-                quantityInput.max = stock;
-                
-                stockInfo.innerHTML = `
-                    <i class="icon-info-sign"></i> 
-                    Stock: <strong>${stock}</strong> | 
-                    Prix de base: <strong>${parseFloat(price).toFixed(2)} GNF</strong>
-                `;
-                
-                quantityInput.value = 1;
-            } else {
-                priceInput.value = '';
-                quantityInput.max = '';
-                stockInfo.innerHTML = '';
-            }
-        }
-    </script>
 </body>
 </html>
