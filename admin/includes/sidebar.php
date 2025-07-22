@@ -88,6 +88,7 @@ try {
       <ul>
         <li><a href="search.php">Rechercher</a></li>
         <li><a href="invoice-search.php">Factures</a></li>
+        <li><a href="manage_proforma.php">Factures</a></li>
       </ul>
     </li>
 

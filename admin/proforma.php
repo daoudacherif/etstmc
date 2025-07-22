@@ -21,6 +21,36 @@ $adminQuery = mysqli_query($con, "SELECT AdminName FROM tbladmin WHERE ID = '$cu
 $adminData = mysqli_fetch_assoc($adminQuery);
 $currentAdminName = $adminData['AdminName'];
 
+// CLEANUP FUNCTION - Remove any orphaned items on page load
+$cleanupQuery = mysqli_query($con, "DELETE FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID' AND (BillingId IS NOT NULL AND BillingId != '' AND BillingId != '0')");
+
+// DEBUG CLEANUP - Force cleanup if requested
+if (isset($_GET['force_cleanup']) && $_GET['force_cleanup'] == '1') {
+    mysqli_query($con, "DELETE FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+    unset($_SESSION['proforma_discount']);
+    unset($_SESSION['proforma_discountType']);
+    unset($_SESSION['proforma_discountValue']);
+    echo "<script>alert('Panier proforma forcé à vide'); window.location.href='proforma.php';</script>";
+    exit;
+}
+
+// CLEAR CART FUNCTION
+if (isset($_POST['clearProformaCart'])) {
+    $deleteQuery = mysqli_query($con, "DELETE FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+    if ($deleteQuery) {
+        // Nettoyer aussi les variables de session
+        unset($_SESSION['proforma_discount']);
+        unset($_SESSION['proforma_discountType']);
+        unset($_SESSION['proforma_discountValue']);
+        
+        echo "<script>
+                alert('Panier proforma vidé avec succès');
+                window.location.href='proforma.php';
+              </script>";
+        exit;
+    }
+}
+
 // Appliquer une remise (pour proforma)
 if (isset($_POST['applyDiscount'])) {
     $discountValue = max(0, floatval($_POST['discount']));
@@ -130,7 +160,7 @@ if (isset($_POST['addtocart'])) {
     exit;
 }
 
-// GÉNÉRATION DE LA FACTURE PROFORMA
+// GÉNÉRATION DE LA FACTURE PROFORMA - VERSION CORRIGÉE
 if (isset($_POST['generateProforma'])) {
     // Vérifier qu'il y a des articles dans le panier proforma
     $checkCartQuery = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
@@ -157,7 +187,7 @@ if (isset($_POST['generateProforma'])) {
     }
     $netTotal = max(0, $grand - $discount);
 
-    // Générer un numéro de facture proforma unique - s'assurer qu'il soit vraiment unique
+    // Générer un numéro de facture proforma unique
     do {
         $proformaNumber = 'PF-' . date('Y') . '-' . mt_rand(1000, 9999);
         $checkExist = mysqli_query($con, "SELECT ID FROM tblproforma WHERE ProformaNumber = '$proformaNumber'");
@@ -166,7 +196,7 @@ if (isset($_POST['generateProforma'])) {
     // Date de validité
     $validUntil = date('Y-m-d', strtotime("+$validitydays days"));
 
-    // Commencer une transaction pour assurer la cohérence
+    // Désactiver l'autocommit pour transaction
     mysqli_autocommit($con, false);
 
     try {
@@ -184,18 +214,30 @@ if (isset($_POST['generateProforma'])) {
         
         $proformaId = mysqli_insert_id($con);
         
-        // Mettre à jour le panier avec le numéro proforma
+        // ÉTAPE CRITIQUE: Mettre à jour le panier avec le numéro proforma et changer le statut
         $updateCartQuery = "UPDATE tblcart SET BillingId='$proformaNumber', IsCheckOut=3 WHERE IsCheckOut=2 AND AdminID='$currentAdminID'";
         if (!mysqli_query($con, $updateCartQuery)) {
             throw new Exception("Erreur lors de la mise à jour du panier: " . mysqli_error($con));
         }
         
         // Vérifier que la mise à jour a bien fonctionné
-        $verifyUpdate = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$proformaNumber' AND IsCheckOut=3");
+        $verifyUpdate = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$proformaNumber' AND IsCheckOut=3 AND AdminID='$currentAdminID'");
         $updatedCount = mysqli_fetch_assoc($verifyUpdate)['count'];
         
         if ($updatedCount == 0) {
             throw new Exception("Aucun article n'a été associé à la proforma");
+        }
+        
+        // DOUBLE VÉRIFICATION: S'assurer qu'il n'y a plus d'articles avec IsCheckOut=2
+        $remainingItemsQuery = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+        $remainingCount = mysqli_fetch_assoc($remainingItemsQuery)['count'];
+        
+        if ($remainingCount > 0) {
+            // FORCE CLEANUP: Supprimer tous les articles restants avec IsCheckOut=2 pour cet admin
+            $forceCleanup = mysqli_query($con, "DELETE FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+            if (!$forceCleanup) {
+                throw new Exception("Erreur lors du nettoyage du panier");
+            }
         }
         
         // Valider la transaction
@@ -204,13 +246,13 @@ if (isset($_POST['generateProforma'])) {
         $_SESSION['proforma_id'] = $proformaId;
         $_SESSION['proforma_number'] = $proformaNumber;
         
-        // Nettoyer les variables de remise
+        // Nettoyer TOUTES les variables de session liées à la proforma
         unset($_SESSION['proforma_discount']);
         unset($_SESSION['proforma_discountType']);
         unset($_SESSION['proforma_discountValue']);
 
         echo "<script>
-                alert('Facture proforma créée avec succès : $proformaNumber\\nNombre d\\'articles: $updatedCount');
+                alert('✅ Facture proforma créée avec succès !\\n\\nNuméro: $proformaNumber\\nArticles: $updatedCount\\nMontant: " . number_format($netTotal, 2) . " GNF\\n\\n✅ Panier proforma vidé pour nouveau devis.');
                 window.location.href='proforma_invoice.php?number=$proformaNumber&refresh=1';
               </script>";
         exit;
@@ -218,7 +260,7 @@ if (isset($_POST['generateProforma'])) {
     } catch (Exception $e) {
         // Annuler la transaction en cas d'erreur
         mysqli_rollback($con);
-        echo "<script>alert('Erreur: " . addslashes($e->getMessage()) . "');</script>";
+        echo "<script>alert('❌ Erreur: " . addslashes($e->getMessage()) . "');</script>";
     }
     
     // Remettre l'autocommit à true
@@ -232,6 +274,77 @@ if ($productNamesQuery) {
     while ($row = mysqli_fetch_assoc($productNamesQuery)) {
         $productNames[] = $row['ProductName'];
     }
+}
+
+// DEBUG SECTION - temporaire pour diagnostiquer les problèmes
+if (isset($_GET['debug']) && $_GET['debug'] == '1') {
+    echo "<div class='alert alert-info'><h4>🔍 DEBUG INFO:</h4>";
+    
+    // Vérifier tous les éléments du panier pour l'admin actuel
+    $debugQuery = mysqli_query($con, "
+        SELECT 
+            ID, ProductId, ProductQty, Price, IsCheckOut, BillingId, AdminID,
+            (SELECT ProductName FROM tblproducts WHERE ID = tblcart.ProductId) as ProductName
+        FROM tblcart 
+        WHERE AdminID = '$currentAdminID' 
+        ORDER BY IsCheckOut, ID
+    ");
+    
+    echo "<strong>Articles dans tblcart pour AdminID $currentAdminID:</strong><br>";
+    echo "<table class='table table-bordered table-condensed'>";
+    echo "<tr><th>ID</th><th>Product</th><th>Qty</th><th>Price</th><th>IsCheckOut</th><th>BillingId</th><th>Status</th></tr>";
+    
+    $hasData = false;
+    while ($debugRow = mysqli_fetch_assoc($debugQuery)) {
+        $hasData = true;
+        $rowClass = '';
+        $status = '';
+        if ($debugRow['IsCheckOut'] == 2) {
+            $rowClass = 'style="background-color: #ffffcc;"'; // Yellow for proforma cart
+            $status = 'Panier Proforma';
+        }
+        if ($debugRow['IsCheckOut'] == 3) {
+            $rowClass = 'style="background-color: #ccffcc;"'; // Green for completed proforma
+            $status = 'Proforma Générée';
+        }
+        if ($debugRow['IsCheckOut'] == 1) {
+            $rowClass = 'style="background-color: #ffcccc;"'; // Red for sales
+            $status = 'Vente';
+        }
+        if ($debugRow['IsCheckOut'] == 0) {
+            $rowClass = 'style="background-color: #ccccff;"'; // Blue for normal cart
+            $status = 'Panier Normal';
+        }
+        
+        echo "<tr $rowClass>";
+        echo "<td>{$debugRow['ID']}</td>";
+        echo "<td>{$debugRow['ProductName']}</td>";
+        echo "<td>{$debugRow['ProductQty']}</td>";
+        echo "<td>{$debugRow['Price']}</td>";
+        echo "<td>{$debugRow['IsCheckOut']}</td>";
+        echo "<td>{$debugRow['BillingId']}</td>";
+        echo "<td>$status</td>";
+        echo "</tr>";
+    }
+    
+    if (!$hasData) {
+        echo "<tr><td colspan='7'>Aucun article trouvé dans tblcart pour cet admin</td></tr>";
+    }
+    
+    echo "</table>";
+    
+    // Afficher les variables de session
+    echo "<h5>Variables de Session:</h5>";
+    echo "<pre>";
+    echo "Admin ID: " . $currentAdminID . "\n";
+    echo "Admin Name: " . $currentAdminName . "\n";
+    echo "Proforma Discount: " . ($_SESSION['proforma_discount'] ?? 'Not set') . "\n";
+    echo "Discount Type: " . ($_SESSION['proforma_discountType'] ?? 'Not set') . "\n";
+    echo "Discount Value: " . ($_SESSION['proforma_discountValue'] ?? 'Not set') . "\n";
+    echo "</pre>";
+    
+    echo "<p><a href='proforma.php?force_cleanup=1' class='btn btn-danger btn-small'>🧹 Force Clean Cart</a></p>";
+    echo "</div>";
 }
 ?>
 <!DOCTYPE html>
@@ -269,6 +382,20 @@ if ($productNamesQuery) {
             color: #f89406;
             font-weight: bold;
         }
+        .cart-actions {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: right;
+        }
+        .debug-panel {
+            background-color: #fff9c4;
+            border: 1px solid #f1c40f;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -289,9 +416,25 @@ if ($productNamesQuery) {
 
         <div class="container-fluid">
             <hr>
+            
+            <!-- Debug Panel (if debug mode is on) -->
+            <?php if (isset($_GET['debug'])): ?>
+            <div class="debug-panel">
+                <strong>🔧 Mode Debug Activé</strong> - 
+                <a href="proforma.php" class="btn btn-small">Désactiver Debug</a>
+                <a href="verify_proforma_database.php" class="btn btn-info btn-small">Vérifier DB</a>
+                <a href="proforma.php?force_cleanup=1" class="btn btn-danger btn-small">Force Clean</a>
+            </div>
+            <?php endif; ?>
+            
             <!-- Indicateur de panier proforma -->
             <div class="user-cart-indicator">
                 <i class="icon-user"></i> <strong>Proforma gérée par: <?php echo htmlspecialchars($currentAdminName); ?></strong>
+                <?php if (!isset($_GET['debug'])): ?>
+                <span class="pull-right">
+                    <a href="proforma.php?debug=1" class="btn btn-mini">🔍 Debug</a>
+                </span>
+                <?php endif; ?>
             </div>
             
             <!-- Information sur les factures proforma -->
@@ -404,25 +547,43 @@ if ($productNamesQuery) {
             <!-- ========== PANIER PROFORMA + REMISE ========== -->
             <div class="row-fluid">
                 <div class="span12">
-                    <!-- FORMULAIRE DE REMISE -->
-                    <form method="post" class="form-inline" style="text-align:right;">
-                        <label>Remise :</label>
-                        <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
+                    
+                    <!-- Actions du panier -->
+                    <div class="cart-actions">
+                        <!-- FORMULAIRE DE REMISE -->
+                        <form method="post" class="form-inline" style="display:inline;">
+                            <label>Remise :</label>
+                            <input type="number" name="discount" step="any" value="<?php echo $discountValue; ?>" style="width:80px;" />
+                            
+                            <select name="discountType" style="width:120px; margin-left:5px;">
+                                <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
+                                <option value="percentage" <?php echo ($discountType == 'percentage') ? 'selected' : ''; ?>>Pourcentage (%)</option>
+                            </select>
+                            
+                            <button class="btn btn-info" type="submit" name="applyDiscount" style="margin-left:5px;">Appliquer</button>
+                        </form>
                         
-                        <select name="discountType" style="width:120px; margin-left:5px;">
-                            <option value="absolute" <?php echo ($discountType == 'absolute') ? 'selected' : ''; ?>>Valeur absolue</option>
-                            <option value="percentage" <?php echo ($discountType == 'percentage') ? 'selected' : ''; ?>>Pourcentage (%)</option>
-                        </select>
+                        <!-- BOUTON VIDER PANIER -->
+                        <?php 
+                        $cartCheckQuery = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+                        $cartItemCount = mysqli_fetch_assoc($cartCheckQuery)['count'];
                         
-                        <button class="btn btn-info" type="submit" name="applyDiscount" style="margin-left:5px;">Appliquer</button>
-                    </form>
-                    <hr>
+                        if ($cartItemCount > 0): 
+                        ?>
+                            <form method="post" style="display: inline; margin-left: 10px;">
+                                <button type="submit" name="clearProformaCart" class="btn btn-warning btn-small" 
+                                        onclick="return confirm('Êtes-vous sûr de vouloir vider le panier proforma? Cette action ne peut pas être annulée.');">
+                                    <i class="icon-trash"></i> Vider le Panier
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
 
                     <!-- Tableau du panier proforma -->
                     <div class="widget-box">
                         <div class="widget-title">
                             <span class="icon"><i class="icon-list-alt"></i></span>
-                            <h5>Articles dans le devis proforma</h5>
+                            <h5>Articles dans le devis proforma (<?php echo $cartItemCount; ?> articles)</h5>
                         </div>
                         <div class="widget-content nopadding">
                             <table class="table table-bordered" style="font-size: 15px">
@@ -518,7 +679,10 @@ if ($productNamesQuery) {
                                     } else {
                                         ?>
                                         <tr>
-                                            <td colspan="7" style="color:red; text-align:center">Aucun article dans le devis proforma</td>
+                                            <td colspan="7" style="color:red; text-align:center">
+                                                <i class="icon-info-sign"></i> Aucun article dans le devis proforma
+                                                <br><small>Utilisez la recherche ci-dessus pour ajouter des articles</small>
+                                            </td>
                                         </tr>
                                         <?php
                                     }
