@@ -67,7 +67,6 @@ try {
       <a href="#"><i class="icon-shopping-cart"></i> <span>Ventes</span></a>
       <ul>
         <li><a href="cart.php">Comptant <span class="label label-important"></span></a></li>
-        <li><a href="proforma.php">Comptant <span class="label label-important"></span></a></li>
         <li><a href="quick_sales.php">vente rapide <span class="label label-important"></span></a></li>
         <li><a href="dettecart.php">Terme <span class="label label-important"></span></a></li>
         <li><a href="return.php">Retour</a></li>
@@ -88,7 +87,7 @@ try {
       <ul>
         <li><a href="search.php">Rechercher</a></li>
         <li><a href="invoice-search.php">Factures</a></li>
-        <li><a href="manage_proforma.php">Factures</a></li>
+        
       </ul>
     </li>
 
