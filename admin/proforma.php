@@ -132,6 +132,15 @@ if (isset($_POST['addtocart'])) {
 
 // GÉNÉRATION DE LA FACTURE PROFORMA
 if (isset($_POST['generateProforma'])) {
+    // Vérifier qu'il y a des articles dans le panier proforma
+    $checkCartQuery = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+    $cartCount = mysqli_fetch_assoc($checkCartQuery)['count'];
+    
+    if ($cartCount == 0) {
+        echo "<script>alert('Aucun article dans le panier proforma. Veuillez ajouter des articles avant de générer la proforma.'); window.location.href='proforma.php';</script>";
+        exit;
+    }
+
     // Récupération des infos client
     $custname     = mysqli_real_escape_string($con, trim($_POST['customername']));
     $custmobile   = preg_replace('/[^0-9+]/','', $_POST['mobilenumber']);
@@ -148,25 +157,49 @@ if (isset($_POST['generateProforma'])) {
     }
     $netTotal = max(0, $grand - $discount);
 
-    // Générer un numéro de facture proforma unique
-    $proformaNumber = 'PF-' . date('Y') . '-' . mt_rand(1000, 9999);
+    // Générer un numéro de facture proforma unique - s'assurer qu'il soit vraiment unique
+    do {
+        $proformaNumber = 'PF-' . date('Y') . '-' . mt_rand(1000, 9999);
+        $checkExist = mysqli_query($con, "SELECT ID FROM tblproforma WHERE ProformaNumber = '$proformaNumber'");
+    } while (mysqli_num_rows($checkExist) > 0);
 
     // Date de validité
     $validUntil = date('Y-m-d', strtotime("+$validitydays days"));
 
-    // Créer l'enregistrement proforma
-    $query = "INSERT INTO tblproforma 
-              (ProformaNumber, CustomerName, CustomerMobile, CustomerEmail, CustomerAddress, 
-               FinalAmount, ValidUntil, AdminID, CreatedAt)
-              VALUES 
-              ('$proformaNumber', '$custname', '$custmobile', '$custemail', '$custaddress', 
-               '$netTotal', '$validUntil', '$currentAdminID', NOW())";
-    
-    if (mysqli_query($con, $query)) {
+    // Commencer une transaction pour assurer la cohérence
+    mysqli_autocommit($con, false);
+
+    try {
+        // Créer l'enregistrement proforma
+        $query = "INSERT INTO tblproforma 
+                  (ProformaNumber, CustomerName, CustomerMobile, CustomerEmail, CustomerAddress, 
+                   FinalAmount, ValidUntil, AdminID, CreatedAt)
+                  VALUES 
+                  ('$proformaNumber', '$custname', '$custmobile', '$custemail', '$custaddress', 
+                   '$netTotal', '$validUntil', '$currentAdminID', NOW())";
+        
+        if (!mysqli_query($con, $query)) {
+            throw new Exception("Erreur lors de la création de la proforma: " . mysqli_error($con));
+        }
+        
         $proformaId = mysqli_insert_id($con);
         
         // Mettre à jour le panier avec le numéro proforma
-        mysqli_query($con, "UPDATE tblcart SET BillingId='$proformaNumber', IsCheckOut=3 WHERE IsCheckOut=2 AND AdminID='$currentAdminID'");
+        $updateCartQuery = "UPDATE tblcart SET BillingId='$proformaNumber', IsCheckOut=3 WHERE IsCheckOut=2 AND AdminID='$currentAdminID'";
+        if (!mysqli_query($con, $updateCartQuery)) {
+            throw new Exception("Erreur lors de la mise à jour du panier: " . mysqli_error($con));
+        }
+        
+        // Vérifier que la mise à jour a bien fonctionné
+        $verifyUpdate = mysqli_query($con, "SELECT COUNT(*) as count FROM tblcart WHERE BillingId='$proformaNumber' AND IsCheckOut=3");
+        $updatedCount = mysqli_fetch_assoc($verifyUpdate)['count'];
+        
+        if ($updatedCount == 0) {
+            throw new Exception("Aucun article n'a été associé à la proforma");
+        }
+        
+        // Valider la transaction
+        mysqli_commit($con);
         
         $_SESSION['proforma_id'] = $proformaId;
         $_SESSION['proforma_number'] = $proformaNumber;
@@ -177,13 +210,19 @@ if (isset($_POST['generateProforma'])) {
         unset($_SESSION['proforma_discountValue']);
 
         echo "<script>
-                alert('Facture proforma créée : $proformaNumber');
-                window.location.href='proforma_invoice.php?number=$proformaNumber';
+                alert('Facture proforma créée avec succès : $proformaNumber\\nNombre d\\'articles: $updatedCount');
+                window.location.href='proforma_invoice.php?number=$proformaNumber&refresh=1';
               </script>";
         exit;
-    } else {
-        echo "<script>alert('Erreur lors de la création de la proforma');</script>";
+        
+    } catch (Exception $e) {
+        // Annuler la transaction en cas d'erreur
+        mysqli_rollback($con);
+        echo "<script>alert('Erreur: " . addslashes($e->getMessage()) . "');</script>";
     }
+    
+    // Remettre l'autocommit à true
+    mysqli_autocommit($con, true);
 }
 
 // Récupérer les noms de produits pour le datalist

@@ -44,6 +44,15 @@ $itemsQuery = mysqli_query($con, "
     WHERE c.BillingId = '$proformaNumber' AND c.IsCheckOut = 3
 ");
 
+// Vérifier qu'il y a des articles
+if (!$itemsQuery || mysqli_num_rows($itemsQuery) == 0) {
+    echo "<script>
+            alert('Aucun article trouvé pour cette proforma. Il peut y avoir eu un problème lors de la génération.');
+            window.location.href='proforma.php';
+          </script>";
+    exit;
+}
+
 // Récupérer les informations de l'entreprise (admin)
 $adminQuery = mysqli_query($con, "SELECT AdminName FROM tbladmin WHERE ID = '$currentAdminID'");
 $adminData = mysqli_fetch_assoc($adminQuery);
@@ -583,6 +592,10 @@ $formattedValidUntil = date("d/m/Y", strtotime($proformaData['ValidUntil']));
             <a href="dashboard.php" class="btn btn-secondary">
               <i class="icon-home"></i> Tableau de bord
             </a>
+            <!-- Bouton de diagnostic (à supprimer en production) -->
+            <a href="?number=<?php echo $proformaNumber; ?>&debug=1" class="btn btn-warning btn-small">
+              <i class="icon-wrench"></i> Debug
+            </a>
           </div>
         </div>
       </div>
@@ -613,6 +626,21 @@ window.onload = function() {
         window.print();
     }, 1000);
 };
+<?php endif; ?>
+
+// Forcer le rafraîchissement si nécessaire
+<?php if (isset($_GET['refresh'])): ?>
+// Supprimer le paramètre refresh de l'URL pour éviter les rafraîchissements répétés
+if (window.location.search.indexOf('refresh=1') !== -1) {
+    var newUrl = window.location.href.replace(/[?&]refresh=1/, '');
+    window.history.replaceState({}, document.title, newUrl);
+}
+<?php endif; ?>
+
+// Diagnostic pour vérifier les articles (à supprimer en production)
+<?php if (isset($_GET['debug'])): ?>
+console.log('Proforma Number: <?php echo $proformaNumber; ?>');
+console.log('Items found: <?php echo mysqli_num_rows($itemsQuery); ?>');
 <?php endif; ?>
 </script>
 </body>
